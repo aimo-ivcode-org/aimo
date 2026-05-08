@@ -9,23 +9,22 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 | Module | Purpose |
 | --- | --- |
 | `aimo-core` | Core abstractions and runtime (`Aimo`, sessions, chat clients, model-facing prompt flow, tool/system-message annotations). |
-| `aimo-model-ollama` | Ollama-backed Spring AI model integration and prompt factory wiring. |
+| `aimo-model-ollama` | Ollama-backed Aimo model integration. |
 | `aimo-server` | REST API layer for sessions, chat streaming, and history. |
 | `aimo-plugin-ui` | UI-specific server plugin (title endpoints + title tool controller). |
 | `aimo-ui` | React + Vite frontend packaged into resources for server distribution. |
-| `examples/basic` | Runnable Spring Boot app that composes server + UI plugin + Ollama model module. |
+| `examples/simple-ollama` | Runnable Spring Boot app that composes server + UI plugin + Ollama model module. |
 
 ## Tech stack
 
 - Kotlin `2.2.21`
 - Spring Boot `4.0.3`
-- Spring AI `2.0.0-SNAPSHOT`
 - Java toolchain `21`
 - React `19` + Vite `7`
 
 ## Architecture at a glance
 
-1. `examples/basic` starts Spring Boot and pulls in the other modules as dependencies.
+1. `examples/simple-ollama` starts Spring Boot and pulls in the other modules as dependencies.
 2. `aimo-server` exposes API routes under `/aimo-api/*`.
 3. `aimo-core` manages sessions, history, tool callbacks, and model prompt orchestration.
 4. `aimo-model-ollama` provides the `ChatModel` implementation used by `aimo-core`.
@@ -35,7 +34,7 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 
 - JDK 21
 - Node.js + npm (for frontend builds/dev)
-- Ollama running locally (default API endpoint expected by Spring AI/Ollama)
+- Ollama running locally
 - The default model configured in `aimo-model-ollama`:
   - `gpt-oss:20b`
 
@@ -50,7 +49,7 @@ ollama pull gpt-oss:20b
 Run the composed demo app:
 
 ```powershell
-.\gradlew.bat :examples:basic:bootRun
+.\gradlew.bat :examples:simple-ollama:bootRun
 ```
 
 Default API base URL used by the frontend clients:
@@ -77,7 +76,7 @@ If you want faster UI iteration, run the backend and Vite separately.
 Terminal 1 (backend):
 
 ```powershell
-.\gradlew.bat :examples:basic:bootRun
+.\gradlew.bat :examples:simple-ollama:bootRun
 ```
 
 Terminal 2 (frontend):
@@ -117,10 +116,9 @@ aimo/
   aimo-server/
   aimo-plugin-ui/
   aimo-ui/
-  examples/basic/
+  examples/simple-ollama/
 ```
 
 ## Notes
 
-- This repository currently uses snapshot dependencies (Spring AI and custom Gradle plugins).
-- If dependency resolution fails, check that your network/repository access includes snapshot repositories configured in `settings.gradle.kts` and `build.gradle.kts`.
+- If dependency resolution fails, check your network/repository access for the repositories configured in `settings.gradle.kts` and `build.gradle.kts`.

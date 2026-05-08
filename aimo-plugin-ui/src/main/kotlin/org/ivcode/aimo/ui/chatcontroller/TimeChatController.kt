@@ -4,7 +4,6 @@ import org.ivcode.aimo.core.controller.ChatController
 import org.ivcode.aimo.core.controller.Tool
 import org.ivcode.aimo.server.util.getRequestMetadata
 import org.ivcode.aimo.ui.model.TimeResponse
-import org.springframework.ai.chat.model.ToolContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -21,7 +20,7 @@ class TimeChatController {
         name ="current_time",
         description = "Returns current server time and, when x-timezone-offset is provided, inferred user-local time"
     )
-    fun currentTime(context: ToolContext): TimeResponse {
+    fun currentTime(context: Map<String, Any>): TimeResponse {
         val now = Instant.now().truncatedTo(ChronoUnit.SECONDS)
 
         val userZoneId = context.getTimezoneOffset()?.let {
@@ -34,7 +33,7 @@ class TimeChatController {
         )
     }
 
-    fun ToolContext.getTimezoneOffset(): Int? {
+    fun Map<String, Any>.getTimezoneOffset(): Int? {
         return getRequestMetadata()?.let {
             return it.headers[HEADER_X_TIMEZONE_OFFSET]?.firstOrNull()?.toIntOrNull()
         }

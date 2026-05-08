@@ -14,7 +14,6 @@ dependencies {
 
     // Spring-Boot
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
-    implementation("org.springframework.ai:spring-ai-starter-model-ollama")
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 

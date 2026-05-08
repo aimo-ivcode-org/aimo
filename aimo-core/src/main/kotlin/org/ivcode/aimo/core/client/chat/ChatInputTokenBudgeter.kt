@@ -1,8 +1,7 @@
 package org.ivcode.aimo.core.client.chat
 
 import org.ivcode.aimo.core.AimoChatMessage
-import org.springframework.ai.chat.model.ChatResponse
-import org.springframework.ai.tool.ToolCallback
+import org.ivcode.aimo.core.model.AimoToolCallback
 import kotlin.math.ceil
 
 /**
@@ -45,43 +44,6 @@ internal class ChatInputTokenBudgeter(
     )
 
     /**
-     * Computes the prompt history subset, executes [block], and refines the estimator using
-     * actual prompt usage reported in the returned [ChatResponse].
-     *
-     * @param systemMessages System messages included on this model call.
-     * @param history Persisted prior conversation messages for this chat.
-     * @param prompt Current user prompt message.
-     * @param taskMessages Messages generated during the current request loop (assistant/tool).
-     * @param tools Tool callbacks available to this model call.
-     * @param block Invoked with the selected history subset to perform the model call.
-     * @return The [ChatResponse] returned by [block].
-     */
-    fun prompt(
-        systemMessages: List<AimoChatMessage>,
-        history: List<AimoChatMessage>,
-        prompt: AimoChatMessage,
-        taskMessages: List<AimoChatMessage>,
-        tools: List<ToolCallback>,
-        block: (messages: List<AimoChatMessage>, tools: List<ToolCallback>) -> ChatResponse,
-    ): ChatResponse {
-        val promptPlan = createPromptPlan(
-            systemMessages = systemMessages,
-            history = history,
-            prompt = prompt,
-            taskMessages = taskMessages,
-            tools = tools,
-        )
-
-        val response = block(systemMessages + promptPlan.history + prompt + taskMessages, tools)
-        recordPromptUsage(
-            promptCharacters = promptPlan.promptCharacters,
-            promptTokens = response.toObservedPromptTokens(),
-        )
-
-        return response
-    }
-
-    /**
      * Returns the subset of [history] that fits in the remaining token budget after reserving
      * tokens for [systemMessages], [prompt], [taskMessages], and [tools].
      *
@@ -100,7 +62,7 @@ internal class ChatInputTokenBudgeter(
         history: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
-        tools: List<ToolCallback>,
+        tools: List<AimoToolCallback>,
     ): List<AimoChatMessage> {
         return createPromptPlan(
             systemMessages = systemMessages,
@@ -120,7 +82,7 @@ internal class ChatInputTokenBudgeter(
      */
     fun recordPromptUsage(
         promptMessages: List<AimoChatMessage>,
-        tools: List<ToolCallback>,
+        tools: List<AimoToolCallback>,
         promptTokens: Int,
     ) {
         val promptCharacters = countMessageCharacters(promptMessages) + countToolCharacters(tools)
@@ -190,24 +152,24 @@ internal class ChatInputTokenBudgeter(
      * @param tools Tool callbacks included in prompt options.
      * @return Estimated aggregate token count for tool definitions.
      */
-    private fun estimateToolTokens(tools: List<ToolCallback>): Int {
+    private fun estimateToolTokens(tools: List<AimoToolCallback>): Int {
         return tools.sumOf { toolCallback ->
-            val toolDefinition = toolCallback.toolDefinition
+            val def = toolCallback.toolDefinition
 
             // Count explicit fields serialized for tool context.
-            estimateTokens(toolDefinition.name()) +
-                estimateTokens(toolDefinition.description()) +
-                estimateTokens(toolDefinition.inputSchema())
+            estimateTokens(def.name) +
+                estimateTokens(def.description ?: "") +
+                estimateTokens(def.inputSchema.toString())
         }
     }
 
-    private fun countToolCharacters(tools: List<ToolCallback>): Int {
+    private fun countToolCharacters(tools: List<AimoToolCallback>): Int {
         return tools.sumOf { toolCallback ->
-            val toolDefinition = toolCallback.toolDefinition
+            val def = toolCallback.toolDefinition
 
-            countCharacters(toolDefinition.name()) +
-                countCharacters(toolDefinition.description()) +
-                countCharacters(toolDefinition.inputSchema())
+            countCharacters(def.name) +
+                countCharacters(def.description ?: "") +
+                countCharacters(def.inputSchema.toString())
         }
     }
 
@@ -235,7 +197,7 @@ internal class ChatInputTokenBudgeter(
         history: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
-        tools: List<ToolCallback>,
+        tools: List<AimoToolCallback>,
     ): PromptPlan {
         val fixedMessages = systemMessages + listOf(prompt) + taskMessages
         val fixedInputTokens = estimateMessagesTokens(fixedMessages) + estimateToolTokens(tools)
@@ -260,47 +222,6 @@ internal class ChatInputTokenBudgeter(
         }
     }
 
-    private fun ChatResponse.toObservedPromptTokens(): Int {
-        val usage = metadata.usage
-
-        if (usage.promptTokens > 0) {
-            return usage.promptTokens
-        }
-
-        val inferredFromUsage = usage.totalTokens - usage.completionTokens
-        if (inferredFromUsage > 0) {
-            return inferredFromUsage
-        }
-
-        val resultMetadata = result?.metadata
-        val promptCount = resultMetadata?.get<Any>("prompt_eval_count")?.toPositiveInt()
-            ?: resultMetadata?.get<Any>("prompt_tokens")?.toPositiveInt()
-            ?: resultMetadata?.get<Any>("input_tokens")?.toPositiveInt()
-        if (promptCount != null) {
-            return promptCount
-        }
-
-        val nativeUsage = usage.nativeUsage
-        if (nativeUsage is Map<*, *>) {
-            val nativePrompt = nativeUsage["prompt_eval_count"]?.toPositiveInt()
-                ?: nativeUsage["prompt_tokens"]?.toPositiveInt()
-                ?: nativeUsage["input_tokens"]?.toPositiveInt()
-            if (nativePrompt != null) {
-                return nativePrompt
-            }
-        }
-
-        return 0
-    }
-
-    private fun Any?.toPositiveInt(): Int? {
-        return when (this) {
-            is Number -> toInt().takeIf { it > 0 }
-            is String -> toIntOrNull()?.takeIf { it > 0 }
-            else -> null
-        }
-    }
-
     private fun charactersPerToken(): Double {
         synchronized(this) {
             if (observedPromptTokens > 0) {
@@ -318,4 +239,3 @@ internal class ChatInputTokenBudgeter(
         const val MAX_CHARACTERS_PER_TOKEN = 12.0
     }
 }
-

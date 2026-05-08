@@ -11,7 +11,6 @@ dependencies {
     api("org.jetbrains.kotlin:kotlin-reflect")
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
-    implementation("org.springframework.ai:spring-ai-model")
     implementation("tools.jackson.module:jackson-module-kotlin")
 
     testImplementation(kotlin("test"))

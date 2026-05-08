@@ -1,16 +1,8 @@
 package org.ivcode.aimo.core
 
-import org.springframework.ai.chat.prompt.Prompt
-import org.springframework.ai.tool.ToolCallback
 import java.time.Instant
 import java.util.UUID
 
-interface PromptFactory {
-    fun create(
-        messages: List<AimoChatMessage>,
-        tools: List<ToolCallback>
-    ): Prompt
-}
 
 enum class AimoChatMessageType {
     SYSTEM,

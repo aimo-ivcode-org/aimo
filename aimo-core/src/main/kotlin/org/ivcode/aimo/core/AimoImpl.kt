@@ -4,13 +4,13 @@ import org.ivcode.aimo.core.client.session.AimoSessionClientImpl
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModel
-import org.springframework.ai.tool.ToolCallback
+import org.ivcode.aimo.core.model.AimoToolCallback
 import java.util.UUID
 
 internal class AimoImpl (
     private val model: AimoChatModel,
     private val chatClientDao: AimoChatClientDao,
-    private val tools: List<ToolCallback>,
+    private val tools: List<AimoToolCallback>,
     private val systemMessage: List<SystemMessageCallback>
 ): Aimo {
     override fun getSessionClient(chatId: UUID): AimoSessionClient? = chatClientDao.getChatSession(chatId)?.let {

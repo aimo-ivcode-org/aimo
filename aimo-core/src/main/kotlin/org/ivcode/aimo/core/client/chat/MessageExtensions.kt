@@ -54,6 +54,16 @@ internal fun createAssistantMessage (
     done = done,
 )
 
+internal fun createDoneMessage(
+    messageId: Int,
+): AimoChatMessage = createAssistantMessage(
+    messageId = messageId,
+    content = null,
+    thinking = null,
+    toolCalls = null,
+    done = true,
+)
+
 internal fun createSystemMessage (
     messageId: Int,
     type: AimoChatMessageType = AimoChatMessageType.SYSTEM,

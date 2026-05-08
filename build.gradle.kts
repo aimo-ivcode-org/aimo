@@ -5,10 +5,6 @@ plugins {
 group = "org.ivcode"
 version = "0.1-SNAPSHOT"
 
-// Centralized Spring AI version used by subprojects. Subprojects will import the
-// Spring AI BOM so they don't need to declare the explicit version locally.
-extra["springAiVersion"] = "2.0.0-SNAPSHOT"
-
 subprojects {
 
 	// Ensure all subprojects inherit the root group and version so they
@@ -19,23 +15,12 @@ subprojects {
 
 	// Provide repository configuration to all subprojects so they don't need
 	// to declare repositories locally. Prefer mavenLocal() for fast local
-	// iteration, then mavenCentral, and snapshot repositories used by the
-	// project.
+	// iteration, then mavenCentral.
 	repositories {
 		mavenLocal()
 		mavenCentral()
 		maven { url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/") }
-		maven { url = uri("https://repo.spring.io/snapshot") }
 	}
-
-	// Ensure all subprojects import the Spring AI BOM using the centralized
-	// version defined above. This makes spring-ai dependencies versionless in
-	// subproject build scripts and resolves their version from the BOM.
-	// Apply a small Groovy script that applies the dependency-management plugin
-	// and imports the Spring AI BOM using the centralized version. Using a
-	// Groovy script avoids Kotlin DSL compile-time issues with the dependency
-	// management DSL while still centralizing the BOM configuration.
-	apply(from = rootProject.file("gradle/spring-ai-bom.gradle"))
 
 	// Centralized dependency versions. Subprojects can declare dependencies
 	// without a version (e.g. implementation("group:artifact")) and the version
