@@ -63,14 +63,16 @@ data class AimoPrompt (
 /**
  * Aimo-owned tool callback contract for runtime tool invocation.
  *
- * Parsing contract for `argumentsJson`:
+ * Current parsing contract for `argumentsJson`:
  * 1) Parse the raw JSON string into a JSON tree/object.
- * 2) Validate it against [AimoToolDefinition.inputSchema] using [AimoToolDefinition.schemaDialect]
- *    (or `$schema` inside the schema when present).
- * 3) Only after successful validation, bind/coerce into typed arguments.
+ * 2) Bind/coerce values into typed arguments for the callback implementation.
+ * 3) Fail fast for binding/runtime issues (for example missing required arguments,
+ *    nullability violations, or type conversion errors).
  *
- * Keep this contract strict so future implementations in other modules or chat contexts
- * can safely reuse the same schema metadata and avoid divergent parsing behavior.
+ * Note: JSON Schema validation against [AimoToolDefinition.inputSchema] and
+ * [AimoToolDefinition.schemaDialect] is not currently enforced by this interface.
+ * Implementations may add validation, but callers must not assume schema validation
+ * occurs unless explicitly documented by the concrete implementation.
  */
 interface AimoToolCallback {
     val toolDefinition: AimoToolDefinition

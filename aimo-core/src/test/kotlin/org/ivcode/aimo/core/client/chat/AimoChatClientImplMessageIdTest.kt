@@ -243,6 +243,39 @@ class AimoChatClientImplMessageIdTest {
         assertEquals("hello world", doneEvent.content)
     }
 
+    @Test
+    fun `chatStream emits final aggregated done callback when provider chunks never mark done`() {
+        val dao = AimoChatClientDaoMemory()
+        val chatId = dao.createChatSession().chatId
+        val client = AimoChatClientImpl(
+            chatId = chatId,
+            session = TestSessionClient(chatId),
+            dao = dao,
+            model = testModel(
+                engine = StreamingResponseEngine(listOf(
+                    responseWithThinkingDone(thinking = "", content = "hello", done = false),
+                    responseWithThinkingDone(thinking = "", content = " world", done = false),
+                )),
+                contextSize = 4000,
+            ),
+            tools = emptyList(),
+            systemMessages = emptyList(),
+        )
+
+        val callbackResponses = mutableListOf<AimoChatResponse>()
+        client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { response ->
+            callbackResponses.add(response)
+        }
+
+        val assistantEvents = callbackResponses
+            .flatMap { it.messages }
+            .filter { it.type == AimoChatMessageType.ASSISTANT && it.messageId == 2 }
+
+        assertTrue(assistantEvents.isNotEmpty())
+        assertEquals(true, assistantEvents.last().done)
+        assertEquals("hello world", assistantEvents.last().content)
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -301,6 +334,20 @@ class AimoChatClientImplMessageIdTest {
             thinking = thinking.ifBlank { null },
             toolName = null,
             done = true,
+        )),
+        createdAt = Instant.now(),
+    )
+
+    private fun responseWithThinkingDone(thinking: String, content: String, done: Boolean): AimoChatResponse = AimoChatResponse(
+        chatId = UUID.randomUUID(),
+        responseId = UUID.randomUUID(),
+        messages = listOf(AimoChatMessage(
+            messageId = 0,
+            type = AimoChatMessageType.ASSISTANT,
+            content = content.ifBlank { null },
+            thinking = thinking.ifBlank { null },
+            toolName = null,
+            done = done,
         )),
         createdAt = Instant.now(),
     )

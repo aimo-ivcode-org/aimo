@@ -169,17 +169,21 @@ internal class AimoChatClientImpl (
     ): AimoChatResponse {
         val thinkingBuilder = StringBuilder()
         val contentBuilder = StringBuilder()
+        var terminalChunkEmitted = false
 
         val streamCallback: (AimoChatResponse) -> Unit = { streamResponse ->
             val streamMessage = streamResponse.extractAssistantMessage(messageId)
             if (!streamMessage.thinking.isNullOrEmpty()) thinkingBuilder.append(streamMessage.thinking)
             if (!streamMessage.content.isNullOrEmpty()) contentBuilder.append(streamMessage.content)
+            if (streamMessage.done == true) {
+                terminalChunkEmitted = true
+            }
             callback?.invoke(
                 AimoChatResponse(
                     chatId = chatId,
                     responseId = responseId,
                     messages = listOf(streamMessage.copy(
-                        done = false,
+                        done = streamMessage.done,
                         thinking = thinkingBuilder.takeIf { it.isNotEmpty() }?.toString(),
                         content = contentBuilder.takeIf { it.isNotEmpty() }?.toString(),
                     )),
@@ -192,7 +196,7 @@ internal class AimoChatClientImpl (
         // Merge aggregated thinking/content into the final response message
         val accThinking = thinkingBuilder.takeIf { it.isNotEmpty() }?.toString()
         val accContent = contentBuilder.takeIf { it.isNotEmpty() }?.toString()
-        return if (accThinking == null && accContent == null) {
+        val aggregatedFinalResponse = if (accThinking == null && accContent == null) {
             finalResponse
         } else {
             finalResponse.copy(
@@ -204,6 +208,18 @@ internal class AimoChatClientImpl (
                 }
             )
         }
+
+        // If no terminal chunk was emitted, explicitly emit one final aggregated done event.
+        if (!terminalChunkEmitted) {
+            callback?.invoke(
+                aggregatedFinalResponse.copy(
+                    messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
+                    createdAt = Instant.now(),
+                )
+            )
+        }
+
+        return aggregatedFinalResponse
     }
 
     private fun createSystemMessageContext(requestId: UUID, request: AimoChatRequest) = SystemMessageContext(
