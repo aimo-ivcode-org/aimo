@@ -180,7 +180,7 @@ class AimoChatClientImplMessageIdTest {
     }
 
     @Test
-    fun `chat does not persist duplicate tool message when tool call id repeats`() {
+    fun `chat persists tool message again when same tool call id appears in a later assistant turn`() {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatSession().chatId
         val client = AimoChatClientImpl(
@@ -192,6 +192,41 @@ class AimoChatClientImplMessageIdTest {
                     listOf(
                         responseWithToolCall(toolName = "echo", arguments = "{\"value\":\"hello\"}", toolCallId = "call-1"),
                         responseWithToolCall(toolName = "echo", arguments = "{\"value\":\"hello\"}", toolCallId = "call-1"),
+                        simpleResponse(),
+                    )
+                ),
+                contextSize = 4000,
+            ),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper),
+            systemMessages = emptyList(),
+        )
+
+        client.chat(AimoChatRequest(prompt = "use the tool", context = emptyMap()))
+
+        val toolMessages = dao.getMessages(chatId).filter { it.type == "TOOL" }
+        assertEquals(2, toolMessages.size)
+        assertEquals(listOf("echo", "echo"), toolMessages.map { it.toolName })
+        assertTrue((toolMessages.first().content ?: "").contains("echo:hello"))
+        assertTrue((toolMessages.last().content ?: "").contains("echo:hello"))
+    }
+
+    @Test
+    fun `chat de-dupes duplicate tool call ids within the same assistant turn`() {
+        val dao = AimoChatClientDaoMemory()
+        val chatId = dao.createChatSession().chatId
+        val client = AimoChatClientImpl(
+            chatId = chatId,
+            session = TestSessionClient(chatId),
+            dao = dao,
+            model = testModel(
+                engine = SequencedResponseEngine(
+                    listOf(
+                        responseWithToolCalls(
+                            listOf(
+                                AimoToolCall(id = "call-1", name = "echo", arguments = "{\"value\":\"hello\"}"),
+                                AimoToolCall(id = "call-1", name = "echo", arguments = "{\"value\":\"hello\"}"),
+                            )
+                        ),
                         simpleResponse(),
                     )
                 ),
@@ -229,7 +264,7 @@ class AimoChatClientImplMessageIdTest {
         )
 
         val callbackResponses = mutableListOf<AimoChatResponse>()
-        client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { response ->
+        val returnedResponse = client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { response ->
             callbackResponses.add(response)
         }
 
@@ -263,7 +298,7 @@ class AimoChatClientImplMessageIdTest {
         )
 
         val callbackResponses = mutableListOf<AimoChatResponse>()
-        client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { response ->
+        val returnedResponse = client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { response ->
             callbackResponses.add(response)
         }
 
@@ -274,6 +309,10 @@ class AimoChatClientImplMessageIdTest {
         assertTrue(assistantEvents.isNotEmpty())
         assertEquals(true, assistantEvents.last().done)
         assertEquals("hello world", assistantEvents.last().content)
+
+        val returnedAssistant = returnedResponse.messages.last { it.type == AimoChatMessageType.ASSISTANT }
+        assertEquals(true, returnedAssistant.done)
+        assertEquals("hello world", returnedAssistant.content)
     }
 
     // -------------------------------------------------------------------------
@@ -319,6 +358,22 @@ class AimoChatClientImplMessageIdTest {
             toolName = null,
             toolCallId = null,
             toolCalls = listOf(AimoToolCall(id = toolCallId, name = toolName, arguments = arguments)),
+            done = true,
+        )),
+        createdAt = Instant.now(),
+    )
+
+    private fun responseWithToolCalls(toolCalls: List<AimoToolCall>): AimoChatResponse = AimoChatResponse(
+        chatId = UUID.randomUUID(),
+        responseId = UUID.randomUUID(),
+        messages = listOf(AimoChatMessage(
+            messageId = 0,
+            type = AimoChatMessageType.ASSISTANT,
+            content = "calling tool",
+            thinking = null,
+            toolName = null,
+            toolCallId = null,
+            toolCalls = toolCalls,
             done = true,
         )),
         createdAt = Instant.now(),

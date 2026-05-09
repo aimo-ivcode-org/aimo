@@ -4,11 +4,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 
 class ControllerHelpersTest {
 
-    private val objectMapper = ObjectMapper()
+    private val objectMapper = jacksonObjectMapper()
 
     @Test
     fun `toAimoToolCallbacks returns empty list when controller has no tool annotations`() {

@@ -66,7 +66,6 @@ internal class AimoChatClientImpl (
         val systemMessages = getSystemMessages(createSystemMessageContext(responseId, request))
         val promptMessage = createUserMessage(messageId = 1, content = request.prompt)
         val taskMessages = mutableListOf<AimoChatMessage>()
-        val processedToolCallIds = mutableSetOf<String>()
         var assistantMessage: AimoChatMessage? = null
 
         while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
@@ -92,6 +91,7 @@ internal class AimoChatClientImpl (
 
             if (!assistantMessage.toolCalls.isNullOrEmpty()) {
                 val toolContext = createToolContext(requestId = responseId, request = request)
+                val processedToolCallIds = mutableSetOf<String>()
 
                 assistantMessage.toolCalls.forEach { toolCall ->
                     if (!processedToolCallIds.add(toolCall.id)) {
@@ -211,12 +211,14 @@ internal class AimoChatClientImpl (
 
         // If no terminal chunk was emitted, explicitly emit one final aggregated done event.
         if (!terminalChunkEmitted) {
-            callback?.invoke(
-                aggregatedFinalResponse.copy(
-                    messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
-                    createdAt = Instant.now(),
-                )
+            val terminalResponse = aggregatedFinalResponse.copy(
+                messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
+                createdAt = Instant.now(),
             )
+            callback?.invoke(
+                terminalResponse
+            )
+            return terminalResponse
         }
 
         return aggregatedFinalResponse
