@@ -15,12 +15,16 @@ import org.springframework.beans.factory.getBeansWithAnnotation
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import tools.jackson.databind.ObjectMapper
 
 @Configuration
 class AimoConfig {
 
     @Bean
-    fun createControllerEntities(ctx: ApplicationContext): List<ChatControllerEntity> {
+    fun createControllerEntities(
+        ctx: ApplicationContext,
+        objectMapper: ObjectMapper,
+    ): List<ChatControllerEntity> {
         val list = mutableListOf<ChatControllerEntity>()
 
         ctx.getBeansWithAnnotation<ChatController>().forEach {(beanName, chatController) ->
@@ -28,7 +32,7 @@ class AimoConfig {
                 name = beanName,
                 clazz = chatController.javaClass,
                 instance = chatController,
-                tools = toAimoToolCallbacks(chatController),
+                tools = toAimoToolCallbacks(chatController, objectMapper),
                 systemMessages = toSystemMessageCallbacks(chatController),
             ))
         }

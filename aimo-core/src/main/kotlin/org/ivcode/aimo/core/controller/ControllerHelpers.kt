@@ -15,7 +15,7 @@ import kotlin.reflect.jvm.kotlinFunction
 
 internal fun toAimoToolCallbacks(
     controller: Any,
-    objectMapper: ObjectMapper = ObjectMapper(),
+    objectMapper: ObjectMapper,
 ): List<AimoToolCallback> {
     val callbacks = mutableListOf<AimoToolCallback>()
     var type: Class<*>? = controller::class.java
@@ -36,7 +36,7 @@ internal fun toAimoToolCallbacks(
 internal fun toAimoToolCallback(
     controller: Any,
     method: Method,
-    objectMapper: ObjectMapper = ObjectMapper(),
+    objectMapper: ObjectMapper,
 ): MethodAimoToolCallback {
     val tool = method.getAnnotation(Tool::class.java)
         ?: throw IllegalArgumentException(
@@ -77,7 +77,7 @@ private fun createAimoToolInputSchema(method: Method, objectMapper: ObjectMapper
 
             properties.set(
                 parameterName,
-                createAimoToolParameterSchema(parameter.type.javaType, objectMapper)
+                createAimoToolParameterSchema(parameter, objectMapper)
             )
 
             if (!parameter.isOptional && !parameter.type.isMarkedNullable) {
@@ -98,10 +98,19 @@ private fun isAimoToolContextParameter(parameter: KParameter, objectMapper: Obje
     return parameter.name == "context" && Map::class.java.isAssignableFrom(rawClass)
 }
 
-private fun createAimoToolParameterSchema(type: java.lang.reflect.Type, objectMapper: ObjectMapper): JsonNode {
+private fun createAimoToolParameterSchema(parameter: KParameter, objectMapper: ObjectMapper): JsonNode {
+    val type = parameter.type.javaType
     val rawClass = objectMapper.typeFactory.constructType(type).rawClass
     val schema = objectMapper.createObjectNode()
     schema.put("type", rawClass.toAimoJsonSchemaType())
+
+    // Include description from @ToolParam annotation if present
+    parameter.findAnnotation<ToolParam>()?.let { toolParam ->
+        if (toolParam.description.isNotBlank()) {
+            schema.put("description", toolParam.description)
+        }
+    }
+
     return schema
 }
 

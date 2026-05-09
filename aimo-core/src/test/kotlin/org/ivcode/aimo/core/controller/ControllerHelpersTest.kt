@@ -4,26 +4,29 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import tools.jackson.databind.ObjectMapper
 
 class ControllerHelpersTest {
 
+    private val objectMapper = ObjectMapper()
+
     @Test
     fun `toAimoToolCallbacks returns empty list when controller has no tool annotations`() {
-        val callbacks = toAimoToolCallbacks(NoToolController())
+        val callbacks = toAimoToolCallbacks(NoToolController(), objectMapper)
 
         assertTrue(callbacks.isEmpty())
     }
 
     @Test
     fun `toAimoToolCallbacks returns callbacks when controller has tool annotations`() {
-        val callbacks = toAimoToolCallbacks(HasToolController())
+        val callbacks = toAimoToolCallbacks(HasToolController(), objectMapper)
 
         assertEquals(1, callbacks.size)
     }
 
     @Test
     fun `toAimoToolCallbacks returns callbacks with derived tool definitions`() {
-        val callbacks = toAimoToolCallbacks(HasToolController())
+        val callbacks = toAimoToolCallbacks(HasToolController(), objectMapper)
 
         assertEquals(1, callbacks.size)
         assertEquals("ping", callbacks.first().toolDefinition.name)
@@ -37,6 +40,7 @@ class ControllerHelpersTest {
         val callback = toAimoToolCallback(
             controller = controller,
             method = AimoToolController::class.java.getDeclaredMethod("describe", String::class.java, Map::class.java),
+            objectMapper = objectMapper,
         )
 
         assertEquals("describe", callback.toolDefinition.name)
@@ -54,6 +58,7 @@ class ControllerHelpersTest {
         val callback = toAimoToolCallback(
             controller = controller,
             method = AimoToolController::class.java.getDeclaredMethod("autoNamed", String::class.java),
+            objectMapper = objectMapper,
         )
 
         assertEquals("autoNamed", callback.toolDefinition.name)
@@ -66,6 +71,7 @@ class ControllerHelpersTest {
         val callback = toAimoToolCallback(
             controller = controller,
             method = AimoToolController::class.java.getDeclaredMethod("summarizeProfile", ProfileRequest::class.java),
+            objectMapper = objectMapper,
         )
 
         val result = callback.call(
@@ -103,6 +109,36 @@ class ControllerHelpersTest {
     }
 
     @Test
+    fun `toAimoToolCallback uses Kotlin-aware default mapper for data classes`() {
+        val controller = AimoToolController()
+        val callback = toAimoToolCallback(
+            controller = controller,
+            method = AimoToolController::class.java.getDeclaredMethod("summarizeAccount", AccountRequest::class.java),
+            objectMapper = objectMapper,
+        )
+
+        val result = callback.call(
+            argumentsJson = """
+                {
+                  "request": {
+                    "owner": {
+                        "name": "Ada",
+                        "plan": "pro"
+                    },
+                    "limits": {
+                      "maxUsers": 7,
+                      "retentionDays": 45
+                    }
+                  }
+                }
+            """.trimIndent(),
+            context = emptyMap(),
+        )
+
+        assertEquals("Ada|pro|7|45", result)
+    }
+
+    @Test
     fun `toSystemMessageCallbacks supports plain kotlin property annotation`() {
         val callbacks = toSystemMessageCallbacks(PlainPropertySystemMessageController())
 
@@ -116,6 +152,20 @@ class ControllerHelpersTest {
 
         assertEquals(1, callbacks.size)
         assertEquals("field-system-message", callbacks.first().call(SystemMessageContext(emptyMap())))
+    }
+
+    @Test
+    fun `toAimoToolCallback includes parameter descriptions from ToolParam annotation`() {
+        val controller = AimoToolController()
+        val callback = toAimoToolCallback(
+            controller = controller,
+            method = AimoToolController::class.java.getDeclaredMethod("search", String::class.java, Int::class.java),
+            objectMapper = objectMapper,
+        )
+
+        val properties = callback.toolDefinition.inputSchema.path("properties")
+        assertEquals("Search term to find", properties.path("query").path("description").toString().trim('"'))
+        assertEquals("Number of results to return", properties.path("limit").path("description").toString().trim('"'))
     }
 
     private class NoToolController {
@@ -145,6 +195,22 @@ class ControllerHelpersTest {
                 request.settings.metadata["priority"],
             ).joinToString("|")
         }
+
+        @Tool(name = "summarizeAccount", description = "Summarizes a data-class payload")
+        fun summarizeAccount(request: AccountRequest): String {
+            return listOf(
+                request.owner.name,
+                request.owner.plan,
+                request.limits.maxUsers,
+                request.limits.retentionDays,
+            ).joinToString("|")
+        }
+
+        @Tool(name = "search", description = "Search for items")
+        fun search(
+            @ToolParam(description = "Search term to find") query: String,
+            @ToolParam(description = "Number of results to return") limit: Int,
+        ): String = "$query:$limit"
     }
 
     private class PlainPropertySystemMessageController {
@@ -161,6 +227,21 @@ class ControllerHelpersTest {
         var user: User = User()
         var settings: Settings = Settings()
     }
+
+    data class AccountRequest(
+        val owner: Owner,
+        val limits: Limits,
+    )
+
+    data class Owner(
+        val name: String,
+        val plan: String,
+    )
+
+    data class Limits(
+        val maxUsers: Int,
+        val retentionDays: Int,
+    )
 
     private class User {
         var name: String = ""

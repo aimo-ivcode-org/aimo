@@ -22,8 +22,10 @@ import kotlin.reflect.jvm.kotlinFunction
  * - return raw `String` results unchanged,
  * - serialize any non-string result back to JSON using Jackson.
  *
+ * The internal [ObjectMapper] is configured with the Kotlin module, enabling reliable
+ * deserialization of Kotlin types including data classes, non-null properties, and default values.
+ *
  * Notes for future integration work:
- * - Complex Kotlin parameter types may require an [objectMapper] with the Kotlin module registered.
  * - Argument binding currently expects a JSON object payload for named parameters.
  * - A context parameter is recognized only when the parameter name is `context` and its raw type is [Map].
  */
@@ -31,7 +33,7 @@ class MethodAimoToolCallback(
     private val target: Any,
     private val method: Method,
     override val toolDefinition: AimoToolDefinition,
-    private val objectMapper: ObjectMapper = defaultObjectMapper(),
+    private val objectMapper: ObjectMapper,
 ) : AimoToolCallback {
 
     private val function = method.kotlinFunction
@@ -170,15 +172,11 @@ class MethodAimoToolCallback(
          * annotation and builds a basic JSON Schema object for the non-context
          * parameters expected by the tool.
          */
-        fun create(
+        fun create (
             target: Any,
             method: Method,
-            objectMapper: ObjectMapper = defaultObjectMapper(),
+            objectMapper: ObjectMapper,
         ): MethodAimoToolCallback = toAimoToolCallback(target, method, objectMapper)
-
-        /** Creates the default mapper used for argument conversion and JSON serialization. */
-        private fun defaultObjectMapper(): ObjectMapper =
-            ObjectMapper()
     }
 }
 

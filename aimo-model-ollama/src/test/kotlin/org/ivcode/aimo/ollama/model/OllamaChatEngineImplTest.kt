@@ -22,8 +22,8 @@ import java.util.Collections
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OllamaChatEngineImplTest {
@@ -104,7 +104,7 @@ class OllamaChatEngineImplTest {
         assertEquals(0.9, requestJson["options"]["top_p"].asDouble())
         assertEquals(25, requestJson["options"]["top_k"].asInt())
         assertEquals("STOP", requestJson["options"]["stop"][0].getTextValue())
-        assertNull(requestJson["options"]["format"])
+        assertEquals("json", requestJson["options"]["format"].getTextValue())
 
         val toolJson = requestJson["tools"][0]["function"]
         assertEquals("lookupWeather", toolJson["name"].getTextValue())
@@ -165,14 +165,14 @@ class OllamaChatEngineImplTest {
             responseLine(content = "lo", done = true),
         ).joinToString(separator = "\n", postfix = "\n")
 
-        StubOllamaServer(listOf(responseBody)).use { server ->
+        StubOllamaServer(listOf(StubResponse(statusCode = 200, body = responseBody))).use { server ->
             val engine = OllamaChatEngineImpl(
                 client = OllamaChatClient(server.baseUrl),
                 modelName = "stream-model",
                 options = AimoChatOptions(),
             )
 
-            val callbacks = mutableListOf<org.ivcode.aimo.core.AimoChatResponse>()
+            val callbacks = mutableListOf<AimoChatResponse>()
             val finalResponse = engine.call(
                 AimoPrompt(
                     messages = listOf(
@@ -201,6 +201,70 @@ class OllamaChatEngineImplTest {
         }
     }
 
+    @Test
+    fun `client throws clear error for non-2xx response bodies`() {
+        StubOllamaServer(
+            listOf(
+                StubResponse(
+                    statusCode = 500,
+                    body = "Internal server exploded: upstream returned HTML, not JSON",
+                )
+            )
+        ).use { server ->
+            val client = OllamaChatClient(server.baseUrl)
+            val request = ChatRequest(
+                model = "test-model",
+                messages = listOf(
+                    Message(
+                        role = "user",
+                        content = "Hello",
+                    )
+                ),
+            )
+
+            val error = assertFailsWith<IllegalStateException> {
+                client.chat(request)
+            }
+
+            assertTrue(error.message!!.contains("HTTP 500"))
+            assertTrue(error.message!!.contains("Internal server exploded"))
+            assertTrue(error.message!!.contains("not JSON"))
+        }
+    }
+
+    @Test
+    fun `buildRequest forwards provider options even without standard ollama options`() {
+        val engine = OllamaChatEngineImpl(
+            client = OllamaChatClient("http://localhost:11434"),
+            modelName = "fallback-model",
+            options = AimoChatOptions(
+                providerOptions = mapOf(
+                    "format" to "json",
+                    "keep_alive" to "30m",
+                ),
+            ),
+        )
+
+        val prompt = AimoPrompt(
+            messages = listOf(
+                AimoChatMessage(
+                    messageId = 1,
+                    type = AimoChatMessageType.USER,
+                    content = "Hello",
+                    thinking = null,
+                    toolName = null,
+                    done = null,
+                )
+            ),
+        )
+
+        val request = buildRequest(engine, prompt)
+        val requestJson = mapper.readTree(mapper.writeValueAsString(request))
+
+        assertEquals("json", requestJson["options"]["format"].getTextValue())
+        assertEquals("30m", requestJson["options"]["keep_alive"].getTextValue())
+    }
+
     private fun responseLine(
         content: String,
         done: Boolean,
@@ -218,7 +282,7 @@ class OllamaChatEngineImplTest {
         val method = OllamaChatEngineImpl::class.java.getDeclaredMethod(
             "buildRequest",
             AimoPrompt::class.java,
-            java.lang.Boolean::class.java,
+            Boolean::class.javaObjectType,
         )
         method.isAccessible = true
         return method.invoke(engine, prompt, null) as ChatRequest
@@ -244,7 +308,7 @@ class OllamaChatEngineImplTest {
     private fun tools.jackson.databind.JsonNode.getTextValue(): String = textValue()
 
     private class StubOllamaServer(
-        responses: List<String>,
+        responses: List<StubResponse>,
     ) : AutoCloseable {
         private val server = ServerSocket(0)
         val baseUrl: String = "http://127.0.0.1:${server.localPort}"
@@ -268,11 +332,11 @@ class OllamaChatEngineImplTest {
                         }
                         requests += String(bodyBytes, StandardCharsets.UTF_8)
 
-                        val responseBytes = body.toByteArray(StandardCharsets.UTF_8)
+                        val responseBytes = body.body.toByteArray(StandardCharsets.UTF_8)
                         val output = socket.getOutputStream()
                         output.write(
                             (
-                                "HTTP/1.1 200 OK\r\n" +
+                                "HTTP/1.1 ${body.statusCode} ${body.reasonPhrase()}\r\n" +
                                     "Content-Type: application/x-ndjson\r\n" +
                                     "Content-Length: ${responseBytes.size}\r\n" +
                                     "Connection: close\r\n" +
@@ -348,6 +412,23 @@ class OllamaChatEngineImplTest {
                 }
                 bytes.write(next)
             }
+        }
+    }
+
+    private data class StubResponse(
+        val statusCode: Int,
+        val body: String,
+    ) {
+        fun reasonPhrase(): String = when (statusCode) {
+            200 -> "OK"
+            400 -> "Bad Request"
+            401 -> "Unauthorized"
+            403 -> "Forbidden"
+            404 -> "Not Found"
+            500 -> "Internal Server Error"
+            502 -> "Bad Gateway"
+            503 -> "Service Unavailable"
+            else -> ""
         }
     }
 }

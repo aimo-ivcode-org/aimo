@@ -1,6 +1,7 @@
 package org.ivcode.aimo.ollama.client
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonAnyGetter
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -94,7 +95,9 @@ data class Options(
     @field:JsonProperty("mirostat_tau") val mirostatTau: Double? = null,
     @field:JsonProperty("mirostat_eta") val mirostatEta: Double? = null,
     @field:JsonProperty("penalize_newline") val penalizeNewline: Boolean? = null,
-    @field:JsonProperty("stop") val stop: List<String>? = null
+    @field:JsonProperty("stop") val stop: List<String>? = null,
+    @get:JsonAnyGetter
+    val providerOptions: Map<String, Any> = emptyMap(),
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL) // don't serialize nulls

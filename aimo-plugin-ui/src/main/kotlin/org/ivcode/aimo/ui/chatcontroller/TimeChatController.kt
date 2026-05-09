@@ -34,9 +34,7 @@ class TimeChatController {
     }
 
     fun Map<String, Any>.getTimezoneOffset(): Int? {
-        return getRequestMetadata()?.let {
-            return it.headers[HEADER_X_TIMEZONE_OFFSET]?.firstOrNull()?.toIntOrNull()
-        }
+        return getRequestMetadata()?.headers?.get(HEADER_X_TIMEZONE_OFFSET)?.firstOrNull()?.toIntOrNull()
     }
 
     fun toZoneId(timezoneOffset: Int): ZoneId? {

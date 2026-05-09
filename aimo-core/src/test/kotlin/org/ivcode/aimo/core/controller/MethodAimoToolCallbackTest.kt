@@ -18,6 +18,7 @@ class MethodAimoToolCallbackTest {
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("echo", String::class.java),
             toolDefinition = toolDefinition("echo"),
+            objectMapper = objectMapper,
         )
 
         val result = callback.call("""{"value":"hello"}""", emptyMap())
@@ -32,6 +33,7 @@ class MethodAimoToolCallbackTest {
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("describe", String::class.java, Map::class.java),
             toolDefinition = toolDefinition("describe"),
+            objectMapper = objectMapper,
         )
 
         val result = callback.call(
@@ -49,6 +51,7 @@ class MethodAimoToolCallbackTest {
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("echo", String::class.java),
             toolDefinition = toolDefinition("echo"),
+            objectMapper = objectMapper,
         )
 
         val error = assertFailsWith<IllegalArgumentException> {
@@ -65,6 +68,7 @@ class MethodAimoToolCallbackTest {
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("summarizeProfile", ProfileRequest::class.java),
             toolDefinition = toolDefinition("summarizeProfile"),
+            objectMapper = objectMapper,
         )
 
         val result = callback.call(
@@ -109,6 +113,7 @@ class MethodAimoToolCallbackTest {
                 target = controller,
                 method = TestToolController::class.java.getDeclaredMethod("notATool", String::class.java),
                 toolDefinition = toolDefinition("not_a_tool"),
+                objectMapper = objectMapper,
             )
         }
 

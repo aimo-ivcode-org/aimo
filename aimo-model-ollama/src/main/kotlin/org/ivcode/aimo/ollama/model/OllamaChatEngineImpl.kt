@@ -195,7 +195,7 @@ private fun Map<String, Any?>.toProperty(): Property {
 private fun AimoChatOptions.toOllamaOptions(): Options? {
     val hasValues = temperature != null || maxTokens != null || topP != null ||
         topK != null || frequencyPenalty != null || presencePenalty != null ||
-        stopSequences.isNotEmpty()
+        stopSequences.isNotEmpty() || providerOptions.isNotEmpty()
     if (!hasValues) return null
     return Options(
         temperature      = temperature,
@@ -205,6 +205,7 @@ private fun AimoChatOptions.toOllamaOptions(): Options? {
         frequencyPenalty = frequencyPenalty,
         presencePenalty  = presencePenalty,
         stop             = stopSequences.ifEmpty { null },
+        providerOptions  = providerOptions,
     )
 }
 

@@ -14,15 +14,17 @@ import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoPrompt
-import org.ivcode.aimo.core.model.AimoToolCallback
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import tools.jackson.databind.ObjectMapper
 
 class AimoChatClientImplMessageIdTest {
+
+    private val objectMapper = ObjectMapper()
 
     @Test
     fun `chat persists sequential message ids across requests`() {
@@ -81,7 +83,7 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools()),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper),
             systemMessages = emptyList(),
         )
 
@@ -195,7 +197,7 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools()),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper),
             systemMessages = emptyList(),
         )
 
