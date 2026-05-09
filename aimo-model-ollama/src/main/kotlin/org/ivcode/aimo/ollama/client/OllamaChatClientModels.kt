@@ -63,7 +63,7 @@ internal data class ToolCallFunction (
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-data class Options(
+internal data class Options(
     @field:JsonProperty("numa") val numa: Boolean? = null,
     @field:JsonProperty("num_ctx") val numCtx: Int? = null,
     @field:JsonProperty("num_batch") val numBatch: Int? = null,

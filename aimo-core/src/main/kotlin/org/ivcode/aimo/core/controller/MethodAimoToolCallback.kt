@@ -22,8 +22,9 @@ import kotlin.reflect.jvm.kotlinFunction
  * - return raw `String` results unchanged,
  * - serialize any non-string result back to JSON using Jackson.
  *
- * The internal [ObjectMapper] is configured with the Kotlin module, enabling reliable
- * deserialization of Kotlin types including data classes, non-null properties, and default values.
+ * The supplied [objectMapper] is used as-is. Callers are responsible for providing an
+ * [ObjectMapper] configured for their expected payloads, including registering the Kotlin
+ * module when Kotlin-specific deserialization behavior is required.
  *
  * Notes for future integration work:
  * - Argument binding currently expects a JSON object payload for named parameters.

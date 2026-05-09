@@ -88,7 +88,6 @@ internal class AimoChatClientImpl (
 
             val engineResponse = call(responseId, messageId, prompt, callback)
             assistantMessage = engineResponse.extractAssistantMessage(messageId)
-            callback?.invoke(createDoneMessage(responseId, assistantMessage.copy(done = true)))
             taskMessages.add(assistantMessage)
 
             if (!assistantMessage.toolCalls.isNullOrEmpty()) {
@@ -239,15 +238,6 @@ internal class AimoChatClientImpl (
             messages = listOf(message),
             createdAt = Instant.now(),
         ))
-    }
-
-    private fun createDoneMessage(responseId: UUID, message: AimoChatMessage): AimoChatResponse {
-        return AimoChatResponse(
-            chatId = chatId,
-            responseId = responseId,
-            messages = listOf(message),
-            createdAt = Instant.now(),
-        )
     }
 
     private fun List<AimoChatMessage>.withoutThinking(): List<AimoChatMessage> {
