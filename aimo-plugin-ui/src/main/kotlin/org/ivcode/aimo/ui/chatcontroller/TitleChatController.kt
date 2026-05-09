@@ -7,13 +7,12 @@ import org.ivcode.aimo.core.AimoSessionClient
 import org.ivcode.aimo.core.controller.ChatController
 import org.ivcode.aimo.core.controller.SystemMessage
 import org.ivcode.aimo.core.controller.Tool
+import org.ivcode.aimo.core.controller.ToolParam
 import org.ivcode.aimo.core.util.getSessionClient
 import org.ivcode.aimo.ui.extentions.getTitle
 import org.ivcode.aimo.ui.extentions.setTitle
 import org.ivcode.aimo.ui.model.SessionTitle
 import org.ivcode.aimo.ui.model.TitleResponse
-import org.springframework.ai.chat.model.ToolContext
-import org.springframework.ai.tool.annotation.ToolParam
 import tools.jackson.databind.ObjectMapper
 
 private const val TITLE_TOOL_NAME = "set_title"
@@ -52,7 +51,7 @@ class TitleChatController(
     @Tool(name = TITLE_TOOL_NAME, description = "Set the chat title with source=ASSISTANT. Returns TitleResponse JSON: { title: string, source: \"USER\" | \"ASSISTANT\" } (USER = user-set, ASSISTANT = LLM-set).")
     fun setTitle(
         @ToolParam(description = "The new title") title: String,
-        context: ToolContext
+        context: Map<String, Any>
     ): TitleResponse {
         val sessionClient = context.getSessionClient() ?: throw IllegalStateException("Title cannot be set. No session client found in context")
         return setTitle(title, sessionClient, AimoChatMessageType.ASSISTANT.name)
@@ -95,7 +94,7 @@ class TitleChatController(
      * Tool helper that reads the title from the current tool execution context.
      */
     @Tool(name = "getTitle", description = "Gets the title of the chat session.")
-    fun getTitle(context: ToolContext): SessionTitle? {
+    fun getTitle(context: Map<String, Any>): SessionTitle? {
         return context.getSessionClient()?.getTitle()
     }
 

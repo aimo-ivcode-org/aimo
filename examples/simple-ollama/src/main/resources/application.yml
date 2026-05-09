@@ -3,12 +3,9 @@ spring:
     async:
       request-timeout: 0s
 
-logging:
-  level:
-    org.springframework.ai: DEBUG
 
 aimo.model.ollama:
-  assistant:
+  gpt-oss:
     base-url: http://localhost:11434
     primary: true
     contextSize: 2048

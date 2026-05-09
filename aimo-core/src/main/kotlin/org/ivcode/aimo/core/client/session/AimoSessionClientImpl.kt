@@ -8,8 +8,8 @@ import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatModel
+import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.toChatMessageEntity
-import org.springframework.ai.tool.ToolCallback
 import java.time.Instant
 import java.util.UUID
 
@@ -17,7 +17,7 @@ internal class AimoSessionClientImpl (
     override val chatId: UUID,
     private val dao: AimoChatClientDao,
     private val model: AimoChatModel,
-    private val tools: List<ToolCallback>,
+    private val tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
     metadata: Map<String, Any>
 ) : AimoSessionClient {
