@@ -24,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class OllamaChatEngineImplTest {
@@ -152,10 +153,70 @@ class OllamaChatEngineImplTest {
         assertEquals("internal reasoning", responseMessage.thinking)
         assertNotNull(responseMessage.toolCalls)
         assertEquals(1, responseMessage.toolCalls!!.size)
+        assertTrue(responseMessage.toolCalls!!.single().id.startsWith("ollama-"))
         assertEquals("lookupWeather", responseMessage.toolCalls!!.single().name)
         val toolArguments = mapper.readTree(responseMessage.toolCalls!!.single().arguments)
         assertEquals("Boston", toolArguments["city"].getTextValue())
         assertEquals("metric", toolArguments["units"].getTextValue())
+    }
+
+    @Test
+    fun `tool call ids are stable when provider id missing and preserve provider id when present`() {
+        val engine = OllamaChatEngineImpl(
+            client = OllamaChatClient("http://localhost:11434"),
+            modelName = "configured-model",
+            options = AimoChatOptions(),
+        )
+
+        val withoutProviderId = ChatResponse(
+            model = "configured-model",
+            createdAt = Instant.parse("2026-05-06T00:00:00Z"),
+            message = Message(
+                role = "assistant",
+                content = "answer",
+                toolCalls = listOf(
+                    ToolCall(
+                        function = ToolCallFunction(
+                            name = "lookupWeather",
+                            arguments = linkedMapOf("units" to "metric", "city" to "Boston"),
+                        )
+                    )
+                ),
+            ),
+            done = true,
+            doneReason = null,
+            totalDuration = null,
+            loadDuration = null,
+            promptEvalCount = null,
+            promptEvalDuration = null,
+            evalCount = null,
+            evalDuration = null,
+            logProbs = null,
+        )
+
+        val mappedA = mapResponse(engine, withoutProviderId, done = true)
+        val mappedB = mapResponse(engine, withoutProviderId, done = true)
+        val generatedIdA = mappedA.messages.single().toolCalls!!.single().id
+        val generatedIdB = mappedB.messages.single().toolCalls!!.single().id
+        assertTrue(generatedIdA.startsWith("ollama-"))
+        assertEquals(generatedIdA, generatedIdB)
+
+        val withProviderId = withoutProviderId.copy(
+            message = withoutProviderId.message.copy(
+                toolCalls = listOf(
+                    ToolCall(
+                        id = "provider-call-123",
+                        function = ToolCallFunction(
+                            name = "lookupWeather",
+                            arguments = linkedMapOf("city" to "Boston", "units" to "metric"),
+                        )
+                    )
+                )
+            )
+        )
+        val mappedWithProviderId = mapResponse(engine, withProviderId, done = true)
+        assertEquals("provider-call-123", mappedWithProviderId.messages.single().toolCalls!!.single().id)
+        assertNotEquals("provider-call-123", generatedIdA)
     }
 
     @Test
@@ -229,6 +290,36 @@ class OllamaChatEngineImplTest {
             assertTrue(error.message!!.contains("HTTP 500"))
             assertTrue(error.message!!.contains("Internal server exploded"))
             assertTrue(error.message!!.contains("not JSON"))
+        }
+    }
+
+    @Test
+    fun `client throws clear error for 2xx response with no ndjson lines`() {
+        StubOllamaServer(
+            listOf(
+                StubResponse(
+                    statusCode = 200,
+                    body = "\n \n\t\n",
+                )
+            )
+        ).use { server ->
+            val client = OllamaChatClient(server.baseUrl)
+            val request = ChatRequest(
+                model = "test-model",
+                messages = listOf(
+                    Message(
+                        role = "user",
+                        content = "Hello",
+                    )
+                ),
+            )
+
+            val error = assertFailsWith<IllegalStateException> {
+                client.chat(request)
+            }
+
+            assertTrue(error.message!!.contains("HTTP 2xx"))
+            assertTrue(error.message!!.contains("no NDJSON response lines"))
         }
     }
 

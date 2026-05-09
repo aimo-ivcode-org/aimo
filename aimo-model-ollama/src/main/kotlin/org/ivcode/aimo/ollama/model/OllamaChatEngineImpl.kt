@@ -21,6 +21,7 @@ import org.ivcode.aimo.ollama.client.Tool
 import org.ivcode.aimo.ollama.client.Type
 import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import java.security.MessageDigest
 import java.util.UUID
 
 /**
@@ -102,7 +103,8 @@ internal class OllamaChatEngineImpl(
         val toolCalls = msg.toolCalls
             ?.map { tc ->
                 AimoToolCall(
-                    id        = UUID.randomUUID().toString(),
+                    id        = tc.id?.takeIf { it.isNotBlank() }
+                        ?: stableToolCallId(tc.function.name, tc.function.arguments),
                     name      = tc.function.name,
                     arguments = mapper.writeValueAsString(tc.function.arguments),
                 )
@@ -126,6 +128,26 @@ internal class OllamaChatEngineImpl(
             messages    = listOf(aimoMessage),
             createdAt   = response.createdAt,
         )
+    }
+}
+
+private fun stableToolCallId(name: String, arguments: Map<String, Any?>): String {
+    val canonicalArgs = schemaMapper.writeValueAsString(canonicalizeForHash(arguments))
+    val fingerprint = "$name|$canonicalArgs"
+    val hash = MessageDigest.getInstance("SHA-256")
+        .digest(fingerprint.toByteArray(Charsets.UTF_8))
+        .joinToString("") { "%02x".format(it) }
+    return "ollama-$hash"
+}
+
+private fun canonicalizeForHash(value: Any?): Any? {
+    return when (value) {
+        is Map<*, *> -> value.entries
+            .sortedBy { it.key.toString() }
+            .associate { (key, mapValue) -> key.toString() to canonicalizeForHash(mapValue) }
+        is List<*> -> value.map { canonicalizeForHash(it) }
+        is Array<*> -> value.map { canonicalizeForHash(it) }
+        else -> value
     }
 }
 

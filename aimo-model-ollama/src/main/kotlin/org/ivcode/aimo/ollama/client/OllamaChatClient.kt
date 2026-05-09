@@ -60,6 +60,10 @@ internal class OllamaChatClient (
     }
 
     private fun concatResponses(responses: List<ChatResponse>): ChatResponse {
+        if (responses.isEmpty()) {
+            throw IllegalStateException("Ollama chat request returned HTTP 2xx but contained no NDJSON response lines")
+        }
+
         if(responses.size == 1) {
             return responses[0]
         }

@@ -49,6 +49,7 @@ internal data class Message(
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 internal data class ToolCall (
+    val id: String? = null,
     val function: ToolCallFunction
 )
 
