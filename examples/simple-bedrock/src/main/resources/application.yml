@@ -1,0 +1,38 @@
+spring.mvc.async.request-timeout: 0s
+
+# AWS Credentials
+# Set these via:
+# 1. application.yml properties (this file):
+#    aimo.model.bedrock.claude-sonnet.aws-access-key-id=your-key
+#    aimo.model.bedrock.claude-sonnet.aws-secret-access-key=your-secret
+# 2. Environment variables:
+#   AWS_ACCESS_KEY_ID=your-key
+#   AWS_SECRET_ACCESS_KEY=your-secret
+# 3. AWS CLI profiles: AWS_PROFILE=your-profile
+
+aimo.model.bedrock:
+  deepseek:
+    region: us-west-2
+    primary: false
+    contextSize: 8192
+    # Optional: specify AWS credentials here
+    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
+    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+    options:
+      model: deepseek.v3.2
+      temperature: 0.7
+      maxTokens: 1024
+
+  deepseek_reasoning:
+    region: us-west-2
+    primary: true
+    contextSize: 8192
+    # Optional: specify AWS credentials here
+    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
+    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+    options:
+      model: deepseek.v3.2
+      temperature: 0.7
+      maxTokens: 1024
+      additional-model-request-fields:
+        reasoning_config: high

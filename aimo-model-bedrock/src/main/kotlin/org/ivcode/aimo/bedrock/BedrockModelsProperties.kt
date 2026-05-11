@@ -12,5 +12,7 @@ data class BedrockModelProperties(
     val primary: Boolean = false,
     val contextSize: Int = 8192,
     val options: Map<String, Any> = emptyMap(),
+    val awsAccessKeyId: String? = null,
+    val awsSecretAccessKey: String? = null,
 )
 

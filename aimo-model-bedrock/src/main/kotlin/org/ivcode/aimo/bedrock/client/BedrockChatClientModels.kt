@@ -21,6 +21,7 @@ internal data class ConverseRequest(
     val system: List<SystemContentBlock>? = null,
     val inferenceConfig: InferenceConfiguration? = null,
     val toolConfig: ToolConfiguration? = null,
+    val additionalModelRequestFields: Map<String, Any?>? = null,
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -40,6 +41,7 @@ internal data class SystemContentBlock(
 @JsonIgnoreProperties(ignoreUnknown = true)
 internal data class ContentBlock(
     val text: String? = null,
+    val reasoning: String? = null,
     @field:JsonProperty("toolUse")
     val toolUse: ToolUse? = null,
     @field:JsonProperty("toolResult")

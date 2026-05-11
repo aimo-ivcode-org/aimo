@@ -20,10 +20,10 @@ import org.ivcode.aimo.bedrock.client.InputSchema
 import org.ivcode.aimo.bedrock.client.SystemContentBlock
 import org.ivcode.aimo.bedrock.client.Tool
 import org.ivcode.aimo.bedrock.client.ToolConfiguration
+import org.ivcode.aimo.bedrock.client.ToolUse
 import org.ivcode.aimo.bedrock.client.ToolSpec
 import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
-import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
 
@@ -45,9 +45,15 @@ class BedrockChatModelFactory(
     /** One client per region. */
     private val clients: Map<String, BedrockChatClient> =
         properties.values
-            .map { it.region }
-            .distinct()
-            .associateWith { region -> BedrockChatClient(region) }
+            .distinctBy { it.region to it.awsAccessKeyId }
+            .associateBy { "${it.region}:${it.awsAccessKeyId ?: "default"}" }
+            .mapValues { (_, props) ->
+                BedrockChatClient(
+                    region = props.region,
+                    awsAccessKeyId = props.awsAccessKeyId,
+                    awsSecretAccessKey = props.awsSecretAccessKey
+                )
+            }
 
     // -------------------------------------------------------------------------
     // AimoChatModelProviderFactory
@@ -61,8 +67,13 @@ class BedrockChatModelFactory(
     override fun createAimoChatModel(name: String): AimoChatModel? {
         val props = properties[name]
             ?: return null
-        val client = clients[props.region]
-            ?: BedrockChatClient(props.region)
+        val clientKey = "${props.region}:${props.awsAccessKeyId ?: "default"}"
+        val client = clients[clientKey]
+            ?: BedrockChatClient(
+                region = props.region,
+                awsAccessKeyId = props.awsAccessKeyId,
+                awsSecretAccessKey = props.awsSecretAccessKey
+            )
         val rawOptions = resolveOptions(name, props.options)
         val aimoOptions = rawOptions.toAimoChatOptions()
         val engine = BedrockChatEngineImpl(client, name, aimoOptions)
@@ -190,8 +201,10 @@ internal class BedrockChatEngineImpl(
 
     override fun call(prompt: AimoPrompt, callback: (AimoChatResponse) -> Unit): AimoChatResponse {
         val request = buildRequest(prompt)
-        val response = client.converse(options.model ?: modelName, request)
-        callback(toAimoChatResponse(response, done = true))
+        var messageId = 0
+        val response = client.converseStream(options.model ?: modelName, request) { chunk ->
+            callback(toAimoChatResponse(chunk, done = false, messageId = messageId++))
+        }
         return toAimoChatResponse(response, done = true)
     }
 
@@ -201,14 +214,31 @@ internal class BedrockChatEngineImpl(
 
     private fun buildRequest(prompt: AimoPrompt): ConverseRequest {
         val merged = merge(options, prompt.options)
+        val systemBlocks = prompt.messages
+            .asSequence()
+            .filter { it.type == AimoChatMessageType.SYSTEM }
+            .mapNotNull { msg ->
+                msg.content
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { SystemContentBlock(text = it) }
+            }
+            .toList()
+
+        val conversationMessages = prompt.messages
+            .asSequence()
+            .filter { it.type != AimoChatMessageType.SYSTEM }
+            .mapNotNull { it.toConverseMessageOrNull() }
+            .toList()
+
         return ConverseRequest(
             model = merged.model ?: modelName,
-            messages = prompt.messages.map { it.toConverseMessage() },
-            system = listOf(SystemContentBlock(text = "You are a helpful assistant.")),
+            messages = conversationMessages,
+            system = systemBlocks.ifEmpty { null },
             inferenceConfig = merged.toInferenceConfiguration(),
             toolConfig = prompt.tools.takeIf { it.isNotEmpty() }?.let { tools ->
                 ToolConfiguration(tools = tools.map { it.toTool() })
             },
+            additionalModelRequestFields = merged.additionalModelRequestFields(),
         )
     }
 
@@ -255,11 +285,16 @@ internal class BedrockChatEngineImpl(
             .joinToString(" ")
             .takeIf { it.isNotBlank() }
 
+        val thinkingContent = msg.content
+            .mapNotNull { it.reasoning }
+            .joinToString("\n")
+            .takeIf { it.isNotBlank() }
+
         val aimoMessage = AimoChatMessage(
             messageId = messageId,
             type = AimoChatMessageType.ASSISTANT,
             content = textContent,
-            thinking = null,
+            thinking = thinkingContent,
             toolName = null,
             toolCallId = null,
             toolCalls = toolCalls,
@@ -279,19 +314,47 @@ internal class BedrockChatEngineImpl(
 // Extension helpers (file-private)
 // =============================================================================
 
-private fun AimoChatMessage.toConverseMessage(): ConverseMessage {
+private fun AimoChatMessage.toConverseMessageOrNull(): ConverseMessage? {
     val role = when (type) {
-        AimoChatMessageType.SYSTEM -> "system"
+        AimoChatMessageType.SYSTEM -> throw IllegalArgumentException(
+            "SYSTEM messages must be mapped to ConverseRequest.system and not request.messages"
+        )
         AimoChatMessageType.USER -> "user"
         AimoChatMessageType.ASSISTANT -> "assistant"
         AimoChatMessageType.TOOL -> "user"
     }
-    return ConverseMessage(
-        role = role,
-        content = listOf(
-            ContentBlock(text = content.orEmpty())
-        )
-    )
+
+    val blocks = mutableListOf<ContentBlock>()
+
+    val text = content?.takeIf { it.isNotBlank() }
+    if (text != null) {
+        blocks += ContentBlock(text = text)
+    }
+
+    if (type == AimoChatMessageType.ASSISTANT) {
+        toolCalls.orEmpty().forEach { call ->
+            blocks += ContentBlock(
+                toolUse = ToolUse(
+                    toolUseId = call.id,
+                    name = call.name,
+                    input = call.arguments.toJsonMap(),
+                )
+            )
+        }
+    }
+
+    if (blocks.isEmpty()) return null
+
+    return ConverseMessage(role = role, content = blocks)
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun String.toJsonMap(): Map<String, Any?> {
+    return try {
+        schemaMapper.readValue(this, Map::class.java) as? Map<String, Any?> ?: mapOf("raw" to this)
+    } catch (_: Exception) {
+        mapOf("raw" to this)
+    }
 }
 
 private fun AimoToolDefinition.toTool(): Tool {
@@ -322,5 +385,19 @@ private fun AimoChatOptions.toInferenceConfiguration(): InferenceConfiguration? 
         topK = topK,
         stopSequences = stopSequences.ifEmpty { null },
     )
+}
+
+@Suppress("UNCHECKED_CAST")
+private fun AimoChatOptions.additionalModelRequestFields(): Map<String, Any?>? {
+    val direct = providerOptions["additionalModelRequestFields"] as? Map<String, Any?>
+    if (!direct.isNullOrEmpty()) return direct
+
+    val kebab = providerOptions["additional-model-request-fields"] as? Map<String, Any?>
+    if (!kebab.isNullOrEmpty()) return kebab
+
+    val snake = providerOptions["additional_model_request_fields"] as? Map<String, Any?>
+    if (!snake.isNullOrEmpty()) return snake
+
+    return null
 }
 

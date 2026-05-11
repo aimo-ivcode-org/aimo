@@ -22,9 +22,11 @@ rootProject.name = "aimo"
 // --== Modules ==-- //
 include("aimo-core")
 include("aimo-model-ollama")
+include("aimo-model-bedrock")
 include("aimo-server")
 include("aimo-plugin-ui")
 include("aimo-ui")
 
 // --== Examples ==-- //
 include(":examples:simple-ollama")
+include(":examples:simple-bedrock")
