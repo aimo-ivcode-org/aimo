@@ -326,20 +326,40 @@ private fun AimoChatMessage.toConverseMessageOrNull(): ConverseMessage? {
 
     val blocks = mutableListOf<ContentBlock>()
 
-    val text = content?.takeIf { it.isNotBlank() }
-    if (text != null) {
-        blocks += ContentBlock(text = text)
-    }
-
-    if (type == AimoChatMessageType.ASSISTANT) {
-        toolCalls.orEmpty().forEach { call ->
+    when (type) {
+        AimoChatMessageType.TOOL -> {
+            // Tool results must be mapped to ToolResultBlock to complete the tool-calling loop
+            val toolUseId = toolCallId ?: return null
+            val resultContent = content?.takeIf { it.isNotBlank() }
+                ?.let { listOf(ContentBlock(text = it)) }
+                ?: emptyList()
             blocks += ContentBlock(
-                toolUse = ToolUse(
-                    toolUseId = call.id,
-                    name = call.name,
-                    input = call.arguments.toJsonMap(),
+                toolResult = org.ivcode.aimo.bedrock.client.ToolResult(
+                    toolUseId = toolUseId,
+                    content = resultContent,
                 )
             )
+        }
+        AimoChatMessageType.ASSISTANT -> {
+            val text = content?.takeIf { it.isNotBlank() }
+            if (text != null) {
+                blocks += ContentBlock(text = text)
+            }
+            toolCalls.orEmpty().forEach { call ->
+                blocks += ContentBlock(
+                    toolUse = ToolUse(
+                        toolUseId = call.id,
+                        name = call.name,
+                        input = call.arguments.toJsonMap(),
+                    )
+                )
+            }
+        }
+        else -> {
+            val text = content?.takeIf { it.isNotBlank() }
+            if (text != null) {
+                blocks += ContentBlock(text = text)
+            }
         }
     }
 

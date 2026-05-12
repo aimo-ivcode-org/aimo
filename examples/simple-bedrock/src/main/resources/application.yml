@@ -24,7 +24,7 @@ aimo.model.bedrock:
   # - Use cases: complex reasoning, coding, and general-purpose tasks
   # - Input: text
   # - Output: text
-  deepseek-v32_reasoning:
+  deepseek-v32:
     primary: true
     region: us-west-2
     contextSize: 8192
@@ -43,7 +43,7 @@ aimo.model.bedrock:
   # - Use cases: complex reasoning, coding, and general-purpose tasks
   # - Input: text, image, video
   # - Output: text
-  nova_pro:
+  nova-pro:
     region: us-west-2
     contextSize: 4096
     awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
@@ -58,7 +58,7 @@ aimo.model.bedrock:
   # - Use cases: more cost-effective than Nova Pro for less complex tasks, such as straightforward Q&A and simple text generation.
   # - Input: text
   # - Output: text
-  nova_micro:
+  nova-micro:
     region: us-west-2
     contextSize: 4096
     awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
