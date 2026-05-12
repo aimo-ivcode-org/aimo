@@ -21,14 +21,16 @@ internal class BedrockChatClient(
 ) {
     private val log = LoggerFactory.getLogger(BedrockChatClient::class.java)
     private val mapper = jacksonObjectMapper()
+    private val normalizedAccessKeyId = awsAccessKeyId?.trim().orEmpty().ifBlank { null }
+    private val normalizedSecretAccessKey = awsSecretAccessKey?.trim().orEmpty().ifBlank { null }
 
     val client: BedrockRuntimeClient = BedrockRuntimeClient.builder()
         .region(software.amazon.awssdk.regions.Region.of(region))
         .apply {
-            if (awsAccessKeyId != null && awsSecretAccessKey != null) {
+            if (normalizedAccessKeyId != null && normalizedSecretAccessKey != null) {
                 credentialsProvider(
                     StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey)
+                        AwsBasicCredentials.create(normalizedAccessKeyId, normalizedSecretAccessKey)
                     )
                 )
             }
@@ -38,10 +40,10 @@ internal class BedrockChatClient(
     val asyncClient: BedrockRuntimeAsyncClient = BedrockRuntimeAsyncClient.builder()
         .region(software.amazon.awssdk.regions.Region.of(region))
         .apply {
-            if (awsAccessKeyId != null && awsSecretAccessKey != null) {
+            if (normalizedAccessKeyId != null && normalizedSecretAccessKey != null) {
                 credentialsProvider(
                     StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create(awsAccessKeyId, awsSecretAccessKey)
+                        AwsBasicCredentials.create(normalizedAccessKeyId, normalizedSecretAccessKey)
                     )
                 )
             }
@@ -60,6 +62,3 @@ internal class BedrockChatClient(
 }
 
 internal typealias ChatCallback = (ConverseResponse) -> Unit
-
-
-

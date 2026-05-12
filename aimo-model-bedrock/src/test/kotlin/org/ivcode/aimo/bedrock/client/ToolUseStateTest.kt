@@ -41,7 +41,7 @@ class ToolUseStateTest {
         state.mergeFrom(ToolUsePartial(inputChunk = "\":"))
         state.mergeFrom(ToolUsePartial(inputChunk = "1}"))
 
-        assertEquals("{\"a\":",  state.inputChunks.toString().substring(0, 4) + state.inputChunks.toString().substring(4, 5))
+        assertEquals("{\"a\":1}", state.inputChunks.toString())
     }
 
     @Test
@@ -193,8 +193,4 @@ class ToolUseStateTest {
         assertEquals(true, body["active"])
     }
 }
-
-
-
-
 

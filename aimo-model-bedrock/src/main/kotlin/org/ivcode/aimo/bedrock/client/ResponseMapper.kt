@@ -36,12 +36,15 @@ internal object ResponseMapper {
             }
         )
 
+        val stopReason = response.stopReasonAsString()?.lowercase()?.ifBlank { null } ?: "end_turn"
+        val usage = response.usage()
+
         return ConverseResponse(
             output = Output(message = message),
-            stopReason = response.stopReason().toString(),
+            stopReason = stopReason,
             usage = Usage(
-                inputTokens = response.usage().inputTokens(),
-                outputTokens = response.usage().outputTokens()
+                inputTokens = usage?.inputTokens() ?: 0,
+                outputTokens = usage?.outputTokens() ?: 0,
             )
         )
     }
@@ -138,4 +141,3 @@ internal data class BedrockRequestFields(
     val toolConfig: software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration?,
     val additionalModelRequestFields: Document?,
 )
-

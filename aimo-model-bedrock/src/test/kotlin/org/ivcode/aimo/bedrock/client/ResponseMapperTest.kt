@@ -244,13 +244,58 @@ class ResponseMapperTest {
         assertEquals("end_turn", response.stopReason)
     }
 
+    @Test
+    @DisplayName("mapBedrockResponse defaults stopReason when missing")
+    fun testMapBedrockResponseMissingStopReason() {
+        val bedrockResponse = createBedrockResponse(
+            role = ConversationRole.ASSISTANT,
+            textContent = "Done",
+            includeStopReason = false,
+        )
+
+        val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
+        assertEquals("end_turn", response.stopReason)
+    }
+
+    @Test
+    @DisplayName("mapBedrockResponse defaults usage tokens to zero when usage is missing")
+    fun testMapBedrockResponseMissingUsage() {
+        val bedrockResponse = createBedrockResponse(
+            role = ConversationRole.ASSISTANT,
+            textContent = "Done",
+            includeUsage = false,
+        )
+
+        val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
+        assertEquals(0, response.usage.inputTokens)
+        assertEquals(0, response.usage.outputTokens)
+    }
+
+    @Test
+    @DisplayName("mapBedrockResponse handles missing stopReason and usage together")
+    fun testMapBedrockResponseMissingStopReasonAndUsage() {
+        val bedrockResponse = createBedrockResponse(
+            role = ConversationRole.ASSISTANT,
+            textContent = "Done",
+            includeStopReason = false,
+            includeUsage = false,
+        )
+
+        val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
+        assertEquals("end_turn", response.stopReason)
+        assertEquals(0, response.usage.inputTokens)
+        assertEquals(0, response.usage.outputTokens)
+    }
+
     // Helper methods for creating mock Bedrock responses
     private fun createBedrockResponse(
         role: ConversationRole,
         textContent: String? = null,
         inputTokens: Int = 0,
         outputTokens: Int = 0,
-        stopReason: String = "end_turn"
+        stopReason: String = "end_turn",
+        includeStopReason: Boolean = true,
+        includeUsage: Boolean = true,
     ): BedrockConverseResponse {
         val contentBlock = if (textContent != null) {
             BedrockContentBlock.builder().text(textContent).build()
@@ -263,17 +308,21 @@ class ResponseMapperTest {
             .content(contentBlock)
             .build()
 
-        return BedrockConverseResponse.builder()
+        val builder = BedrockConverseResponse.builder()
             .output { output ->
                 output.message(message)
             }
-            .stopReason(stopReason)
-            .usage { usage ->
+
+        if (includeStopReason) {
+            builder.stopReason(stopReason)
+        }
+        if (includeUsage) {
+            builder.usage { usage ->
                 usage.inputTokens(inputTokens)
                 usage.outputTokens(outputTokens)
             }
-            .build()
+        }
+
+        return builder.build()
     }
 }
-
-

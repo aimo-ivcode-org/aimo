@@ -24,6 +24,7 @@ import org.ivcode.aimo.bedrock.client.ToolUse
 import org.ivcode.aimo.bedrock.client.ToolSpec
 import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
 
@@ -48,21 +49,21 @@ class BedrockChatModelFactory(
     override val provider: String = "bedrock"
 
     /**
-     * One client per (region, credential) pair.
-     * Keyed by "region:credentialKey" where credentialKey is either:
-     * - An explicit AWS access key ID (if both awsAccessKeyId and awsSecretAccessKey are set)
-     * - "default" (if neither credential is set, using AWS SDK default credential chain)
+     * One client per (region, normalized credential identity) pair.
+     *
+     * Credential identity is:
+     * - `default` when both values are blank/null and AWS SDK default chain is used.
+     * - `(accessKeyId, secretFingerprint)` when explicit static credentials are configured.
      */
-    private val clients: Map<String, BedrockChatClient> =
+    private val clients: Map<ClientPoolKey, BedrockChatClient> =
         properties.values
-            .distinctBy { it.region to it.awsAccessKeyId }
-            .onEach { validateCredentials(it) }
-            .associateBy { "${it.region}:${it.awsAccessKeyId ?: "default"}" }
-            .mapValues { (_, props) ->
-                BedrockChatClient(
+            .map { props -> props to normalizeCredentials(props) }
+            .distinctBy { (props, creds) -> clientPoolKey(props.region, creds) }
+            .associate { (props, creds) ->
+                clientPoolKey(props.region, creds) to BedrockChatClient(
                     region = props.region,
-                    awsAccessKeyId = props.awsAccessKeyId,
-                    awsSecretAccessKey = props.awsSecretAccessKey
+                    awsAccessKeyId = creds.awsAccessKeyId,
+                    awsSecretAccessKey = creds.awsSecretAccessKey,
                 )
             }
 
@@ -78,12 +79,13 @@ class BedrockChatModelFactory(
     override fun createAimoChatModel(name: String): AimoChatModel? {
         val props = properties[name]
             ?: return null
-        val clientKey = "${props.region}:${props.awsAccessKeyId ?: "default"}"
+        val normalizedCredentials = normalizeCredentials(props)
+        val clientKey = clientPoolKey(props.region, normalizedCredentials)
         val client = clients[clientKey]
             ?: BedrockChatClient(
                 region = props.region,
-                awsAccessKeyId = props.awsAccessKeyId,
-                awsSecretAccessKey = props.awsSecretAccessKey
+                awsAccessKeyId = normalizedCredentials.awsAccessKeyId,
+                awsSecretAccessKey = normalizedCredentials.awsSecretAccessKey,
             )
         val rawOptions = resolveOptions(name, props.options)
         val aimoOptions = rawOptions.toAimoChatOptions()
@@ -115,23 +117,55 @@ class BedrockChatModelFactory(
     // -------------------------------------------------------------------------
 
     /**
-     * Validates that credentials are either both present or both absent.
-     * Throws if only one of awsAccessKeyId/awsSecretAccessKey is set.
+     * Trims credential values, normalizes blanks to null, and validates all-or-none semantics.
      */
-    private fun validateCredentials(props: BedrockModelProperties) {
-        val hasKeyId = !props.awsAccessKeyId.isNullOrBlank()
-        val hasSecret = !props.awsSecretAccessKey.isNullOrBlank()
+    private fun normalizeCredentials(props: BedrockModelProperties): NormalizedCredentials {
+        val accessKeyId = props.awsAccessKeyId?.trim().orEmpty().ifBlank { null }
+        val secretAccessKey = props.awsSecretAccessKey?.trim().orEmpty().ifBlank { null }
 
+        val hasKeyId = accessKeyId != null
+        val hasSecret = secretAccessKey != null
         if (hasKeyId != hasSecret) {
             throw IllegalArgumentException(
                 "Bedrock model credentials must be fully specified or omitted entirely. " +
-                "Region: ${props.region}, " +
-                "awsAccessKeyId present: $hasKeyId, " +
-                "awsSecretAccessKey present: $hasSecret. " +
-                "Either provide both or neither to use the AWS SDK default credential chain."
+                    "Region: ${props.region}, " +
+                    "awsAccessKeyId present: $hasKeyId, " +
+                    "awsSecretAccessKey present: $hasSecret. " +
+                    "Either provide both or neither to use the AWS SDK default credential chain."
             )
         }
+
+        return NormalizedCredentials(
+            awsAccessKeyId = accessKeyId,
+            awsSecretAccessKey = secretAccessKey,
+        )
     }
+
+    private fun clientPoolKey(region: String, credentials: NormalizedCredentials): ClientPoolKey {
+        val secretFingerprint = credentials.awsSecretAccessKey?.sha256HexPrefix()
+        return ClientPoolKey(
+            region = region,
+            accessKeyId = credentials.awsAccessKeyId,
+            secretFingerprint = secretFingerprint,
+        )
+    }
+
+    private fun String.sha256HexPrefix(length: Int = 12): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(toByteArray())
+        val hex = digest.joinToString("") { "%02x".format(it) }
+        return hex.take(length)
+    }
+
+    private data class NormalizedCredentials(
+        val awsAccessKeyId: String?,
+        val awsSecretAccessKey: String?,
+    )
+
+    private data class ClientPoolKey(
+        val region: String,
+        val accessKeyId: String?,
+        val secretFingerprint: String?,
+    )
 
     /** Ensures `model` is always present in the options map. */
     private fun resolveOptions(name: String, raw: Map<String, Any>): Map<String, Any> {
@@ -198,10 +232,13 @@ private fun Any.asDouble(): Double = when (this) {
     else -> toString().toDouble()
 }
 
-@Suppress("UNCHECKED_CAST")
 private fun Any.asStringList(): List<String> = when (this) {
-    is List<*> -> this as List<String>
-    else -> toString().split(",").map { it.trim() }
+    is List<*> -> this
+        .mapNotNull { item -> item?.toString()?.trim()?.takeIf { it.isNotEmpty() } }
+    else -> toString()
+        .split(",")
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
 }
 
 // =============================================================================
@@ -437,7 +474,6 @@ private fun AimoChatOptions.toInferenceConfiguration(): InferenceConfiguration? 
     )
 }
 
-@Suppress("UNCHECKED_CAST")
 private fun AimoChatOptions.additionalModelRequestFields(): Map<String, Any?>? {
     val direct = providerOptions["additionalModelRequestFields"] as? Map<String, Any?>
     if (!direct.isNullOrEmpty()) return direct
