@@ -1,8 +1,4 @@
-spring:
-  mvc:
-    async:
-      request-timeout: 0s
-
+spring.mvc.async.request-timeout: 0s
 
 aimo.model.ollama:
   gpt-oss:

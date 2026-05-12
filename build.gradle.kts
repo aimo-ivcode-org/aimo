@@ -22,6 +22,15 @@ subprojects {
 		maven { url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/") }
 	}
 
+	// Use AWS SDK BOM for dependency management
+	apply(plugin = "io.spring.dependency-management")
+
+	extensions.configure<io.spring.gradle.dependencymanagement.dsl.DependencyManagementExtension> {
+		imports {
+			mavenBom("software.amazon.awssdk:bom:2.31.52")
+		}
+	}
+
 	// Centralized dependency versions. Subprojects can declare dependencies
 	// without a version (e.g. implementation("group:artifact")) and the version
 	// will be resolved from the table below.

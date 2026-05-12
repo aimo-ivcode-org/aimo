@@ -1,4 +1,4 @@
-package org.ivcode.aimo.examples.basic
+package org.ivcode.aimo.examples.bedrock
 
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
@@ -15,10 +15,11 @@ fun main(args: Array<String>) {
 }
 
 @Configuration
-class SimpleOllamaConfig {
+class SimpleBedrockConfig {
 
     @Bean
     fun createAimoDao(): AimoChatClientDao {
         return AimoChatClientDaoMemory()
     }
 }
+
