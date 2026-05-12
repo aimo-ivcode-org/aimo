@@ -1,7 +1,5 @@
 package org.ivcode.aimo.examples.basic
 
-import org.ivcode.aimo.core.controller.ChatController
-import org.ivcode.aimo.core.controller.SystemMessage
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.springframework.boot.autoconfigure.SpringBootApplication

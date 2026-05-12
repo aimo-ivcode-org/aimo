@@ -2,7 +2,6 @@ package org.ivcode.aimo.bedrock.client
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
-import software.amazon.awssdk.core.document.Document
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertNotNull
