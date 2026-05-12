@@ -50,7 +50,7 @@ aimo.model.bedrock.claude-3-sonnet.options.maxTokens=1024
   - `temperature` - Sampling temperature (0.0 to 1.0)
   - `maxTokens` - Maximum tokens in response
   - `topP` - Top-P nucleus sampling parameter
-  - `topK` - Top-K sampling parameter
+  - `topK` - Top-K sampling parameter (forwarded via `additionalModelRequestFields.top_k`)
   - `stop` - Stop sequences
 
 ## AWS Credentials

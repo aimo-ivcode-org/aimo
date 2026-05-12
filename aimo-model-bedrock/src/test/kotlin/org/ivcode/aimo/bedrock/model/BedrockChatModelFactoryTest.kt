@@ -1,6 +1,10 @@
 package org.ivcode.aimo.bedrock.model
 
 import org.ivcode.aimo.bedrock.BedrockModelProperties
+import org.ivcode.aimo.core.AimoChatMessage
+import org.ivcode.aimo.core.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoPrompt
+import org.ivcode.aimo.bedrock.client.ConverseRequest
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -126,6 +130,56 @@ class BedrockChatModelFactoryTest {
         assertEquals(listOf("first", "second", "third"), model.options.stopSequences)
     }
 
+    @Test
+    @DisplayName("forwards frequency/presence penalties into additional model request fields")
+    fun forwardsPenaltyOptionsIntoAdditionalModelRequestFields() {
+        val properties = mapOf(
+            "model-a" to bedrockProps(
+                awsAccessKeyId = null,
+                awsSecretAccessKey = null,
+                options = mapOf(
+                    "model" to "test-model",
+                    "frequencyPenalty" to 0.4,
+                    "presencePenalty" to 0.2,
+                ),
+            ),
+        )
+
+        val factory = BedrockChatModelFactory(properties)
+        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val request = buildRequest(model)
+
+        assertEquals(0.4, request.additionalModelRequestFields?.get("frequency_penalty"))
+        assertEquals(0.2, request.additionalModelRequestFields?.get("presence_penalty"))
+    }
+
+    @Test
+    @DisplayName("does not override explicit penalty fields in additional model request fields")
+    fun doesNotOverrideExplicitPenaltyAdditionalFields() {
+        val properties = mapOf(
+            "model-a" to bedrockProps(
+                awsAccessKeyId = null,
+                awsSecretAccessKey = null,
+                options = mapOf(
+                    "model" to "test-model",
+                    "frequencyPenalty" to 0.4,
+                    "presencePenalty" to 0.2,
+                    "additional-model-request-fields" to mapOf(
+                        "frequency_penalty" to 0.9,
+                        "presence_penalty" to 0.8,
+                    ),
+                ),
+            ),
+        )
+
+        val factory = BedrockChatModelFactory(properties)
+        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val request = buildRequest(model)
+
+        assertEquals(0.9, request.additionalModelRequestFields?.get("frequency_penalty"))
+        assertEquals(0.8, request.additionalModelRequestFields?.get("presence_penalty"))
+    }
+
     private fun bedrockProps(
         awsAccessKeyId: String?,
         awsSecretAccessKey: String?,
@@ -145,5 +199,25 @@ class BedrockChatModelFactoryTest {
         field.isAccessible = true
         val clients = field.get(factory) as Map<*, *>
         return clients.size
+    }
+
+    private fun buildRequest(model: org.ivcode.aimo.core.model.AimoChatModel): ConverseRequest {
+        val method = model.chatEngine.javaClass.getDeclaredMethod("buildRequest", AimoPrompt::class.java)
+        method.isAccessible = true
+        val prompt = AimoPrompt(
+            messages = listOf(
+                AimoChatMessage(
+                    messageId = 0,
+                    type = AimoChatMessageType.USER,
+                    content = "hello",
+                    thinking = null,
+                    toolName = null,
+                    toolCallId = null,
+                    toolCalls = null,
+                    done = null,
+                )
+            )
+        )
+        return method.invoke(model.chatEngine, prompt) as ConverseRequest
     }
 }

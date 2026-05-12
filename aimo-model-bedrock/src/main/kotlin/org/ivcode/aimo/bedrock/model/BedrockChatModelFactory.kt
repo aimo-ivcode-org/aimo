@@ -476,13 +476,23 @@ private fun AimoChatOptions.toInferenceConfiguration(): InferenceConfiguration? 
 
 private fun AimoChatOptions.additionalModelRequestFields(): Map<String, Any?>? {
     val direct = providerOptions["additionalModelRequestFields"] as? Map<String, Any?>
-    if (!direct.isNullOrEmpty()) return direct
-
     val kebab = providerOptions["additional-model-request-fields"] as? Map<String, Any?>
-    if (!kebab.isNullOrEmpty()) return kebab
-
     val snake = providerOptions["additional_model_request_fields"] as? Map<String, Any?>
-    if (!snake.isNullOrEmpty()) return snake
 
-    return null
+    val merged = LinkedHashMap<String, Any?>()
+    if (!direct.isNullOrEmpty()) merged.putAll(direct)
+    else if (!kebab.isNullOrEmpty()) merged.putAll(kebab)
+    else if (!snake.isNullOrEmpty()) merged.putAll(snake)
+
+    if (frequencyPenalty != null && merged.keys.none { it.normalizedOptionKey() == "frequencypenalty" }) {
+        merged["frequency_penalty"] = frequencyPenalty
+    }
+    if (presencePenalty != null && merged.keys.none { it.normalizedOptionKey() == "presencepenalty" }) {
+        merged["presence_penalty"] = presencePenalty
+    }
+
+    return merged.takeIf { it.isNotEmpty() }
 }
+
+private fun String.normalizedOptionKey(): String =
+    lowercase().replace("-", "").replace("_", "")

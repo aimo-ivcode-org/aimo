@@ -16,10 +16,10 @@ internal object ResponseMapper {
         val message = ConverseMessage(
             role = response.output().message().role().toString().lowercase(),
             content = response.output().message().content().map { cb ->
+                val reasoning = TypeExtractors.extractReasoningText(cb)
                 when {
                     cb.text() != null -> ContentBlock(text = cb.text())
-                    TypeExtractors.extractReasoningText(cb) != null ->
-                        ContentBlock(reasoning = TypeExtractors.extractReasoningText(cb))
+                    reasoning != null -> ContentBlock(reasoning = reasoning)
                     cb.toolUse() != null -> ContentBlock(toolUse = ToolUse(
                         toolUseId = cb.toolUse().toolUseId(),
                         name = cb.toolUse().name(),
@@ -121,9 +121,29 @@ internal object ResponseMapper {
             system = bedrockSystemPrompt,
             inferenceConfig = bedrockInferenceConfig,
             toolConfig = bedrockToolConfig,
-            additionalModelRequestFields = request.additionalModelRequestFields?.let { DocumentConverter.anyToDocument(it) },
+            additionalModelRequestFields = mergeAdditionalModelRequestFields(
+                request.additionalModelRequestFields,
+                request.inferenceConfig?.topK,
+            ),
         )
     }
+
+    private fun mergeAdditionalModelRequestFields(
+        existing: Map<String, Any?>?,
+        topK: Int?,
+    ): Document? {
+        if (existing.isNullOrEmpty() && topK == null) return null
+
+        val merged = LinkedHashMap<String, Any?>()
+        existing?.let { merged.putAll(it) }
+        if (topK != null && merged.keys.none { it.isTopKKey() }) {
+            merged["top_k"] = topK
+        }
+        return DocumentConverter.anyToDocument(merged)
+    }
+
+    private fun String.isTopKKey(): Boolean =
+        lowercase().replace("_", "").replace("-", "") == "topk"
 
     private fun stringToBedrockRole(role: String): ConversationRole = when (role.lowercase()) {
         "user" -> ConversationRole.USER

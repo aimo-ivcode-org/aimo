@@ -104,6 +104,37 @@ class ResponseMapperTest {
     }
 
     @Test
+    @DisplayName("toBedrockFields forwards topK via additionalModelRequestFields.top_k")
+    fun testToBedrockFieldsTopKAdditionalField() {
+        val request = ConverseRequest(
+            model = "test-model",
+            messages = emptyList(),
+            inferenceConfig = InferenceConfiguration(topK = 42),
+        )
+
+        val fields = ResponseMapper.toBedrockFields(request)
+        assertNotNull(fields.additionalModelRequestFields)
+        val map = DocumentConverter.documentToMap(fields.additionalModelRequestFields!!)
+        assertEquals(42.0, map["top_k"])
+    }
+
+    @Test
+    @DisplayName("toBedrockFields keeps explicit top_k over inference topK")
+    fun testToBedrockFieldsTopKDoesNotOverrideExplicitField() {
+        val request = ConverseRequest(
+            model = "test-model",
+            messages = emptyList(),
+            inferenceConfig = InferenceConfiguration(topK = 42),
+            additionalModelRequestFields = mapOf("top_k" to 7),
+        )
+
+        val fields = ResponseMapper.toBedrockFields(request)
+        assertNotNull(fields.additionalModelRequestFields)
+        val map = DocumentConverter.documentToMap(fields.additionalModelRequestFields!!)
+        assertEquals(7.0, map["top_k"])
+    }
+
+    @Test
     @DisplayName("toBedrockFields omits null inference config")
     fun testToBedrockFieldsNullInferenceConfig() {
         val request = ConverseRequest(
