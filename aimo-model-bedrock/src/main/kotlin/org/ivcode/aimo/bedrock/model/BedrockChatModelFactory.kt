@@ -30,11 +30,16 @@ import java.util.UUID
 /**
  * [AimoChatModelProviderFactory] backed by AWS Bedrock API.
  *
- * One [BedrockChatClient] instance is created per distinct [BedrockModelProperties.region]
- * and shared across all models in that region to reuse the underlying AWS SDK client.
+ * One [BedrockChatClient] instance is created per distinct (region, credential-key) tuple.
+ * - If explicit credentials (awsAccessKeyId/awsSecretAccessKey) are provided, they must
+ *   both be present or both be absent (null).
+ * - If credentials are omitted, the AWS SDK default credential chain is used.
+ * - Models sharing the same region and credential configuration reuse the same client.
  *
  * @param properties Map of model-name → [BedrockModelProperties] sourced from
  *                   `aimo.model.bedrock.*` configuration.
+ * @throws IllegalArgumentException if credentials are partially specified (only one of
+ *                                  awsAccessKeyId or awsSecretAccessKey is set).
  */
 class BedrockChatModelFactory(
     private val properties: Map<String, BedrockModelProperties>,
@@ -42,10 +47,16 @@ class BedrockChatModelFactory(
 
     override val provider: String = "bedrock"
 
-    /** One client per region. */
+    /**
+     * One client per (region, credential) pair.
+     * Keyed by "region:credentialKey" where credentialKey is either:
+     * - An explicit AWS access key ID (if both awsAccessKeyId and awsSecretAccessKey are set)
+     * - "default" (if neither credential is set, using AWS SDK default credential chain)
+     */
     private val clients: Map<String, BedrockChatClient> =
         properties.values
             .distinctBy { it.region to it.awsAccessKeyId }
+            .onEach { validateCredentials(it) }
             .associateBy { "${it.region}:${it.awsAccessKeyId ?: "default"}" }
             .mapValues { (_, props) ->
                 BedrockChatClient(
@@ -102,6 +113,25 @@ class BedrockChatModelFactory(
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Validates that credentials are either both present or both absent.
+     * Throws if only one of awsAccessKeyId/awsSecretAccessKey is set.
+     */
+    private fun validateCredentials(props: BedrockModelProperties) {
+        val hasKeyId = !props.awsAccessKeyId.isNullOrBlank()
+        val hasSecret = !props.awsSecretAccessKey.isNullOrBlank()
+
+        if (hasKeyId != hasSecret) {
+            throw IllegalArgumentException(
+                "Bedrock model credentials must be fully specified or omitted entirely. " +
+                "Region: ${props.region}, " +
+                "awsAccessKeyId present: $hasKeyId, " +
+                "awsSecretAccessKey present: $hasSecret. " +
+                "Either provide both or neither to use the AWS SDK default credential chain."
+            )
+        }
+    }
 
     /** Ensures `model` is always present in the options map. */
     private fun resolveOptions(name: String, raw: Map<String, Any>): Map<String, Any> {

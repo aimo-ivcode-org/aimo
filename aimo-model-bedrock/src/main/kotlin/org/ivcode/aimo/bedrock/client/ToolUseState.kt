@@ -1,0 +1,52 @@
+package org.ivcode.aimo.bedrock.client
+
+import software.amazon.awssdk.core.document.Document
+import tools.jackson.databind.ObjectMapper
+
+/**
+ * Accumulates tool-use state across stream delta events.
+ */
+internal class ToolUseState {
+    var toolUseId: String? = null
+    var name: String? = null
+    val inputChunks: StringBuilder = StringBuilder()
+    var inputDocument: Document? = null
+
+    fun mergeFrom(partial: ToolUsePartial?) {
+        if (partial == null) return
+        if (!partial.toolUseId.isNullOrBlank()) toolUseId = partial.toolUseId
+        if (!partial.name.isNullOrBlank()) name = partial.name
+        if (!partial.inputChunk.isNullOrEmpty()) inputChunks.append(partial.inputChunk)
+        if (partial.inputDocument != null) inputDocument = partial.inputDocument
+    }
+
+    fun toToolUse(mapper: ObjectMapper): ToolUse? {
+        val resolvedId = toolUseId?.takeIf { it.isNotBlank() } ?: return null
+        val resolvedName = name?.takeIf { it.isNotBlank() } ?: return null
+        val input = when {
+            inputDocument != null -> {
+                val unwrapped = inputDocument!!.unwrap()
+                @Suppress("UNCHECKED_CAST")
+                (unwrapped as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: emptyMap()
+            }
+            inputChunks.isNotBlank() -> parseToolInput(mapper, inputChunks.toString())
+            else -> emptyMap()
+        }
+
+        return ToolUse(
+            toolUseId = resolvedId,
+            name = resolvedName,
+            input = input,
+        )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseToolInput(mapper: ObjectMapper, raw: String): Map<String, Any?> {
+        return try {
+            mapper.readValue(raw, Map::class.java) as? Map<String, Any?> ?: mapOf("raw" to raw)
+        } catch (_: Exception) {
+            mapOf("raw" to raw)
+        }
+    }
+}
+
