@@ -24,11 +24,7 @@ internal class ToolUseState {
         val resolvedId = toolUseId?.takeIf { it.isNotBlank() } ?: return null
         val resolvedName = name?.takeIf { it.isNotBlank() } ?: return null
         val input = when {
-            inputDocument != null -> {
-                val unwrapped = inputDocument!!.unwrap()
-                @Suppress("UNCHECKED_CAST")
-                (unwrapped as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: emptyMap()
-            }
+            inputDocument != null -> DocumentConverter.documentToMap(inputDocument!!)
             inputChunks.isNotBlank() -> parseToolInput(mapper, inputChunks.toString())
             else -> emptyMap()
         }
