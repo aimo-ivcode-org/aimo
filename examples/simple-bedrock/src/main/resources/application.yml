@@ -1,5 +1,11 @@
 spring.mvc.async.request-timeout: 0s
 
+logging:
+  level:
+    # Set the logging level for the BedrockChatClient to TRACE to see detailed logs of the interactions with the Bedrock API.
+    org.ivcode.aimo.bedrock.client.BedrockChatClient: TRACE
+
+
 # AWS Credentials
 # Set these via:
 # 1. application.yml properties (this file):
@@ -11,28 +17,86 @@ spring.mvc.async.request-timeout: 0s
 # 3. AWS CLI profiles: AWS_PROFILE=your-profile
 
 aimo.model.bedrock:
-  deepseek:
-    region: us-west-2
-    primary: false
-    contextSize: 8192
-    # Optional: specify AWS credentials here
-    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
-    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
-    options:
-      model: deepseek.v3.2
-      temperature: 0.7
-      maxTokens: 1024
 
-  deepseek_reasoning:
-    region: us-west-2
+  ## --== Deepseek ==-- ##
+
+  # Deepseek v3.2:
+  # - Use cases: complex reasoning, coding, and general-purpose tasks
+  # - Input: text
+  # - Output: text
+  deepseek-v32_reasoning:
     primary: true
+    region: us-west-2
     contextSize: 8192
-    # Optional: specify AWS credentials here
     awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
     awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
     options:
       model: deepseek.v3.2
-      temperature: 0.7
+      temperature: 1
       maxTokens: 1024
       additional-model-request-fields:
         reasoning_config: high
+
+  ## --== Amazon ==-- ##
+
+  # Nova Pro:
+  # - Use cases: complex reasoning, coding, and general-purpose tasks
+  # - Input: text, image, video
+  # - Output: text
+  nova_pro:
+    region: us-west-2
+    contextSize: 4096
+    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
+    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+    options:
+      model: us.amazon.nova-pro-v1:0
+      temperature: 0.7
+      topP: 0.9
+      maxTokens: 512
+
+  # Nova Micro:
+  # - Use cases: more cost-effective than Nova Pro for less complex tasks, such as straightforward Q&A and simple text generation.
+  # - Input: text
+  # - Output: text
+  nova_micro:
+    region: us-west-2
+    contextSize: 4096
+    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
+    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+    options:
+      model: us.amazon.nova-micro-v1:0
+      temperature: 0.7
+      topP: 0.9
+      maxTokens: 512
+
+  ## --== OpenAI ==-- ##
+
+  # Gpt-oss-120b
+  # - Use cases: complex reasoning, coding, and general-purpose tasks
+  # - Input: text
+  # - Output: text
+  gpt-oss-120b:
+    region: us-west-2
+    contextSize: 4096
+    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
+    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+    options:
+      model: openai.gpt-oss-120b-1:0
+      temperature: 0.7
+      topP: 0.9
+      maxTokens: 512
+
+  # Gpt-oss-20b:
+  # - Use cases: cost-effective for less basic tasks, general-purpose tasks
+  # - Input: text
+  # - Output: text
+  gpt-oss-20b:
+    region: us-west-2
+    contextSize: 4096
+    awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
+    awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
+    options:
+      model: openai.gpt-oss-20b-1:0
+      temperature: 0.7
+      topP: 0.9
+      maxTokens: 512

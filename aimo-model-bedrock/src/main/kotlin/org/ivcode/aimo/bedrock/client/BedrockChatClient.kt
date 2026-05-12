@@ -13,14 +13,17 @@ import software.amazon.awssdk.services.bedrockruntime.model.Message as BedrockMe
 import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock as BedrockContentBlock
 import software.amazon.awssdk.services.bedrockruntime.model.ToolResultContentBlock as BedrockToolResultContentBlock
 import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole
+import org.slf4j.LoggerFactory
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import org.ivcode.aimo.bedrock.client.transformer.MessageTransformerRegistry
 
 internal class BedrockChatClient(
     val region: String = "us-east-1",
     val awsAccessKeyId: String? = null,
     val awsSecretAccessKey: String? = null
 ) {
+    private val log = LoggerFactory.getLogger(BedrockChatClient::class.java)
     private val mapper: ObjectMapper = jacksonObjectMapper()
 
     val client: BedrockRuntimeClient = BedrockRuntimeClient.builder()
@@ -51,6 +54,14 @@ internal class BedrockChatClient(
 
     fun converse(modelId: String, request: ConverseRequest): ConverseResponse {
         val fields = request.toBedrockFields()
+        log.debug(
+            "Bedrock converse request modelId={}, messages={}, system={}, tools={}, additionalFields={}",
+            modelId,
+            request.messages.size,
+            request.system?.size ?: 0,
+            request.toolConfig?.tools?.size ?: 0,
+            request.additionalModelRequestFields?.isNotEmpty() == true,
+        )
         val bedrockRequest = BedrockConverseRequest.builder()
             .modelId(modelId)
             .messages(fields.messages)
@@ -60,10 +71,36 @@ internal class BedrockChatClient(
             .additionalModelRequestFields(fields.additionalModelRequestFields)
             .build()
 
+        if (log.isTraceEnabled) {
+            log.trace("Bedrock converse request (AIMO) modelId={} payload={}", modelId, asLogValue(request))
+            log.trace("Bedrock converse request (SDK) modelId={} payload={}", modelId, asLogValue(bedrockRequest))
+        }
+
         return try {
             val response = client.converse(bedrockRequest)
-            mapBedrockResponse(response)
+            if (log.isTraceEnabled) {
+                log.trace("Bedrock converse response (SDK) modelId={} payload={}", modelId, asLogValue(response))
+            }
+            val mapped = mapBedrockResponse(response)
+            if (log.isTraceEnabled) {
+                log.trace("Bedrock converse response (AIMO mapped) modelId={} payload={}", modelId, asLogValue(mapped))
+            }
+            val transformer = MessageTransformerRegistry.create(modelId)
+            val transformed = transformer.transformFinalResponse(mapped)
+            log.debug(
+                "Bedrock converse response modelId={}, stopReason={}, usageIn={}, usageOut={}, contentBlocks={}",
+                modelId,
+                transformed.stopReason,
+                transformed.usage.inputTokens,
+                transformed.usage.outputTokens,
+                transformed.output.message.content.size,
+            )
+            if (log.isTraceEnabled) {
+                log.trace("Bedrock converse response (AIMO transformed) modelId={} payload={}", modelId, asLogValue(transformed))
+            }
+            transformed
         } catch (e: Exception) {
+            log.error("Bedrock converse failed modelId={}: {}", modelId, e.message, e)
             throw IllegalStateException("Bedrock chat request failed: ${e.message}", e)
         }
     }
@@ -71,12 +108,21 @@ internal class BedrockChatClient(
     fun converseStream(modelId: String, request: ConverseRequest, callback: ChatCallback): ConverseResponse {
         val textBuilder = StringBuilder()
         val reasoningBuilder = StringBuilder()
-        val textFilter = ModelControlTextFilter()
+        val transformer = MessageTransformerRegistry.create(modelId)
         val streamedToolUses = mutableListOf<ToolUse>()
         val toolUseStatesByIndex = mutableMapOf<Int, ToolUseState>()
         var role = "assistant"
         var stopReason = "end_turn"
         var usage = Usage(inputTokens = 0, outputTokens = 0)
+
+        log.debug(
+            "Bedrock stream request modelId={}, messages={}, system={}, tools={}, additionalFields={}",
+            modelId,
+            request.messages.size,
+            request.system?.size ?: 0,
+            request.toolConfig?.tools?.size ?: 0,
+            request.additionalModelRequestFields?.isNotEmpty() == true,
+        )
 
         val fields = request.toBedrockFields()
         val streamRequest = BedrockConverseStreamRequest.builder()
@@ -87,75 +133,117 @@ internal class BedrockChatClient(
             .toolConfig(fields.toolConfig)
             .additionalModelRequestFields(fields.additionalModelRequestFields)
             .build()
+
+        if (log.isTraceEnabled) {
+            log.trace("Bedrock stream request (AIMO) modelId={} payload={}", modelId, asLogValue(request))
+            log.trace("Bedrock stream request (SDK) modelId={} payload={}", modelId, asLogValue(streamRequest))
+        }
+
         val handler = ConverseStreamResponseHandler.builder()
             .subscriber(
                 ConverseStreamResponseHandler.Visitor.builder()
                     .onMessageStart { event ->
                         role = event.roleAsString().lowercase()
+                        if (log.isTraceEnabled) {
+                            log.trace("Bedrock stream event onMessageStart modelId={} payload={}", modelId, asLogValue(event))
+                        }
                     }
                     .onContentBlockStart { event ->
+                        if (log.isTraceEnabled) {
+                            log.trace("Bedrock stream event onContentBlockStart modelId={} payload={}", modelId, asLogValue(event))
+                        }
                         val index = event.contentBlockIndex()
                         val state = toolUseStatesByIndex.getOrPut(index) { ToolUseState() }
                         state.mergeFrom(extractToolUseStart(event.start()))
                     }
                     .onContentBlockDelta { event ->
-                        val text = textFilter.consume(event.delta().text().orEmpty())
-                        val reasoning = extractReasoningText(event.delta())
+                        if (log.isTraceEnabled) {
+                            log.trace("Bedrock stream event onContentBlockDelta modelId={} payload={}", modelId, asLogValue(event))
+                        }
+                        val rawText = event.delta().text().orEmpty()
+                        val chunk = transformer.consumeChunk(rawText)
+                        val text = chunk.text
+                        val reasoning = chunk.reasoning.takeIf { it.isNotBlank() }
+                            ?: extractReasoningText(event.delta())
                         val index = event.contentBlockIndex()
                         val state = toolUseStatesByIndex.getOrPut(index) { ToolUseState() }
                         state.mergeFrom(extractToolUseDelta(event.delta()))
-                        if (!text.isNullOrEmpty()) {
+                        if (text.isNotEmpty()) {
                             textBuilder.append(text)
-                            callback(
-                                ConverseResponse(
-                                    output = Output(
-                                        message = ConverseMessage(
-                                            role = role,
-                                            content = listOf(ContentBlock(text = text)),
-                                        )
-                                    ),
-                                    stopReason = "streaming",
-                                    usage = usage,
-                                )
+                            val callbackPayload = ConverseResponse(
+                                output = Output(
+                                    message = ConverseMessage(
+                                        role = role,
+                                        content = listOf(ContentBlock(text = text)),
+                                    )
+                                ),
+                                stopReason = "streaming",
+                                usage = usage,
                             )
+                            if (log.isTraceEnabled) {
+                                log.trace(
+                                    "Bedrock stream callback text chunk modelId={} payload={}",
+                                    modelId,
+                                    asLogValue(callbackPayload),
+                                )
+                            }
+                            callback(callbackPayload)
                         }
                         if (!reasoning.isNullOrBlank()) {
                             reasoningBuilder.append(reasoning)
-                            callback(
-                                ConverseResponse(
-                                    output = Output(
-                                        message = ConverseMessage(
-                                            role = role,
-                                            content = listOf(ContentBlock(reasoning = reasoning)),
-                                        )
-                                    ),
-                                    stopReason = "streaming",
-                                    usage = usage,
-                                )
+                            val callbackPayload = ConverseResponse(
+                                output = Output(
+                                    message = ConverseMessage(
+                                        role = role,
+                                        content = listOf(ContentBlock(reasoning = reasoning)),
+                                    )
+                                ),
+                                stopReason = "streaming",
+                                usage = usage,
                             )
+                            if (log.isTraceEnabled) {
+                                log.trace(
+                                    "Bedrock stream callback reasoning chunk modelId={} payload={}",
+                                    modelId,
+                                    asLogValue(callbackPayload),
+                                )
+                            }
+                            callback(callbackPayload)
                         }
                     }
                     .onContentBlockStop { event ->
+                        if (log.isTraceEnabled) {
+                            log.trace("Bedrock stream event onContentBlockStop modelId={} payload={}", modelId, asLogValue(event))
+                        }
                         val index = event.contentBlockIndex()
                         val finalized = toolUseStatesByIndex.remove(index)?.toToolUse(mapper)
                         if (finalized != null) {
                             streamedToolUses += finalized
-                            callback(
-                                ConverseResponse(
-                                    output = Output(
-                                        message = ConverseMessage(
-                                            role = role,
-                                            content = listOf(ContentBlock(toolUse = finalized)),
-                                        )
-                                    ),
-                                    stopReason = "streaming",
-                                    usage = usage,
-                                )
+                            val callbackPayload = ConverseResponse(
+                                output = Output(
+                                    message = ConverseMessage(
+                                        role = role,
+                                        content = listOf(ContentBlock(toolUse = finalized)),
+                                    )
+                                ),
+                                stopReason = "streaming",
+                                usage = usage,
                             )
+                            if (log.isTraceEnabled) {
+                                log.trace(
+                                    "Bedrock stream callback toolUse chunk modelId={} payload={}",
+                                    modelId,
+                                    asLogValue(callbackPayload),
+                                )
+                            }
+                            callback(callbackPayload)
                         }
                     }
                     .onMessageStop { event ->
                         stopReason = event.stopReasonAsString().lowercase()
+                        if (log.isTraceEnabled) {
+                            log.trace("Bedrock stream event onMessageStop modelId={} payload={}", modelId, asLogValue(event))
+                        }
                     }
                     .onMetadata { event ->
                         val metaUsage = event.usage()
@@ -163,6 +251,9 @@ internal class BedrockChatClient(
                             inputTokens = metaUsage?.inputTokens() ?: usage.inputTokens,
                             outputTokens = metaUsage?.outputTokens() ?: usage.outputTokens,
                         )
+                        if (log.isTraceEnabled) {
+                            log.trace("Bedrock stream event onMetadata modelId={} payload={}", modelId, asLogValue(event))
+                        }
                     }
                     .build()
             )
@@ -176,28 +267,41 @@ internal class BedrockChatClient(
                 streamedToolUses.forEach { add(ContentBlock(toolUse = it)) }
             }.ifEmpty { listOf(ContentBlock(text = "")) }
 
-            ConverseResponse(
-                output = Output(
-                    message = ConverseMessage(
-                        role = role,
-                        content = finalContent,
-                    )
-                ),
+            val assembled = ConverseResponse(
+                output = Output(message = ConverseMessage(role = role, content = finalContent)),
                 stopReason = stopReason,
                 usage = usage,
             )
+            if (log.isTraceEnabled) {
+                log.trace("Bedrock stream response (AIMO assembled) modelId={} payload={}", modelId, asLogValue(assembled))
+            }
+            val transformed = transformer.transformFinalResponse(assembled)
+            log.debug(
+                "Bedrock stream response modelId={}, stopReason={}, usageIn={}, usageOut={}, textLen={}, reasoningLen={}, toolUses={}",
+                modelId,
+                transformed.stopReason,
+                transformed.usage.inputTokens,
+                transformed.usage.outputTokens,
+                transformed.output.message.content.sumOf { it.text?.length ?: 0 },
+                transformed.output.message.content.sumOf { it.reasoning?.length ?: 0 },
+                transformed.output.message.content.count { it.toolUse != null },
+            )
+            if (log.isTraceEnabled) {
+                log.trace("Bedrock stream response (AIMO transformed) modelId={} payload={}", modelId, asLogValue(transformed))
+            }
+            transformed
         } catch (e: Exception) {
+            log.error("Bedrock stream failed modelId={}: {}", modelId, e.message, e)
             throw IllegalStateException("Bedrock stream request failed: ${e.message}", e)
         }
     }
 
     private fun mapBedrockResponse(response: BedrockConverseResponse): ConverseResponse {
-        val textFilter = ModelControlTextFilter()
         val message = ConverseMessage(
             role = response.output().message().role().toString().lowercase(),
             content = response.output().message().content().map { cb ->
                 when {
-                    cb.text() != null -> ContentBlock(text = textFilter.consume(cb.text()))
+                    cb.text() != null -> ContentBlock(text = cb.text())
                     extractReasoningText(cb) != null -> ContentBlock(reasoning = extractReasoningText(cb))
                     cb.toolUse() != null -> ContentBlock(toolUse = ToolUse(
                         toolUseId = cb.toolUse().toolUseId(),
@@ -445,6 +549,14 @@ internal class BedrockChatClient(
         val toolConfig: software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration?,
         val additionalModelRequestFields: Document?,
     )
+
+    private fun asLogValue(value: Any?): String {
+        return try {
+            mapper.writeValueAsString(value)
+        } catch (_: Exception) {
+            value?.toString() ?: "null"
+        }
+    }
 
     /**
      * Removes model-side control tags (for example DeepSeek's DSML function_call marker)
