@@ -1,12 +1,8 @@
 package org.ivcode.aimo.bedrock.client
 
-import com.fasterxml.jackson.annotation.JsonAnyGetter
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.annotation.JsonValue
-import com.fasterxml.jackson.annotation.JsonCreator
-import java.time.Instant
 
 /* References:
  * - https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html

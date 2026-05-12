@@ -1,6 +1,6 @@
 # Simple Bedrock Example
 
-Runnable Spring Boot application integrating Aimo with AWS Bedrock Claude models.
+Runnable Spring Boot application integrating Aimo with AWS Bedrock models.
 
 ## Prerequisites
 
