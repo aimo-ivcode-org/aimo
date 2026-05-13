@@ -80,14 +80,19 @@ private lateinit var bedrockFactory: AimoChatModelProviderFactory
 val model = bedrockFactory.createAimoChatModel("claude-3-sonnet")
 ```
 
-## Supported Models
+## Tested Models
 
-Any AWS Bedrock model is supported. Common examples:
+The following models are currently configured in `examples/simple-bedrock` and verified for thinking/tool support:
 
-- `anthropic.claude-3-5-sonnet-20241022-v2:0` - Claude 3.5 Sonnet
-- `anthropic.claude-3-5-haiku-20241022-v1:0` - Claude 3.5 Haiku
-- `meta.llama3-70b-instruct-v1:0` - Llama 3 70B
-- `mistral.large-2402-v1:0` - Mistral Large
+| model | thinking | tools |
+| --- | --- | --- |
+| `deepseek.v3.2` | ✅ | ✅ |
+| `us.amazon.nova-pro-v1:0` | ✅ | ✅ |
+| `us.amazon.nova-micro-v1:0` | ⚠️ | ✅ |
+| `openai.gpt-oss-120b-1:0` | ✅ | ✅ |
+| `openai.gpt-oss-20b-1:0` | ✅ | ✅ |
+| `google.gemma-3-27b-it` | ❌ | ❌ |
+| `google.gemma-3-4b-it` | ❌ | ❌ |
 
 Check the AWS Bedrock console for the complete list of available models and their IDs.
 
