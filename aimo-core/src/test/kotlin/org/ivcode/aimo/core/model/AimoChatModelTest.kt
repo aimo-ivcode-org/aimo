@@ -38,7 +38,7 @@ class AimoChatModelTest {
             chatEngine = engine,
             options = options,
             isPrimary = false,
-            contextSize = 4096,
+            context = AimoChatContext(size = 4096),
         )
 
         assertEquals("chatbot", model.name)
@@ -47,7 +47,7 @@ class AimoChatModelTest {
         assertEquals(0.6, model.options.temperature)
         assertEquals("json", model.options.providerOptions["format"])
         assertFalse(model.isPrimary)
-        assertEquals(4096, model.contextSize)
+        assertEquals(4096, model.context.size)
     }
 }
 

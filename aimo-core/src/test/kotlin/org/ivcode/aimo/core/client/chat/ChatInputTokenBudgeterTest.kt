@@ -121,11 +121,51 @@ class ChatInputTokenBudgeterTest {
         assertEquals(listOf(history[1], history[2], history[3]), result)
     }
 
-    private fun message(id: Int, content: String) = AimoChatMessage(
+    @Test
+    fun `promptMessagesForCall keeps thinking when exclusion is disabled`() {
+        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 10, excludeThinking = false)
+        val history = listOf(
+            message(1, "old", thinking = "old-thought"),
+        )
+        val prompt = message(2, "prompt", thinking = "prompt-thought")
+
+        val result = budgeter.promptMessagesForCall(
+            systemMessages = emptyList(),
+            history = history,
+            prompt = prompt,
+            taskMessages = emptyList(),
+            tools = emptyList(),
+        )
+
+        assertEquals("old-thought", result[0].thinking)
+        assertEquals("prompt-thought", result[1].thinking)
+    }
+
+    @Test
+    fun `promptMessagesForCall removes thinking when exclusion is enabled`() {
+        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 10, excludeThinking = true)
+        val history = listOf(
+            message(1, "old", thinking = "old-thought"),
+        )
+        val prompt = message(2, "prompt", thinking = "prompt-thought")
+
+        val result = budgeter.promptMessagesForCall(
+            systemMessages = emptyList(),
+            history = history,
+            prompt = prompt,
+            taskMessages = emptyList(),
+            tools = emptyList(),
+        )
+
+        assertEquals(null, result[0].thinking)
+        assertEquals(null, result[1].thinking)
+    }
+
+    private fun message(id: Int, content: String, thinking: String? = null) = AimoChatMessage(
         messageId = id,
         type = AimoChatMessageType.USER,
         content = content,
-        thinking = null,
+        thinking = thinking,
         toolName = null,
         done = true,
     )

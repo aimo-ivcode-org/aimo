@@ -6,6 +6,7 @@ import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModel
+import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoPrompt
@@ -95,7 +96,10 @@ class BedrockChatModelFactory(
             chatEngine = engine,
             options = aimoOptions,
             isPrimary = props.primary,
-            contextSize = props.contextSize,
+            context = AimoChatContext(
+                size = props.context.size,
+                excludeThinking = props.context.excludeThinking,
+            ),
         )
     }
 
@@ -496,3 +500,4 @@ private fun AimoChatOptions.additionalModelRequestFields(): Map<String, Any?>? {
 
 private fun String.normalizedOptionKey(): String =
     lowercase().replace("-", "").replace("_", "")
+

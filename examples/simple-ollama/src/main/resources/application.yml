@@ -4,7 +4,9 @@ aimo.model.ollama:
   gpt-oss:
     base-url: http://localhost:11434
     primary: true
-    contextSize: 2048
+    context:
+      size: 8192
+      excludeThinking: true
     options:
       model: gpt-oss:20b
       temperature: 0.7

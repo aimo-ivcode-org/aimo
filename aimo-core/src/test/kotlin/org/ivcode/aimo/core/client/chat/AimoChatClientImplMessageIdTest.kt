@@ -13,6 +13,7 @@ import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatOptions
+import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoPrompt
 import java.time.Instant
 import java.util.UUID
@@ -119,6 +120,27 @@ class AimoChatClientImplMessageIdTest {
     }
 
     @Test
+    fun `chat drops empty assistant response from persistence and return payload`() {
+        val dao = AimoChatClientDaoMemory()
+        val chatId = dao.createChatSession().chatId
+        val client = AimoChatClientImpl(
+            chatId = chatId,
+            session = TestSessionClient(chatId),
+            dao = dao,
+            model = testModel(engine = FixedResponseEngine(simpleResponse(content = "")), contextSize = 4000),
+            tools = emptyList(),
+            systemMessages = emptyList(),
+        )
+
+        val response = client.chat(AimoChatRequest(prompt = "empty", context = emptyMap()))
+
+        assertTrue(response.messages.isEmpty())
+        val persisted = dao.getMessages(chatId)
+        assertEquals(1, persisted.size)
+        assertEquals("USER", persisted.single().type)
+    }
+
+    @Test
     fun `chatStream persists thinking from streamed assistant response`() {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatSession().chatId
@@ -146,7 +168,7 @@ class AimoChatClientImplMessageIdTest {
     }
 
     @Test
-    fun `thinking-only assistant history is not replayed as empty assistant content`() {
+    fun `thinking-only assistant history is not replayed when context excludes thinking`() {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatSession().chatId
         val capturedPrompts = mutableListOf<List<AimoChatMessage>>()
@@ -161,6 +183,7 @@ class AimoChatClientImplMessageIdTest {
                     capturedPrompts = capturedPrompts,
                 ),
                 contextSize = 4000,
+                excludeThinking = true,
             ),
             tools = emptyList(),
             systemMessages = emptyList(),
@@ -322,11 +345,15 @@ class AimoChatClientImplMessageIdTest {
     private fun testModel(
         engine: AimoChatEngine,
         contextSize: Int = 1,
+        excludeThinking: Boolean = false,
     ): AimoChatModel = AimoChatModel(
         name = "test",
         chatEngine = engine,
         options = AimoChatOptions(),
-        contextSize = contextSize,
+        context = AimoChatContext(
+            size = contextSize,
+            excludeThinking = excludeThinking,
+        ),
     )
 
     private fun simpleResponse(content: String = "ok"): AimoChatResponse = AimoChatResponse(

@@ -6,6 +6,7 @@ import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoPrompt
+import org.ivcode.aimo.core.model.AimoChatContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -86,7 +87,7 @@ class AimoConfigPrimaryModelSelectionTest {
             chatEngine = TestEngine(),
             options = AimoChatOptions(model = name),
             isPrimary = isPrimary,
-            contextSize = 8192,
+            context = AimoChatContext(size = 8192),
         )
 
     private class TestEngine : AimoChatEngine {
@@ -101,4 +102,3 @@ class AimoConfigPrimaryModelSelectionTest {
         }
     }
 }
-

@@ -36,9 +36,10 @@ internal class AimoChatClientImpl (
     private val toolCallbacks: Map<String, AimoToolCallback> = tools.associateBy { it.toolDefinition.name }
     private val toolDefinitions: List<AimoToolDefinition> = toolCallbacks.values.map { it.toolDefinition }
     private val inputTokenBudgeter = ChatInputTokenBudgeter(
-        maxInputTokens = model.contextSize,
+        maxInputTokens = model.context.size,
         initialObservedPromptCharacters = initialObservedPromptCharacters,
         initialObservedPromptTokens = initialObservedPromptTokens,
+        excludeThinking = model.context.excludeThinking,
     )
 
     override fun chat(request: AimoChatRequest): AimoChatResponse {
@@ -70,24 +71,25 @@ internal class AimoChatClientImpl (
 
         while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
             val messageId = 2 + taskMessages.size
-            val promptHistory = inputTokenBudgeter.historyForPrompt(
+            val promptMessages = inputTokenBudgeter.promptMessagesForCall(
                 systemMessages = systemMessages,
                 history = history,
                 prompt = promptMessage,
                 taskMessages = taskMessages,
                 tools = toolCallbacks.values.toList(),
             )
-            val promptMessages = systemMessages + promptHistory + promptMessage + taskMessages
             val prompt = AimoPrompt(
                 tools = toolDefinitions,
                 systemMessages = this.systemMessages,
                 options = null,
-                messages = promptMessages.withoutThinking(),
+                messages = promptMessages,
             )
 
             val engineResponse = call(responseId, messageId, prompt, callback)
             assistantMessage = engineResponse.extractAssistantMessage(messageId)
-            taskMessages.add(assistantMessage)
+            if (!assistantMessage.isEmptyPayload()) {
+                taskMessages.add(assistantMessage)
+            }
 
             if (!assistantMessage.toolCalls.isNullOrEmpty()) {
                 val toolContext = createToolContext(requestId = responseId, request = request)
@@ -123,7 +125,8 @@ internal class AimoChatClientImpl (
 
         persistTokenBudgeterCalibration()
 
-        val allMessages = listOf(promptMessage) + taskMessages
+        val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
+        val allMessages = listOf(promptMessage) + persistedTaskMessages
         dao.addChatRequest(ChatRequestEntity(
             chatId = chatId,
             requestId = responseId,
@@ -135,7 +138,7 @@ internal class AimoChatClientImpl (
         return AimoChatResponse(
             chatId = chatId,
             responseId = responseId,
-            messages = taskMessages,
+            messages = persistedTaskMessages,
             createdAt = Instant.now(),
         )
     }
@@ -258,19 +261,6 @@ internal class AimoChatClientImpl (
         ))
     }
 
-    private fun List<AimoChatMessage>.withoutThinking(): List<AimoChatMessage> {
-        return map { message ->
-            if (message.thinking == null) {
-                message
-            } else {
-                message.copy(thinking = null)
-            }
-        }.filterNot { message ->
-            message.type == AimoChatMessageType.ASSISTANT
-                && message.content.isNullOrBlank()
-                && message.toolCalls.isNullOrEmpty()
-        }
-    }
 
     private fun AimoChatResponse.extractAssistantMessage(messageId: Int): AimoChatMessage {
         val assistant = messages.lastOrNull { it.type == AimoChatMessageType.ASSISTANT }
@@ -286,6 +276,14 @@ internal class AimoChatClientImpl (
             messages = listOf(extractAssistantMessage(messageId)),
             createdAt = Instant.now(),
         )
+    }
+
+    private fun AimoChatMessage.isEmptyPayload(): Boolean {
+        return content.isNullOrBlank() &&
+            thinking.isNullOrBlank() &&
+            toolCalls.isNullOrEmpty() &&
+            toolName.isNullOrBlank() &&
+            toolCallId.isNullOrBlank()
     }
 
 

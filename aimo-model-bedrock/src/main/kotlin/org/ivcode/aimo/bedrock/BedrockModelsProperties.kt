@@ -10,9 +10,14 @@ data class BedrockModelsProperties(
 data class BedrockModelProperties(
     val region: String = "us-east-1",
     val primary: Boolean = false,
-    val contextSize: Int = 8192,
+    val context: BedrockContextProperties = BedrockContextProperties(),
     val options: Map<String, Any> = emptyMap(),
     val awsAccessKeyId: String? = null,
     val awsSecretAccessKey: String? = null,
+)
+
+data class BedrockContextProperties(
+    val size: Int = 8192,
+    val excludeThinking: Boolean = false,
 )
 

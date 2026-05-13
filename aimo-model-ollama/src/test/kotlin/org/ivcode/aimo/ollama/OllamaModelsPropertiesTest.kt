@@ -16,7 +16,8 @@ class OllamaModelsPropertiesTest {
             mapOf(
                 "aimo.model.ollama.chatbot.base-url" to "http://localhost:11434",
                 "aimo.model.ollama.chatbot.primary" to "true",
-                "aimo.model.ollama.chatbot.context-size" to "16384",
+                "aimo.model.ollama.chatbot.context.size" to "16384",
+                "aimo.model.ollama.chatbot.context.exclude-thinking" to "true",
                 "aimo.model.ollama.chatbot.options.temperature" to "0.7",
                 "aimo.model.ollama.chatbot.options.top-p" to "0.9",
                 "aimo.model.ollama.chatbot.options.stop" to "END,DONE",
@@ -30,7 +31,8 @@ class OllamaModelsPropertiesTest {
         val chatbot = bound.ollama.getValue("chatbot")
         assertEquals("http://localhost:11434", chatbot.baseUrl)
         assertTrue(chatbot.primary)
-        assertEquals(16_384, chatbot.contextSize)
+        assertEquals(16_384, chatbot.context.size)
+        assertTrue(chatbot.context.excludeThinking)
         assertEquals("0.7", chatbot.options["temperature"])
         assertEquals("0.9", chatbot.options["top-p"])
         assertEquals("END,DONE", chatbot.options["stop"])
@@ -42,7 +44,8 @@ class OllamaModelsPropertiesTest {
 
         assertEquals("http://localhost:11434", properties.baseUrl)
         assertFalse(properties.primary)
-        assertEquals(8192, properties.contextSize)
+        assertEquals(8192, properties.context.size)
+        assertFalse(properties.context.excludeThinking)
         assertTrue(properties.options.isEmpty())
     }
 }
