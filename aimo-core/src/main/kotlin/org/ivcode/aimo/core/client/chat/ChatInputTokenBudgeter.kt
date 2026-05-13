@@ -255,7 +255,11 @@ internal class ChatInputTokenBudgeter(
     }
 
     private fun AimoChatMessage.isEmptyPayload(): Boolean {
-        return content.isNullOrBlank() && thinking.isNullOrBlank() && toolCalls.isNullOrEmpty()
+        return content.isNullOrBlank() &&
+            thinking.isNullOrBlank() &&
+            toolCalls.isNullOrEmpty() &&
+            toolName.isNullOrBlank() &&
+            toolCallId.isNullOrBlank()
     }
 
     private fun recordPromptUsage(promptCharacters: Int, promptTokens: Int) {

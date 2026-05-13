@@ -279,7 +279,11 @@ internal class AimoChatClientImpl (
     }
 
     private fun AimoChatMessage.isEmptyPayload(): Boolean {
-        return content.isNullOrBlank() && thinking.isNullOrBlank() && toolCalls.isNullOrEmpty()
+        return content.isNullOrBlank() &&
+            thinking.isNullOrBlank() &&
+            toolCalls.isNullOrEmpty() &&
+            toolName.isNullOrBlank() &&
+            toolCallId.isNullOrBlank()
     }
 
 

@@ -92,7 +92,7 @@ The following models are currently configured in `examples/simple-bedrock` and v
 |----------------------------|----------|-------|
 | `deepseek.v3.2`            | ✅        | ✅     |
 | `us.amazon.nova-pro-v1:0`  | ✅        | ✅     |
-| `us.amazon.nova-micro-v1:0`| ⚠️       | ✅     |
+| `us.amazon.nova-micro-v1:0` | ⚠️       | ✅     |
 | `openai.gpt-oss-120b-1:0`  | ✅        | ✅     |
 | `openai.gpt-oss-20b-1:0`   | ✅        | ✅     |
 | `google.gemma-3-27b-it`    | ❌        | ❌     |
