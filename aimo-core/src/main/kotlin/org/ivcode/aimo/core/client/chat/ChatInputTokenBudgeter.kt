@@ -18,12 +18,14 @@ import kotlin.math.ceil
  * Notes:
  * - Token estimation starts with a character-count heuristic and is refined over time
  *   using observed prompt usage returned by the model.
- * - Only message content is counted; non-content fields (for example, thinking metadata)
- *   are intentionally excluded.
+ * - Message text used for budgeting includes `content` and, by default, `thinking`.
+ *   Set [excludeThinking] to `true` to omit `thinking` from budgeting and prompt payloads.
  * - Tool token estimation uses explicit tool-definition fields (name/description/schema)
  *   instead of relying on object string rendering.
  *
  * @property maxInputTokens Maximum allowed prompt input tokens for one model call.
+ * @property excludeThinking When true, excludes `thinking` text from token/character
+ *   budgeting and strips it from prompt messages sent to the model.
  */
 internal class ChatInputTokenBudgeter(
     private val maxInputTokens: Int,
