@@ -18,7 +18,8 @@ aimo.model.ollama.{name}.<property>
 |---|---|---|---|
 | `base-url` | `String` | `http://localhost:11434` | Base URL of the Ollama server to use for this model. |
 | `primary` | `Boolean` | `false` | Marks this model as the primary model used by Aimo. Only one model may be primary. If no model is marked primary, the first configured model is used. |
-| `contextSize` | `Int` | `8192` | Approximate context window size in tokens. Used to budget input tokens per request. |
+| `context.size` | `Int` | `8192` | Approximate context window size in tokens. Used to budget input tokens per request. |
+| `context.excludeThinking` | `Boolean` | `false` | Excludes assistant thinking content from context-window budgeting and prompt history payload when enabled. |
 | `options.*` | `Map<String, Any>` | — | Ollama chat options applied to every request for this model. See [Ollama options](#ollama-options) below. |
 
 ---
@@ -75,7 +76,9 @@ aimo.model.ollama:
   chatbot:
     base-url: http://localhost:11434
     primary: true
-    contextSize: 16384
+    context:
+      size: 16384
+      excludeThinking: false
     options:
       model: llama3.1:8b
       temperature: 0.7
@@ -90,7 +93,9 @@ aimo.model.ollama:
   fast:
     base-url: http://localhost:11434
     primary: true
-    contextSize: 8192
+    context:
+      size: 8192
+      excludeThinking: false
     options:
       model: llama3.1:8b
       temperature: 0.3
@@ -98,7 +103,9 @@ aimo.model.ollama:
 
   creative:
     base-url: http://other-ollama-host:11434
-    contextSize: 32768
+    context:
+      size: 32768
+      excludeThinking: false
     options:
       model: gpt-oss:20b
       temperature: 0.9

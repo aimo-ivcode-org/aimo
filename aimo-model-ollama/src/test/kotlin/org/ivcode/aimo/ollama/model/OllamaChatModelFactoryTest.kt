@@ -1,6 +1,7 @@
 package org.ivcode.aimo.ollama.model
 
 import org.ivcode.aimo.core.model.AimoChatOptions
+import org.ivcode.aimo.ollama.OllamaContextProperties
 import org.ivcode.aimo.ollama.OllamaModelProperties
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,7 +20,7 @@ class OllamaChatModelFactoryTest {
                 "chatbot" to OllamaModelProperties(
                     baseUrl = "http://localhost:11434",
                     primary = true,
-                    contextSize = 16_384,
+                    context = OllamaContextProperties(size = 16_384, excludeThinking = true),
                     options = linkedMapOf(
                         "temperature" to "0.7",
                         "num_predict" to 512,
@@ -36,7 +37,8 @@ class OllamaChatModelFactoryTest {
 
         assertEquals("chatbot", model.name)
         assertTrue(model.isPrimary)
-        assertEquals(16_384, model.contextSize)
+        assertEquals(16_384, model.context.size)
+        assertTrue(model.context.excludeThinking)
         assertEquals(
             AimoChatOptions(
                 model = "chatbot",
@@ -117,4 +119,3 @@ class OllamaChatModelFactoryTest {
         assertTrue(ex.message!!.contains("Only one Ollama model can be marked primary=true"))
     }
 }
-

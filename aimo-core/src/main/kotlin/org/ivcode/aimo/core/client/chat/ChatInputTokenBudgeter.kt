@@ -29,6 +29,7 @@ internal class ChatInputTokenBudgeter(
     private val maxInputTokens: Int,
     initialObservedPromptCharacters: Long = 0,
     initialObservedPromptTokens: Long = 0,
+    private val excludeThinking: Boolean = false,
 ) {
     private var observedPromptCharacters: Long = initialObservedPromptCharacters.coerceAtLeast(0)
     private var observedPromptTokens: Long = initialObservedPromptTokens.coerceAtLeast(0)
@@ -40,6 +41,7 @@ internal class ChatInputTokenBudgeter(
 
     private data class PromptPlan(
         val history: List<AimoChatMessage>,
+        val promptMessages: List<AimoChatMessage>,
         val promptCharacters: Int,
     )
 
@@ -71,6 +73,22 @@ internal class ChatInputTokenBudgeter(
             taskMessages = taskMessages,
             tools = tools,
         ).history
+    }
+
+    fun promptMessagesForCall(
+        systemMessages: List<AimoChatMessage>,
+        history: List<AimoChatMessage>,
+        prompt: AimoChatMessage,
+        taskMessages: List<AimoChatMessage>,
+        tools: List<AimoToolCallback>,
+    ): List<AimoChatMessage> {
+        return createPromptPlan(
+            systemMessages = systemMessages,
+            history = history,
+            prompt = prompt,
+            taskMessages = taskMessages,
+            tools = tools,
+        ).promptMessages
     }
 
     /**
@@ -121,7 +139,7 @@ internal class ChatInputTokenBudgeter(
         val result = mutableListOf<AimoChatMessage>()
 
         for (message in history.asReversed()) {
-            val messageTokens = estimateTokens(message.content ?: "")
+            val messageTokens = estimateTokens(messageTextForBudgeting(message))
             if (tokenCount + messageTokens > tokenBudget) {
                 break
             }
@@ -139,11 +157,25 @@ internal class ChatInputTokenBudgeter(
      * @return Estimated aggregate token count.
      */
     private fun estimateMessagesTokens(messages: List<AimoChatMessage>): Int {
-        return messages.sumOf { estimateTokens(it.content ?: "") }
+        return messages.sumOf { estimateTokens(messageTextForBudgeting(it)) }
     }
 
     private fun countMessageCharacters(messages: List<AimoChatMessage>): Int {
-        return messages.sumOf { countCharacters(it.content ?: "") }
+        return messages.sumOf { countCharacters(messageTextForBudgeting(it)) }
+    }
+
+    private fun messageTextForBudgeting(message: AimoChatMessage): String {
+        val content = message.content.orEmpty()
+        if (excludeThinking) {
+            return content
+        }
+
+        val thinking = message.thinking.orEmpty()
+        if (thinking.isBlank()) {
+            return content
+        }
+
+        return if (content.isBlank()) thinking else "$content\n$thinking"
     }
 
     /**
@@ -202,13 +234,28 @@ internal class ChatInputTokenBudgeter(
         val fixedMessages = systemMessages + listOf(prompt) + taskMessages
         val fixedInputTokens = estimateMessagesTokens(fixedMessages) + estimateToolTokens(tools)
         val historyForPrompt = truncateHistoryByTokens(history, maxInputTokens - fixedInputTokens)
-        val promptCharacters = countMessageCharacters(systemMessages + historyForPrompt + prompt + taskMessages) +
+        val promptMessages = systemMessages + historyForPrompt + prompt + taskMessages
+        val normalizedPromptMessages = promptMessages
+            .let { messages ->
+                if (!excludeThinking) messages
+                else messages.map { message ->
+                    if (message.thinking == null) message else message.copy(thinking = null)
+                }
+            }
+            .filterNot { it.isEmptyPayload() }
+
+        val promptCharacters = countMessageCharacters(normalizedPromptMessages) +
             countToolCharacters(tools)
 
         return PromptPlan(
             history = historyForPrompt,
+            promptMessages = normalizedPromptMessages,
             promptCharacters = promptCharacters,
         )
+    }
+
+    private fun AimoChatMessage.isEmptyPayload(): Boolean {
+        return content.isNullOrBlank() && thinking.isNullOrBlank() && toolCalls.isNullOrEmpty()
     }
 
     private fun recordPromptUsage(promptCharacters: Int, promptTokens: Int) {

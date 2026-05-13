@@ -1,6 +1,7 @@
 package org.ivcode.aimo.bedrock.model
 
 import org.ivcode.aimo.bedrock.BedrockModelProperties
+import org.ivcode.aimo.bedrock.BedrockContextProperties
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoPrompt
@@ -188,6 +189,7 @@ class BedrockChatModelFactoryTest {
     ): BedrockModelProperties {
         return BedrockModelProperties(
             region = region,
+            context = BedrockContextProperties(),
             options = options,
             awsAccessKeyId = awsAccessKeyId,
             awsSecretAccessKey = awsSecretAccessKey,

@@ -5,6 +5,7 @@ import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.ollama.OllamaModelProperties
 import org.ivcode.aimo.ollama.client.OllamaChatClient
+import org.ivcode.aimo.core.model.AimoChatContext
 
 /**
  * [AimoChatModelProviderFactory] backed by Ollama's native HTTP API.
@@ -50,7 +51,10 @@ class OllamaChatModelFactory (
             chatEngine  = engine,
             options     = aimoOptions,
             isPrimary   = props.primary,
-            contextSize = props.contextSize,
+            context = AimoChatContext(
+                size = props.context.size,
+                excludeThinking = props.context.excludeThinking,
+            ),
         )
     }
 
@@ -141,7 +145,3 @@ private fun Any.asStringList(): List<String> = when (this) {
     is List<*> -> this as List<String>
     else       -> toString().split(",").map { it.trim() }
 }
-
-
-
-

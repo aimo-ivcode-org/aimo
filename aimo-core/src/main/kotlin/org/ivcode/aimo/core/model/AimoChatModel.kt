@@ -7,14 +7,19 @@ package org.ivcode.aimo.core.model
  * @property chatEngine Provider-backed engine used to execute prompts.
  * @property options Default provider-agnostic options applied to requests for this model.
  * @property isPrimary Whether this model is the default selection when multiple models exist.
- * @property contextSize Approximate maximum context window size, measured in tokens.
+ * @property context Context-window behavior for this model.
  */
 data class AimoChatModel (
     val name: String,
     val chatEngine: AimoChatEngine,
     val options: AimoChatOptions,
     val isPrimary: Boolean = false,
-    val contextSize: Int,
+    val context: AimoChatContext = AimoChatContext(),
+)
+
+data class AimoChatContext(
+    val size: Int = 8192,
+    val excludeThinking: Boolean = false,
 )
 
 /**
