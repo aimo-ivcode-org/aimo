@@ -1,5 +1,10 @@
 spring.mvc.async.request-timeout: 0s
 
+logging:
+  level:
+    # Trace all Ollama client request/response and streaming event logs.
+    org.ivcode.aimo.ollama.client: TRACE
+
 aimo.model.ollama:
   gpt-oss:
     base-url: http://localhost:11434

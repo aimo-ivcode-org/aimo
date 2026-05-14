@@ -1,5 +1,6 @@
 package org.ivcode.aimo.ollama.client
 
+import org.slf4j.LoggerFactory
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.io.InputStream
@@ -17,6 +18,7 @@ internal class OllamaChatClient (
     url: String = DEFAULT_URL,
     val mapper: ObjectMapper = jacksonObjectMapper(),
 ) {
+    private val log = LoggerFactory.getLogger(OllamaChatClient::class.java)
     val url = if (url.endsWith("/")) "$url${CHAT_PATH.substring(1)}" else "$url$CHAT_PATH"
     val client: HttpClient = HttpClient.newHttpClient()
 
@@ -24,7 +26,17 @@ internal class OllamaChatClient (
         val parts = mutableListOf<ChatResponse>()
         val requestBody = mapper.writeValueAsString(request)
 
-        val request = HttpRequest.newBuilder()
+        log.debug(
+            "Ollama chat request model={}, messages={}, stream={}",
+            request.model,
+            request.messages.size,
+            request.stream,
+        )
+        if (log.isTraceEnabled) {
+            log.trace("Ollama chat request url={} payload={}", url, asLogValue(request))
+        }
+
+        val httpRequest = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("Content-Type", "application/json")
             .header("Accept", "application/ndjson")
@@ -32,12 +44,24 @@ internal class OllamaChatClient (
             .build()
 
         val response = client.send(
-            request,
+            httpRequest,
             HttpResponse.BodyHandlers.ofInputStream()
+        )
+
+        log.debug(
+            "Ollama chat response status={} model={}",
+            response.statusCode(),
+            request.model,
         )
 
         if (response.statusCode() !in 200..299) {
             val errorBodySnippet = response.body().readBodySnippet()
+            log.error(
+                "Ollama chat request failed status={} model={} errorBodySnippet={}",
+                response.statusCode(),
+                request.model,
+                errorBodySnippet,
+            )
             throw IllegalStateException(
                 "Ollama chat request failed with HTTP ${response.statusCode()}: $errorBodySnippet"
             )
@@ -49,14 +73,24 @@ internal class OllamaChatClient (
             while (reader.readLine().also { line = it } != null) {
                 val responseLine = line!!.trim()
                 if (responseLine.isEmpty()) continue
+                if (log.isTraceEnabled) {
+                    log.trace("Ollama chat response ndjson line model={} payload={}", request.model, responseLine)
+                }
 
                 val chatResponse = mapper.readValue(responseLine, ChatResponse::class.java)
                 parts.add(chatResponse)
+                if (log.isTraceEnabled) {
+                    log.trace("Ollama chat response event model={} payload={}", request.model, asLogValue(chatResponse))
+                }
                 callback?.invoke(chatResponse)
             }
         }
 
-        return concatResponses(parts)
+        val merged = concatResponses(parts)
+        if (log.isTraceEnabled) {
+            log.trace("Ollama chat response merged model={} payload={}", request.model, asLogValue(merged))
+        }
+        return merged
     }
 
     private fun concatResponses(responses: List<ChatResponse>): ChatResponse {
@@ -80,6 +114,14 @@ internal class OllamaChatClient (
         )
 
         return last.copy(message = message)
+    }
+
+    private fun asLogValue(value: Any?): String {
+        return try {
+            mapper.writeValueAsString(value)
+        } catch (_: Exception) {
+            value?.toString() ?: "null"
+        }
     }
 }
 
