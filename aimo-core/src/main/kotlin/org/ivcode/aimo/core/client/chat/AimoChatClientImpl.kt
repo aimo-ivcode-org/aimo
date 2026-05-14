@@ -6,6 +6,9 @@ import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoSessionClient
+import org.ivcode.aimo.core.cache.AimoSessionCache
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
+import org.ivcode.aimo.core.cache.SessionTokenCalibration
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.controller.SystemMessageContext
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -29,10 +32,16 @@ internal class AimoChatClientImpl (
     private val model: AimoChatModel,
     tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
+    private val sessionCache: AimoSessionCache = NoOpAimoSessionCache,
 ) : AimoChatClient {
 
-    private val initialObservedPromptCharacters: Long = session.getProperty(METADATA_KEY__OBSERVED_PROMPT_CHARACTERS).toNonNegativeLong()
-    private val initialObservedPromptTokens: Long = session.getProperty(METADATA_KEY__OBSERVED_PROMPT_TOKENS).toNonNegativeLong()
+    private val cachedTokenCalibration = sessionCache.getTokenCalibration(chatId)
+    private val initialObservedPromptCharacters: Long =
+        cachedTokenCalibration?.observedPromptCharacters
+            ?: session.getProperty(METADATA_KEY__OBSERVED_PROMPT_CHARACTERS).toNonNegativeLong()
+    private val initialObservedPromptTokens: Long =
+        cachedTokenCalibration?.observedPromptTokens
+            ?: session.getProperty(METADATA_KEY__OBSERVED_PROMPT_TOKENS).toNonNegativeLong()
     private val toolCallbacks: Map<String, AimoToolCallback> = tools.associateBy { it.toolDefinition.name }
     private val toolDefinitions: List<AimoToolDefinition> = toolCallbacks.values.map { it.toolDefinition }
     private val inputTokenBudgeter = ChatInputTokenBudgeter(
@@ -59,10 +68,12 @@ internal class AimoChatClientImpl (
         call: (responseId: UUID, messageId: Int, prompt: AimoPrompt, callback: ((AimoChatResponse) -> Unit)?) -> AimoChatResponse,
     ): AimoChatResponse {
         val responseId = UUID.randomUUID()
-        val history = dao.getChatRequests(
-            chatId = chatId,
-            maxRequestCharacters = inputTokenBudgeter.maxRequestCharactersForLookup(),
-        ).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+        val history = sessionCache.getMessages(chatId)
+            ?: dao.getChatRequests(
+                chatId = chatId,
+                maxRequestCharacters = inputTokenBudgeter.maxRequestCharactersForLookup(),
+            ).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+                .also { sessionCache.putMessages(chatId, it) }
 
         val systemMessages = getSystemMessages(createSystemMessageContext(responseId, request))
         val promptMessage = createUserMessage(messageId = 1, content = request.prompt)
@@ -134,6 +145,7 @@ internal class AimoChatClientImpl (
             requestCharacters = allMessages.sumOf { it.content?.length ?: 0 },
             createdAt = Instant.now(),
         ))
+        sessionCache.appendMessages(chatId, allMessages)
 
         return AimoChatResponse(
             chatId = chatId,
@@ -303,6 +315,13 @@ internal class AimoChatClientImpl (
 
         session.writeProperty(METADATA_KEY__OBSERVED_PROMPT_CHARACTERS, calibration.observedPromptCharacters)
         session.writeProperty(METADATA_KEY__OBSERVED_PROMPT_TOKENS, calibration.observedPromptTokens)
+        sessionCache.putTokenCalibration(
+            chatId,
+            SessionTokenCalibration(
+                observedPromptCharacters = calibration.observedPromptCharacters,
+                observedPromptTokens = calibration.observedPromptTokens,
+            )
+        )
     }
 
     private companion object {

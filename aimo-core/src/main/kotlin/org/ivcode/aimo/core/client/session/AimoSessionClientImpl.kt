@@ -3,6 +3,8 @@ package org.ivcode.aimo.core.client.session
 import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoSessionClient
+import org.ivcode.aimo.core.cache.AimoSessionCache
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
 import org.ivcode.aimo.core.client.chat.AimoChatClientImpl
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -13,16 +15,21 @@ import org.ivcode.aimo.core.toChatMessageEntity
 import java.time.Instant
 import java.util.UUID
 
-internal class AimoSessionClientImpl (
+internal class   AimoSessionClientImpl (
     override val chatId: UUID,
     private val dao: AimoChatClientDao,
     private val model: AimoChatModel,
     private val tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
-    metadata: Map<String, Any>
+    metadata: Map<String, Any>,
+    private val sessionCache: AimoSessionCache = NoOpAimoSessionCache,
 ) : AimoSessionClient {
 
-    private val metadata: MutableMap<String, Any> = metadata.toMutableMap()
+    private val metadata: MutableMap<String, Any> = (sessionCache.getMetadata(chatId) ?: metadata).toMutableMap()
+
+    init {
+        sessionCache.putMetadata(chatId, this.metadata)
+    }
 
     override fun createChatClient(): AimoChatClient {
         return AimoChatClientImpl (
@@ -32,6 +39,7 @@ internal class AimoSessionClientImpl (
             model = model,
             tools = tools,
             systemMessages = systemMessages,
+            sessionCache = sessionCache,
         )
     }
 
@@ -50,6 +58,7 @@ internal class AimoSessionClientImpl (
                 createdAt = Instant.now(),
             )
         )
+        sessionCache.appendMessages(chatId, messages)
     }
 
     override fun getMetadata(): Map<String, Any> {
@@ -59,6 +68,7 @@ internal class AimoSessionClientImpl (
     override fun readMetadata(): Map<String, Any> {
         return dao.getChatSession(chatId)?.let { session ->
             replaceAllMetadata(session.metadata)
+            sessionCache.putMetadata(chatId, session.metadata)
             metadata.toMap()
         } ?: throw IllegalStateException("Chat session not found for chatId: $chatId")
     }
@@ -74,11 +84,15 @@ internal class AimoSessionClientImpl (
     override fun writeProperty(property: String, value: Any) {
         dao.upsertSessionMetadata(chatId, mapOf(property to value))
         putMetadata(property, value)
+        sessionCache.upsertMetadata(chatId, mapOf(property to value))
     }
 
     override fun deleteProperty(property: String): Boolean {
         val deleted = dao.deleteSessionMetadata(chatId, listOf(property))
-        if (deleted) removeMetadata(property)
+        if (deleted) {
+            removeMetadata(property)
+            sessionCache.removeMetadata(chatId, listOf(property))
+        }
         return deleted
     }
 

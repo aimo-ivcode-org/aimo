@@ -2,6 +2,8 @@ package org.ivcode.aimo.core.conf
 
 import org.ivcode.aimo.core.Aimo
 import org.ivcode.aimo.core.AimoImpl
+import org.ivcode.aimo.core.cache.AimoSessionCache
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
 import org.ivcode.aimo.core.controller.ChatController
 import org.ivcode.aimo.core.controller.ChatControllerEntity
 import org.ivcode.aimo.core.controller.SystemMessageCallback
@@ -11,6 +13,7 @@ import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.getBeansWithAnnotation
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
@@ -90,7 +93,14 @@ class AimoConfig {
         chatClientDao: AimoChatClientDao,
         tools: List<AimoToolCallback>,
         systemMessages: List<SystemMessageCallback>,
+        sessionCacheProvider: ObjectProvider<AimoSessionCache>,
     ): Aimo {
-        return AimoImpl(primaryModel, chatClientDao, tools, systemMessages)
+        return AimoImpl(
+            model = primaryModel,
+            chatClientDao = chatClientDao,
+            tools = tools,
+            systemMessage = systemMessages,
+            sessionCache = sessionCacheProvider.ifAvailable ?: NoOpAimoSessionCache,
+        )
     }
 }
