@@ -7,7 +7,8 @@ import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
+import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.cache.SessionCacheStats
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.controller.SystemMessageContext
@@ -32,24 +33,24 @@ internal class AimoChatClientImpl (
     private val model: AimoChatModel,
     tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
-    private val sessionCache: AimoSessionCache = NoOpAimoSessionCache,
-    private val promptBudgeterFactory: PromptBudgeterFactory = DefaultPromptBudgeterFactory,
+    sessionCacheProvider: AimoSessionCacheProvider = NoOpAimoSessionCacheProvider,
 ) : AimoChatClient {
 
-    private val cachedTokenCalibration = sessionCache.getTokenCalibration(chatId)
-    private val initialObservedPromptCharacters: Long =
-        cachedTokenCalibration?.observedPromptCharacters
-            ?: conversation.getChatProperty(METADATA_KEY__OBSERVED_PROMPT_CHARACTERS).toNonNegativeLong()
-    private val initialObservedPromptTokens: Long =
-        cachedTokenCalibration?.observedPromptTokens
-            ?: conversation.getChatProperty(METADATA_KEY__OBSERVED_PROMPT_TOKENS).toNonNegativeLong()
+    private val sessionCache: AimoSessionCache = sessionCacheProvider.get(chatId)
     private val toolCallbacks: Map<String, AimoToolCallback> = tools.associateBy { it.toolDefinition.name }
     private val toolDefinitions: List<AimoToolDefinition> = toolCallbacks.values.map { it.toolDefinition }
-    private val promptBudgeter: PromptBudgeter = promptBudgeterFactory.create(
-        model = model,
-        initialObservedPromptCharacters = initialObservedPromptCharacters,
-        initialObservedPromptTokens = initialObservedPromptTokens,
-    )
+    private val promptBudgeter: PromptBudgeter = when (model.context.budgeterType) {
+        org.ivcode.aimo.core.model.AimoPromptBudgeterType.CONTEXT_WINDOW -> ContextWindowPromptBudgeter(
+            maxInputTokens = model.context.size,
+            conversation = conversation,
+            sessionCache = sessionCache,
+            excludeThinking = model.context.excludeThinking,
+        )
+
+        org.ivcode.aimo.core.model.AimoPromptBudgeterType.NO_OP -> NoOpPromptBudgeter(
+            excludeThinking = model.context.excludeThinking,
+        )
+    }
 
     override fun chat(request: AimoChatRequest): AimoChatResponse {
         return doChat(request, null, this::call)
@@ -68,7 +69,7 @@ internal class AimoChatClientImpl (
         call: (responseId: UUID, messageId: Int, prompt: AimoPrompt, callback: ((AimoChatResponse) -> Unit)?) -> AimoChatResponse,
     ): AimoChatResponse {
         val responseId = UUID.randomUUID()
-        var resolvedHistory: List<AimoChatMessage>? = sessionCache.getMessages(chatId)
+        var resolvedHistory: List<AimoChatMessage>? = getCachedMessages()
         val historyProvider: (Long?) -> List<AimoChatMessage> = { chars ->
             resolvedHistory ?: (if (chars == null) {
                 dao.getChatRequests(chatId)
@@ -80,7 +81,7 @@ internal class AimoChatClientImpl (
             }).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
                 .also {
                     resolvedHistory = it
-                    sessionCache.putMessages(chatId, it)
+                    putCachedMessages(it)
                 }
         }
 
@@ -161,7 +162,7 @@ internal class AimoChatClientImpl (
             requestCharacters = allMessages.sumOf { it.content?.length ?: 0 },
             createdAt = Instant.now(),
         ))
-        sessionCache.appendMessages(chatId, allMessages)
+        appendCachedMessages(allMessages)
 
         return AimoChatResponse(
             chatId = chatId,
@@ -314,20 +315,10 @@ internal class AimoChatClientImpl (
             toolCallId.isNullOrBlank()
     }
 
-
-    private fun Any?.toNonNegativeLong(): Long {
-        return when (this) {
-            is Number -> toLong().coerceAtLeast(0)
-            is String -> toLongOrNull()?.coerceAtLeast(0) ?: 0
-            else -> 0
-        }
-    }
-
     private fun persistCacheStats(cacheReadTokens: Long, cacheWriteTokens: Long) {
         if (cacheReadTokens <= 0L && cacheWriteTokens <= 0L) return
-        val current = sessionCache.getCacheStats(chatId) ?: SessionCacheStats()
-        sessionCache.putCacheStats(
-            chatId,
+        val current = getCachedSessionStats() ?: SessionCacheStats()
+        putCachedSessionStats(
             current.copy(
                 totalCacheReadTokens = current.totalCacheReadTokens + cacheReadTokens,
                 totalCacheWriteTokens = current.totalCacheWriteTokens + cacheWriteTokens,
@@ -335,9 +326,31 @@ internal class AimoChatClientImpl (
         )
     }
 
+    private fun getCachedMessages(): List<AimoChatMessage>? {
+        @Suppress("UNCHECKED_CAST")
+        return sessionCache.getRuntimeProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+    }
+
+    private fun putCachedMessages(messages: List<AimoChatMessage>) {
+        sessionCache.writeRuntimeProperty(CACHE_KEY__MESSAGES, messages.toList())
+    }
+
+    private fun appendCachedMessages(messages: List<AimoChatMessage>) {
+        if (messages.isEmpty()) return
+        putCachedMessages(getCachedMessages().orEmpty() + messages)
+    }
+
+    private fun getCachedSessionStats(): SessionCacheStats? {
+        return sessionCache.getRuntimeProperty(CACHE_KEY__CACHE_STATS) as? SessionCacheStats
+    }
+
+    private fun putCachedSessionStats(stats: SessionCacheStats) {
+        sessionCache.writeRuntimeProperty(CACHE_KEY__CACHE_STATS, stats)
+    }
+
     private companion object {
-        const val METADATA_KEY__OBSERVED_PROMPT_CHARACTERS = "chat.inputTokenBudgeter.observedPromptCharacters"
-        const val METADATA_KEY__OBSERVED_PROMPT_TOKENS = "chat.inputTokenBudgeter.observedPromptTokens"
+        const val CACHE_KEY__MESSAGES = "chat.messages"
+        const val CACHE_KEY__CACHE_STATS = "chat.cacheStats"
     }
 }
 

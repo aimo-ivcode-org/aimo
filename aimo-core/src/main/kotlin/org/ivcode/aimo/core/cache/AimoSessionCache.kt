@@ -1,35 +1,30 @@
 package org.ivcode.aimo.core.cache
 
-import org.ivcode.aimo.core.AimoChatMessage
 import java.util.UUID
 
 /**
- * Cache abstraction for cache-lifetime data used during chat orchestration.
+ * Cache abstraction for runtime data associated with a specific chat conversation.
  *
- * DAO storage remains the source of truth for durable conversation metadata.
- * Implementations of this cache accelerate access to runtime metadata,
- * message history, and token calibration.
+ * Each instance is scoped to a single [chatId]. DAO storage remains the source of truth
+ * for durable conversation metadata. This cache provides an acceleration layer for
+ * cache-lifetime state using a generic runtime property map.
  */
 interface AimoSessionCache {
+    /**
+     * The conversation ID this cache instance serves.
+     */
+    val chatId: UUID
 
     /**
-     * Runtime-only metadata that should live only for the cache lifetime.
+     * Runtime-only properties that live only for the cache lifetime.
+     * Stored as a simple String -> Any mapping for flexibility.
      */
-    fun getRuntimeMetadata(chatId: UUID): Map<String, Any>?
-    fun putRuntimeMetadata(chatId: UUID, metadata: Map<String, Any>)
-    fun upsertRuntimeMetadata(chatId: UUID, metadata: Map<String, Any>)
-    fun removeRuntimeMetadata(chatId: UUID, keys: List<String>)
+    fun getRuntimeProperty(key: String): Any?
+    fun getRuntimeProperties(): Map<String, Any>
+    fun writeRuntimeProperty(key: String, value: Any)
+    fun deleteRuntimeProperty(key: String): Boolean
 
-    fun getMessages(chatId: UUID): List<AimoChatMessage>?
-    fun putMessages(chatId: UUID, messages: List<AimoChatMessage>)
-    fun appendMessages(chatId: UUID, messages: List<AimoChatMessage>)
 
-    fun getTokenCalibration(chatId: UUID): SessionTokenCalibration?
-    fun putTokenCalibration(chatId: UUID, calibration: SessionTokenCalibration)
-
-    fun getCacheStats(chatId: UUID): SessionCacheStats?
-    fun putCacheStats(chatId: UUID, stats: SessionCacheStats)
-
-    fun evict(chatId: UUID)
+    fun evict()
 }
 

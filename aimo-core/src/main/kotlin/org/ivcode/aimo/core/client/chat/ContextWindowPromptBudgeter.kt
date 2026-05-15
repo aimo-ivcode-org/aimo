@@ -1,38 +1,33 @@
 package org.ivcode.aimo.core.client.chat
 
 import org.ivcode.aimo.core.AimoChatMessage
+import org.ivcode.aimo.core.AimoConversationClient
+import org.ivcode.aimo.core.cache.AimoSessionCache
+import org.ivcode.aimo.core.cache.SessionTokenCalibration
 import org.ivcode.aimo.core.model.AimoToolCallback
 import kotlin.math.ceil
+import java.util.UUID
 
-/**
- * Computes how much prior chat history can be included in a prompt while staying under
- * a configured input token budget.
- *
- * Budgeting order:
- * 1. Reserve tokens for system messages.
- * 2. Reserve tokens for the current user prompt.
- * 3. Reserve tokens for task messages already produced in this request loop.
- * 4. Reserve tokens for tool definitions/schemas.
- * 5. Fill remaining budget with the newest possible history messages.
- *
- * Notes:
- * - Token estimation starts with a character-count heuristic and is refined over time
- *   using observed prompt usage returned by the model.
- * - Message text used for budgeting includes `content` and, by default, `thinking`.
- *   Set [excludeThinking] to `true` to omit `thinking` from budgeting and prompt payloads.
- * - Tool token estimation uses explicit tool-definition fields (name/description/schema)
- *   instead of relying on object string rendering.
- *
- * @property maxInputTokens Maximum allowed prompt input tokens for one model call.
- * @property excludeThinking When true, excludes `thinking` text from token/character
- *   budgeting and strips it from prompt messages sent to the model.
- */
+// ...existing code...
+
 internal class ContextWindowPromptBudgeter(
     private val maxInputTokens: Int,
     initialObservedPromptCharacters: Long = 0,
     initialObservedPromptTokens: Long = 0,
     private val excludeThinking: Boolean = false,
 ) : PromptBudgeter {
+    constructor(
+        maxInputTokens: Int,
+        conversation: AimoConversationClient,
+        sessionCache: AimoSessionCache,
+        excludeThinking: Boolean = false,
+    ) : this(
+        maxInputTokens = maxInputTokens,
+        initialObservedPromptCharacters = resolveObservedPromptCharacters(conversation, sessionCache),
+        initialObservedPromptTokens = resolveObservedPromptTokens(conversation, sessionCache),
+        excludeThinking = excludeThinking,
+    )
+
     private var observedPromptCharacters: Long = initialObservedPromptCharacters.coerceAtLeast(0)
     private var observedPromptTokens: Long = initialObservedPromptTokens.coerceAtLeast(0)
 
@@ -247,6 +242,37 @@ internal class ContextWindowPromptBudgeter(
         const val DEFAULT_CHARACTERS_PER_TOKEN = 4.0
         const val MIN_CHARACTERS_PER_TOKEN = 1.0
         const val MAX_CHARACTERS_PER_TOKEN = 12.0
+        const val CACHE_KEY__TOKEN_CALIBRATION = "chat.tokenCalibration"
+        const val METADATA_KEY__OBSERVED_PROMPT_CHARACTERS = "chat.inputTokenBudgeter.observedPromptCharacters"
+        const val METADATA_KEY__OBSERVED_PROMPT_TOKENS = "chat.inputTokenBudgeter.observedPromptTokens"
+
+        private fun resolveObservedPromptCharacters(
+            conversation: AimoConversationClient,
+            sessionCache: AimoSessionCache,
+        ): Long {
+            return getTokenCalibration(sessionCache)?.observedPromptCharacters
+                ?: conversation.getChatProperty(METADATA_KEY__OBSERVED_PROMPT_CHARACTERS).toNonNegativeLong()
+        }
+
+        private fun resolveObservedPromptTokens(
+            conversation: AimoConversationClient,
+            sessionCache: AimoSessionCache,
+        ): Long {
+            return getTokenCalibration(sessionCache)?.observedPromptTokens
+                ?: conversation.getChatProperty(METADATA_KEY__OBSERVED_PROMPT_TOKENS).toNonNegativeLong()
+        }
+
+        private fun getTokenCalibration(sessionCache: AimoSessionCache): SessionTokenCalibration? {
+            return sessionCache.getRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION) as? SessionTokenCalibration
+        }
+
+        private fun Any?.toNonNegativeLong(): Long {
+            return when (this) {
+                is Number -> toLong().coerceAtLeast(0)
+                is String -> toLongOrNull()?.coerceAtLeast(0) ?: 0
+                else -> 0
+            }
+        }
     }
 }
 

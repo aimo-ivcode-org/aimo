@@ -1,7 +1,7 @@
 package org.ivcode.aimo.core
 
-import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
+import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.client.conversation.AimoConversationClientImpl
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -14,7 +14,7 @@ internal class AimoImpl (
     private val chatClientDao: AimoChatClientDao,
     private val tools: List<AimoToolCallback>,
     private val systemMessage: List<SystemMessageCallback>,
-    private val sessionCache: AimoSessionCache = NoOpAimoSessionCache,
+    private val sessionCacheProvider: AimoSessionCacheProvider = NoOpAimoSessionCacheProvider,
 ): Aimo {
     override fun getConversationClient(chatId: UUID): AimoConversationClient? = chatClientDao.getChatConversation(chatId)?.let { conversation ->
         AimoConversationClientImpl (
@@ -23,7 +23,7 @@ internal class AimoImpl (
             dao = chatClientDao,
             tools = tools,
             systemMessages = systemMessage,
-            sessionCache = sessionCache,
+            sessionCacheProvider = sessionCacheProvider,
         )
     }
 
@@ -39,7 +39,7 @@ internal class AimoImpl (
     override fun deleteConversation(chatId: UUID): Boolean {
         val deleted = chatClientDao.deleteChatConversation(chatId)
         if (deleted) {
-            sessionCache.evict(chatId)
+            sessionCacheProvider.get(chatId).evict()
         }
         return deleted
     }

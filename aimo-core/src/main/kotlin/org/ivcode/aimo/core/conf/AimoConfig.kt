@@ -2,8 +2,8 @@ package org.ivcode.aimo.core.conf
 
 import org.ivcode.aimo.core.Aimo
 import org.ivcode.aimo.core.AimoImpl
-import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
+import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.controller.ChatController
 import org.ivcode.aimo.core.controller.ChatControllerEntity
 import org.ivcode.aimo.core.controller.SystemMessageCallback
@@ -93,14 +93,14 @@ class AimoConfig {
         chatClientDao: AimoChatClientDao,
         tools: List<AimoToolCallback>,
         systemMessages: List<SystemMessageCallback>,
-        sessionCacheProvider: ObjectProvider<AimoSessionCache>,
+        sessionCacheProviderProvider: ObjectProvider<AimoSessionCacheProvider>,
     ): Aimo {
         return AimoImpl(
             model = primaryModel,
             chatClientDao = chatClientDao,
             tools = tools,
             systemMessage = systemMessages,
-            sessionCache = sessionCacheProvider.ifAvailable ?: NoOpAimoSessionCache,
+            sessionCacheProvider = sessionCacheProviderProvider.ifAvailable ?: NoOpAimoSessionCacheProvider,
         )
     }
 }

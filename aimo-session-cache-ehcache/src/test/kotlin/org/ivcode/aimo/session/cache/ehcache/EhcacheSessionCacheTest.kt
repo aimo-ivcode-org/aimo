@@ -13,61 +13,102 @@ class EhcacheSessionCacheTest {
 
     @Test
     fun `stores and appends messages`() {
-        val cache = EhcacheSessionCache(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
         try {
-            val chatId = UUID.randomUUID()
-            cache.putMessages(chatId, listOf(message(1, "hello")))
-            cache.appendMessages(chatId, listOf(message(2, "world")))
+            val chatId = java.util.UUID.randomUUID()
+            val cache = provider.get(chatId)
+            cache.putCachedMessages(listOf(message(1, "hello")))
+            cache.appendCachedMessages(listOf(message(2, "world")))
 
-            val messages = cache.getMessages(chatId)
+            val messages = cache.getCachedMessages()
             assertNotNull(messages)
             assertEquals(listOf(1, 2), messages.map { it.messageId })
             assertEquals(listOf("hello", "world"), messages.map { it.content })
         } finally {
-            cache.close()
+            provider.close()
         }
     }
 
     @Test
-    fun `upserts runtime metadata and stores token calibration`() {
-        val cache = EhcacheSessionCache(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+    fun `writes and reads runtime properties`() {
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
         try {
-            val chatId = UUID.randomUUID()
-            cache.putRuntimeMetadata(chatId, mapOf("a" to 1))
-            cache.upsertRuntimeMetadata(chatId, mapOf("b" to 2, "a" to 3))
+            val chatId = java.util.UUID.randomUUID()
+            val cache = provider.get(chatId)
+            cache.writeRuntimeProperty("a", 1)
+            cache.writeRuntimeProperty("b", 2)
 
-            val metadata = cache.getRuntimeMetadata(chatId)
-            assertNotNull(metadata)
-            assertEquals(3, metadata["a"])
-            assertEquals(2, metadata["b"])
+            val a = cache.getRuntimeProperty("a")
+            val b = cache.getRuntimeProperty("b")
+            assertEquals(1, a)
+            assertEquals(2, b)
+
+            val allProps = cache.getRuntimeProperties()
+            assertEquals(1, allProps["a"])
+            assertEquals(2, allProps["b"])
 
             val calibration = SessionTokenCalibration(
                 observedPromptCharacters = 120,
                 observedPromptTokens = 30,
             )
-            cache.putTokenCalibration(chatId, calibration)
-            assertEquals(calibration, cache.getTokenCalibration(chatId))
+            cache.writeRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION, calibration)
+            assertEquals(calibration, cache.getTokenCalibration())
         } finally {
-            cache.close()
+            provider.close()
         }
     }
 
     @Test
-    fun `evict removes all session state`() {
-        val cache = EhcacheSessionCache(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+    fun `shares cache state for same chatId`() {
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
         try {
-            val chatId = UUID.randomUUID()
-            cache.putRuntimeMetadata(chatId, mapOf("x" to "y"))
-            cache.putMessages(chatId, listOf(message(1, "hello")))
+            val chatId = java.util.UUID.randomUUID()
+            val cache1 = provider.get(chatId)
+            val cache2 = provider.get(chatId)
 
-            cache.evict(chatId)
-
-            assertNull(cache.getRuntimeMetadata(chatId))
-            assertNull(cache.getMessages(chatId))
-            assertNull(cache.getTokenCalibration(chatId))
+            cache1.writeRuntimeProperty("key", "value")
+            assertEquals("value", cache2.getRuntimeProperty("key"))
         } finally {
-            cache.close()
+            provider.close()
         }
+    }
+
+    @Test
+    fun `cache evict clears shared state for chatId`() {
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        try {
+            val chatId = java.util.UUID.randomUUID()
+            val cache = provider.get(chatId)
+            cache.writeRuntimeProperty("x", "y")
+            cache.putCachedMessages(listOf(message(1, "hello")))
+
+            cache.evict()
+
+            val newCache = provider.get(chatId)
+            assertEquals(emptyMap<String, Any>(), newCache.getRuntimeProperties())
+            assertNull(newCache.getCachedMessages())
+            assertNull(newCache.getTokenCalibration())
+        } finally {
+            provider.close()
+        }
+    }
+
+    private fun org.ivcode.aimo.core.cache.AimoSessionCache.getCachedMessages(): List<AimoChatMessage>? {
+        @Suppress("UNCHECKED_CAST")
+        return getRuntimeProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+    }
+
+    private fun org.ivcode.aimo.core.cache.AimoSessionCache.putCachedMessages(messages: List<AimoChatMessage>) {
+        writeRuntimeProperty(CACHE_KEY__MESSAGES, messages.toList())
+    }
+
+    private fun org.ivcode.aimo.core.cache.AimoSessionCache.appendCachedMessages(messages: List<AimoChatMessage>) {
+        if (messages.isEmpty()) return
+        putCachedMessages(getCachedMessages().orEmpty() + messages)
+    }
+
+    private fun org.ivcode.aimo.core.cache.AimoSessionCache.getTokenCalibration(): SessionTokenCalibration? {
+        return getRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION) as? SessionTokenCalibration
     }
 
     private fun message(id: Int, content: String): AimoChatMessage {
@@ -79,6 +120,11 @@ class EhcacheSessionCacheTest {
             toolName = null,
             done = true,
         )
+    }
+
+    private companion object {
+        const val CACHE_KEY__MESSAGES = "chat.messages"
+        const val CACHE_KEY__TOKEN_CALIBRATION = "chat.tokenCalibration"
     }
 }
 

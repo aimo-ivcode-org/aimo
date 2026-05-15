@@ -3,9 +3,8 @@ package org.ivcode.aimo.core.client.conversation
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
-import org.ivcode.aimo.core.cache.SessionCacheStats
-import org.ivcode.aimo.core.cache.SessionTokenCalibration
+import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModel
@@ -52,20 +51,20 @@ class AimoConversationClientImplTest {
     fun `runtime metadata stays out of durable conversation metadata`() {
         val dao = AimoChatClientDaoMemory()
         val conversation = dao.createChatConversation()
-        val cache = TestSessionCache()
-        val client = createConversationClient(dao, conversation.chatId, cache)
+        val provider = TestSessionCacheProvider()
+        val client = createConversationClient(dao, conversation.chatId, provider)
 
         client.writeRuntimeProperty("draft", "local")
 
         assertEquals("local", client.getRuntimeProperty("draft"))
-        assertEquals(mapOf("draft" to "local"), cache.getRuntimeMetadata(conversation.chatId))
+        assertEquals(mapOf("draft" to "local"), provider.getCached(conversation.chatId))
         assertNull(dao.getChatConversation(conversation.chatId)?.metadata?.get("draft"))
     }
 
     private fun createConversationClient(
         dao: AimoChatClientDaoMemory,
         chatId: UUID,
-        sessionCache: AimoSessionCache = NoOpAimoSessionCache,
+        sessionCacheProvider: AimoSessionCacheProvider = NoOpAimoSessionCacheProvider,
     ): AimoConversationClientImpl {
         return AimoConversationClientImpl(
             chatId = chatId,
@@ -73,38 +72,40 @@ class AimoConversationClientImplTest {
             model = testModel(),
             tools = emptyList(),
             systemMessages = emptyList(),
-            sessionCache = sessionCache,
+            sessionCacheProvider = sessionCacheProvider,
         )
     }
 
-    private class TestSessionCache : AimoSessionCache {
-        private val runtimeMetadata = mutableMapOf<UUID, MutableMap<String, Any>>()
+    private class TestSessionCacheProvider : AimoSessionCacheProvider {
+        private val cachedState = mutableMapOf<UUID, MutableMap<String, Any>>()
 
-        override fun getRuntimeMetadata(chatId: UUID): Map<String, Any>? = runtimeMetadata[chatId]?.toMap()
-
-        override fun putRuntimeMetadata(chatId: UUID, metadata: Map<String, Any>) {
-            runtimeMetadata[chatId] = metadata.toMutableMap()
+        override fun get(chatId: UUID): AimoSessionCache {
+            val state = cachedState.getOrPut(chatId) { mutableMapOf() }
+            return TestSessionCache(chatId, state)
         }
 
-        override fun upsertRuntimeMetadata(chatId: UUID, metadata: Map<String, Any>) {
-            val current = runtimeMetadata.getOrPut(chatId) { mutableMapOf() }
-            current.putAll(metadata)
+        fun getCached(chatId: UUID): Map<String, Any>? = cachedState[chatId]?.toMap()
+    }
+
+    private class TestSessionCache(
+        override val chatId: UUID,
+        private val runtimeMetadata: MutableMap<String, Any>,
+    ) : AimoSessionCache {
+
+        override fun getRuntimeProperty(key: String): Any? = runtimeMetadata[key]
+
+        override fun getRuntimeProperties(): Map<String, Any> = runtimeMetadata.toMap()
+
+        override fun writeRuntimeProperty(key: String, value: Any) {
+            runtimeMetadata[key] = value
         }
 
-        override fun removeRuntimeMetadata(chatId: UUID, keys: List<String>) {
-            val current = runtimeMetadata[chatId] ?: return
-            keys.forEach(current::remove)
+        override fun deleteRuntimeProperty(key: String): Boolean {
+            return runtimeMetadata.remove(key) != null
         }
 
-        override fun getMessages(chatId: UUID): List<AimoChatMessage>? = null
-        override fun putMessages(chatId: UUID, messages: List<AimoChatMessage>) = Unit
-        override fun appendMessages(chatId: UUID, messages: List<AimoChatMessage>) = Unit
-        override fun getTokenCalibration(chatId: UUID): SessionTokenCalibration? = null
-        override fun putTokenCalibration(chatId: UUID, calibration: SessionTokenCalibration) = Unit
-        override fun getCacheStats(chatId: UUID): SessionCacheStats? = null
-        override fun putCacheStats(chatId: UUID, stats: SessionCacheStats) = Unit
-        override fun evict(chatId: UUID) {
-            runtimeMetadata.remove(chatId)
+        override fun evict() {
+            runtimeMetadata.clear()
         }
     }
 

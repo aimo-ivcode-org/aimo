@@ -4,7 +4,8 @@ import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCache
+import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
+import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.client.chat.AimoChatClientImpl
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -21,8 +22,10 @@ internal class AimoConversationClientImpl(
     private val model: AimoChatModel,
     private val tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
-    private val sessionCache: AimoSessionCache = NoOpAimoSessionCache,
+    private val sessionCacheProvider: AimoSessionCacheProvider = NoOpAimoSessionCacheProvider,
 ) : AimoConversationClient {
+
+    private val sessionCache: AimoSessionCache = sessionCacheProvider.get(chatId)
 
     override fun createChatClient(): AimoChatClient {
         return AimoChatClientImpl (
@@ -32,7 +35,7 @@ internal class AimoConversationClientImpl(
             model = model,
             tools = tools,
             systemMessages = systemMessages,
-            sessionCache = sessionCache,
+            sessionCacheProvider = sessionCacheProvider,
         )
     }
 
@@ -51,7 +54,7 @@ internal class AimoConversationClientImpl(
                 createdAt = Instant.now(),
             )
         )
-        sessionCache.appendMessages(chatId, messages)
+        appendCachedMessages(messages)
     }
 
     override fun getChatMetadata(): Map<String, Any> {
@@ -79,29 +82,34 @@ internal class AimoConversationClientImpl(
     }
 
     override fun getRuntimeMetadata(): Map<String, Any> {
-        return sessionCache.getRuntimeMetadata(chatId)?.toMap() ?: emptyMap()
+        return sessionCache.getRuntimeProperties()
     }
 
     override fun getRuntimeProperty(property: String): Any? {
-        return sessionCache.getRuntimeMetadata(chatId)?.get(property)
+        return sessionCache.getRuntimeProperty(property)
     }
 
     override fun writeRuntimeProperty(property: String, value: Any) {
-        sessionCache.upsertRuntimeMetadata(chatId, mapOf(property to value))
+        sessionCache.writeRuntimeProperty(property, value)
     }
 
     override fun deleteRuntimeProperty(property: String): Boolean {
-        val metadata = sessionCache.getRuntimeMetadata(chatId) ?: return false
-        if (!metadata.containsKey(property)) {
-            return false
-        }
-
-        sessionCache.removeRuntimeMetadata(chatId, listOf(property))
-        return true
+        return sessionCache.deleteRuntimeProperty(property)
     }
 
     private fun requireChatConversation() = dao.getChatConversation(chatId)
         ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
+
+    private fun appendCachedMessages(messages: List<AimoChatMessage>) {
+        if (messages.isEmpty()) return
+        @Suppress("UNCHECKED_CAST")
+        val current = sessionCache.getRuntimeProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+        sessionCache.writeRuntimeProperty(CACHE_KEY__MESSAGES, current.orEmpty() + messages)
+    }
+
+    private companion object {
+        const val CACHE_KEY__MESSAGES = "chat.messages"
+    }
 }
 
 
