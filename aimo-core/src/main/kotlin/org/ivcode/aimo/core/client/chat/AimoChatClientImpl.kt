@@ -94,21 +94,22 @@ internal class AimoChatClientImpl (
 
         while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
             val messageId = 2 + taskMessages.size
-            val promptMessages = promptBudgeter.promptMessagesForCall(
+            val engineResponse = promptBudgeter.withPromptForCall(
                 systemMessages = systemMessages,
                 prompt = promptMessage,
                 taskMessages = taskMessages,
                 tools = toolCallbacks.values.toList(),
                 historyProvider = historyProvider,
+                execute = { promptMessages ->
+                    val prompt = AimoPrompt(
+                        tools = toolDefinitions,
+                        systemMessages = this.systemMessages,
+                        options = null,
+                        messages = promptMessages,
+                    )
+                    call(responseId, messageId, prompt, callback)
+                }
             )
-            val prompt = AimoPrompt(
-                tools = toolDefinitions,
-                systemMessages = this.systemMessages,
-                options = null,
-                messages = promptMessages,
-            )
-
-            val engineResponse = call(responseId, messageId, prompt, callback)
 
             // Accumulate prompt-cache usage stats returned by the model.
             accCacheReadTokens += engineResponse.usage?.promptCache?.cacheReadInputTokens?.toLong() ?: 0L
