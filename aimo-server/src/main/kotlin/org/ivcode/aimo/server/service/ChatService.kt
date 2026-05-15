@@ -17,11 +17,11 @@ class ChatService (
     private val mapper: ObjectMapper,
 ) {
     fun chat (chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream) {
-        val session = aimo.getSessionClient(chatId) ?: throw NotFoundException("Chat session with id $chatId not found")
-        val client = session.createChatClient()
+        val conversation = aimo.getConversationClient(chatId) ?: throw NotFoundException("Conversation with id $chatId not found")
+        val client = conversation.createChatClient()
 
         val context: MutableMap<String, Any> = HashMap(context)
-        context.putAll(session.getMetadata())
+        context.putAll(conversation.readChatMetadata())
 
         if (request.stream) {
             chatStream(client, request.toAimoChatRequest(context.toMap()), output)

@@ -5,12 +5,12 @@ import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoHistoryRequest
-import org.ivcode.aimo.core.AimoSession
+import org.ivcode.aimo.core.AimoConversationInfo
 import org.ivcode.aimo.server.model.ChatHistoryRequest
 import org.ivcode.aimo.server.model.ChatMessage
 import org.ivcode.aimo.server.model.ChatRequest
 import org.ivcode.aimo.server.model.ChatResponse
-import org.ivcode.aimo.server.model.ChatSession
+import org.ivcode.aimo.server.model.ChatConversationInfo
 
 internal fun ChatRequest.toAimoChatRequest(context: Map<String, Any> = emptyMap()) = AimoChatRequest (
     prompt = prompt,
@@ -47,6 +47,6 @@ internal fun AimoHistoryRequest.toChatHistoryRequest() = ChatHistoryRequest(
     createdAt = createdAt
 )
 
-internal fun AimoSession.toChatSession() = ChatSession(
+internal fun AimoConversationInfo.toChatConversationInfo() = ChatConversationInfo(
     chatId = chatId,
 )

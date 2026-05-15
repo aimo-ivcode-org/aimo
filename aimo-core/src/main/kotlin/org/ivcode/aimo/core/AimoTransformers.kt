@@ -2,11 +2,10 @@ package org.ivcode.aimo.core
 
 import org.ivcode.aimo.core.dao.ChatMessageEntity
 import org.ivcode.aimo.core.dao.ChatRequestEntity
-import org.ivcode.aimo.core.dao.ChatSessionEntity
-import sun.font.GlyphLayout.done
+import org.ivcode.aimo.core.dao.ChatConversationEntity
 import java.util.UUID
 
-internal fun ChatSessionEntity.toAimoSession(): AimoSession = AimoSession (
+internal fun ChatConversationEntity.toAimoConversationInfo(): AimoConversationInfo = AimoConversationInfo (
     chatId = chatId,
     metadata = metadata
 )

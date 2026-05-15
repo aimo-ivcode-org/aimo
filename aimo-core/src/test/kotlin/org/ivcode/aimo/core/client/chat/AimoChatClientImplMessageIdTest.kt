@@ -5,7 +5,7 @@ import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoSessionClient
+import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.controller.Tool
 import org.ivcode.aimo.core.controller.toAimoToolCallbacks
@@ -30,10 +30,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists sequential message ids across requests`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(simpleResponse())),
             tools = emptyList(),
@@ -50,10 +50,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists sequential ids even when history lookup returns empty`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(simpleResponse()), contextSize = 0),
             tools = emptyList(),
@@ -70,10 +70,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat with tool call persists messages in expected order`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(
                 engine = SequencedResponseEngine(
@@ -101,10 +101,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists thinking from assistant response`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(responseWithThinking("I thought about it", "the answer")), contextSize = 4000),
             tools = emptyList(),
@@ -122,10 +122,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat drops empty assistant response from persistence and return payload`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(simpleResponse(content = "")), contextSize = 4000),
             tools = emptyList(),
@@ -143,10 +143,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chatStream persists thinking from streamed assistant response`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
@@ -170,12 +170,12 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `thinking-only assistant history is not replayed when context excludes thinking`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val capturedPrompts = mutableListOf<List<AimoChatMessage>>()
 
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(
@@ -205,10 +205,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists tool message again when same tool call id appears in a later assistant turn`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(
                 engine = SequencedResponseEngine(
@@ -236,10 +236,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat de-dupes duplicate tool call ids within the same assistant turn`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(
                 engine = SequencedResponseEngine(
@@ -270,10 +270,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chatStream done callback includes aggregated content for same message id`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
@@ -304,10 +304,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chatStream emits final aggregated done callback when provider chunks never mark done`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
@@ -485,16 +485,22 @@ class AimoChatClientImplMessageIdTest {
 
     private class TestSessionClient(
         override val chatId: UUID,
-    ) : AimoSessionClient {
+    ) : AimoConversationClient {
         private val metadata = mutableMapOf<String, Any>()
+        private val runtimeMetadata = mutableMapOf<String, Any>()
 
         override fun createChatClient(): AimoChatClient = throw UnsupportedOperationException()
         override fun addMessages(messages: List<AimoChatMessage>) = throw UnsupportedOperationException()
-        override fun getMetadata(): Map<String, Any> = metadata.toMap()
-        override fun readMetadata(): Map<String, Any> = metadata.toMap()
-        override fun getProperty(property: String): Any? = metadata[property]
-        override fun readProperty(property: String): Any? = metadata[property]
-        override fun writeProperty(property: String, value: Any) { metadata[property] = value }
-        override fun deleteProperty(property: String): Boolean = metadata.remove(property) != null
+        override fun getChatMetadata(): Map<String, Any> = metadata.toMap()
+        override fun readChatMetadata(): Map<String, Any> = metadata.toMap()
+        override fun getChatProperty(property: String): Any? = metadata[property]
+        override fun readChatProperty(property: String): Any? = metadata[property]
+        override fun writeChatProperty(property: String, value: Any) { metadata[property] = value }
+        override fun deleteChatProperty(property: String): Boolean = metadata.remove(property) != null
+        override fun getRuntimeMetadata(): Map<String, Any> = runtimeMetadata.toMap()
+        override fun getRuntimeProperty(property: String): Any? = runtimeMetadata[property]
+        override fun writeRuntimeProperty(property: String, value: Any) { runtimeMetadata[property] = value }
+        override fun deleteRuntimeProperty(property: String): Boolean = runtimeMetadata.remove(property) != null
+
     }
 }

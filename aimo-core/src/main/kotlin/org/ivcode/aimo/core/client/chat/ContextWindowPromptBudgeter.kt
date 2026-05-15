@@ -27,19 +27,14 @@ import kotlin.math.ceil
  * @property excludeThinking When true, excludes `thinking` text from token/character
  *   budgeting and strips it from prompt messages sent to the model.
  */
-internal class ChatInputTokenBudgeter(
+internal class ContextWindowPromptBudgeter(
     private val maxInputTokens: Int,
     initialObservedPromptCharacters: Long = 0,
     initialObservedPromptTokens: Long = 0,
     private val excludeThinking: Boolean = false,
-) {
+) : PromptBudgeter {
     private var observedPromptCharacters: Long = initialObservedPromptCharacters.coerceAtLeast(0)
     private var observedPromptTokens: Long = initialObservedPromptTokens.coerceAtLeast(0)
-
-    data class Calibration(
-        val observedPromptCharacters: Long,
-        val observedPromptTokens: Long,
-    )
 
     private data class PromptPlan(
         val history: List<AimoChatMessage>,
@@ -77,13 +72,14 @@ internal class ChatInputTokenBudgeter(
         ).history
     }
 
-    fun promptMessagesForCall(
+    override fun promptMessagesForCall(
         systemMessages: List<AimoChatMessage>,
-        history: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
         tools: List<AimoToolCallback>,
+        historyProvider: (Long?) -> List<AimoChatMessage>,
     ): List<AimoChatMessage> {
+        val history = historyProvider(maxRequestCharactersForLookup().toLong())
         return createPromptPlan(
             systemMessages = systemMessages,
             history = history,
@@ -93,35 +89,7 @@ internal class ChatInputTokenBudgeter(
         ).promptMessages
     }
 
-    /**
-     * Updates the internal token heuristic using actual prompt token usage returned by the model.
-     *
-     * @param promptMessages Messages that were sent in the prompt.
-     * @param tools Tool callbacks included in that prompt.
-     * @param promptTokens Actual prompt tokens reported by the model response.
-     */
-    fun recordPromptUsage(
-        promptMessages: List<AimoChatMessage>,
-        tools: List<AimoToolCallback>,
-        promptTokens: Int,
-    ) {
-        val promptCharacters = countMessageCharacters(promptMessages) + countToolCharacters(tools)
-        recordPromptUsage(promptCharacters, promptTokens)
-    }
-
-    fun calibration(): Calibration {
-        synchronized(this) {
-            return Calibration(
-                observedPromptCharacters = observedPromptCharacters,
-                observedPromptTokens = observedPromptTokens,
-            )
-        }
-    }
-
-    /**
-     * Returns a request-character budget for DAO history lookup before token-level trimming.
-     */
-    fun maxRequestCharactersForLookup(): Int {
+    private fun maxRequestCharactersForLookup(): Int {
         return ceil(maxInputTokens * charactersPerToken()).toInt().coerceAtLeast(0)
     }
 
@@ -264,17 +232,6 @@ internal class ChatInputTokenBudgeter(
             toolCallId.isNullOrBlank()
     }
 
-    private fun recordPromptUsage(promptCharacters: Int, promptTokens: Int) {
-        if (promptTokens <= 0 || promptCharacters <= 0) {
-            return
-        }
-
-        synchronized(this) {
-            observedPromptCharacters += promptCharacters.toLong()
-            observedPromptTokens += promptTokens.toLong()
-        }
-    }
-
     private fun charactersPerToken(): Double {
         synchronized(this) {
             if (observedPromptTokens > 0) {
@@ -292,3 +249,10 @@ internal class ChatInputTokenBudgeter(
         const val MAX_CHARACTERS_PER_TOKEN = 12.0
     }
 }
+
+
+
+
+
+
+

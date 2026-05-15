@@ -46,10 +46,12 @@ aimo.model.bedrock:
   # - Input: text, image, video
   # - Output: text
   nova-pro:
+    primary: true
     region: us-west-2
     context:
       size: 4096
       excludeThinking: false
+      promptCaching: true
     awsAccessKeyId: ${AWS_ACCESS_KEY_ID}
     awsSecretAccessKey: ${AWS_SECRET_ACCESS_KEY}
     options:
@@ -99,7 +101,6 @@ aimo.model.bedrock:
   # - Input: text
   # - Output: text
   gpt-oss-20b:
-    primary: true
     region: us-west-2
     context:
       size: 4096

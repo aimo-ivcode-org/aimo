@@ -45,6 +45,8 @@ internal object ResponseMapper {
             usage = Usage(
                 inputTokens = usage?.inputTokens() ?: 0,
                 outputTokens = usage?.outputTokens() ?: 0,
+                cacheReadInputTokens = usage?.cacheReadInputTokens() ?: 0,
+                cacheWriteInputTokens = usage?.cacheWriteInputTokens() ?: 0,
             )
         )
     }
@@ -85,6 +87,19 @@ internal object ResponseMapper {
             software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock.builder()
                 .text(sys.text)
                 .build()
+        }?.let { systemBlocks ->
+            if (request.cachePointAfterSystem && systemBlocks.isNotEmpty()) {
+                val cachePoint = software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock.builder()
+                    .cachePoint(
+                        software.amazon.awssdk.services.bedrockruntime.model.CachePointBlock.builder()
+                            .type(software.amazon.awssdk.services.bedrockruntime.model.CachePointType.DEFAULT)
+                            .build()
+                    )
+                    .build()
+                systemBlocks + cachePoint
+            } else {
+                systemBlocks
+            }
         }
 
         val bedrockInferenceConfig = request.inferenceConfig?.let { inf ->
@@ -97,8 +112,7 @@ internal object ResponseMapper {
         }
 
         val bedrockToolConfig = request.toolConfig?.let { tc ->
-            software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration.builder()
-                .tools(tc.tools.map { tool ->
+            val mappedTools = tc.tools.map { tool ->
                     software.amazon.awssdk.services.bedrockruntime.model.Tool.builder()
                         .toolSpec(
                             software.amazon.awssdk.services.bedrockruntime.model.ToolSpecification.builder().apply {
@@ -112,7 +126,22 @@ internal object ResponseMapper {
                             }.build()
                         )
                         .build()
-                })
+                }
+
+            val toolsWithCachePoint = if (request.cachePointAfterTools && mappedTools.isNotEmpty()) {
+                mappedTools + software.amazon.awssdk.services.bedrockruntime.model.Tool.builder()
+                    .cachePoint(
+                        software.amazon.awssdk.services.bedrockruntime.model.CachePointBlock.builder()
+                            .type(software.amazon.awssdk.services.bedrockruntime.model.CachePointType.DEFAULT)
+                            .build()
+                    )
+                    .build()
+            } else {
+                mappedTools
+            }
+
+            software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration.builder()
+                .tools(toolsWithCachePoint)
                 .build()
         }
 

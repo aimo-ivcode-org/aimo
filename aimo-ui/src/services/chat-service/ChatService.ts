@@ -46,7 +46,7 @@ export interface ChatService {
 
     /**
      * Send a chat message
-     * @param chatId The chat session ID
+     * @param chatId The conversation ID
      * @param request The chat request containing prompt and stream settings
      * @param callback Callback for handling chat responses
      * @returns Promise that resolves with the chat response

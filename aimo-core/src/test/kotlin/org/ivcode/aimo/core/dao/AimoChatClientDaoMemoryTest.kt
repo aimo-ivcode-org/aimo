@@ -10,7 +10,7 @@ class AimoChatClientDaoMemoryTest {
     @Test
     fun `getChatRequests with maxRequestCharacters returns newest requests within budget`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
 
         dao.addChatRequest(request(chatId, 1, 10, "r1"))
         dao.addChatRequest(request(chatId, 2, 20, "r2"))
@@ -24,7 +24,7 @@ class AimoChatClientDaoMemoryTest {
     @Test
     fun `getChatRequests with maxRequestCharacters returns empty for zero or negative budget`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         dao.addChatRequest(request(chatId, 1, 10, "r1"))
 
         assertEquals(emptyList(), dao.getChatRequests(chatId, maxRequestCharacters = 0))
@@ -34,7 +34,7 @@ class AimoChatClientDaoMemoryTest {
     @Test
     fun `getChatRequests with maxRequestCharacters keeps oversized newest request`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
 
         dao.addChatRequest(request(chatId, 1, 10, "r1"))
         dao.addChatRequest(request(chatId, 2, 40, "r2"))
@@ -47,7 +47,7 @@ class AimoChatClientDaoMemoryTest {
     @Test
     fun `getChatRequests with maxRequestCharacters preserves complete requests`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val requestId1 = UUID.randomUUID()
         val requestId2 = UUID.randomUUID()
 

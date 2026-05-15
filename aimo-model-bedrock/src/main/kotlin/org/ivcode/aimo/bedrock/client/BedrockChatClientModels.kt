@@ -18,6 +18,17 @@ internal data class ConverseRequest(
     val inferenceConfig: InferenceConfiguration? = null,
     val toolConfig: ToolConfiguration? = null,
     val additionalModelRequestFields: Map<String, Any?>? = null,
+    /**
+     * When `true`, [ResponseMapper] will append a cache-point block after all
+     * system content blocks so Bedrock may cache the system-prompt KV state.
+     */
+    val cachePointAfterSystem: Boolean = false,
+
+    /**
+     * When `true`, [ResponseMapper] will append a cache-point tool entry after
+     * tool definitions so Bedrock may cache stable tool schemas.
+     */
+    val cachePointAfterTools: Boolean = false,
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -114,5 +125,9 @@ internal data class Output(
 internal data class Usage(
     val inputTokens: Int,
     val outputTokens: Int,
+    /** Tokens that were served from the Bedrock prompt cache (0 when caching is not used). */
+    val cacheReadInputTokens: Int = 0,
+    /** Tokens that were written into the Bedrock prompt cache (0 when caching is not used). */
+    val cacheWriteInputTokens: Int = 0,
 )
 

@@ -8,6 +8,7 @@ import org.ehcache.config.builders.ExpiryPolicyBuilder
 import org.ehcache.config.builders.ResourcePoolsBuilder
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.cache.AimoSessionCache
+import org.ivcode.aimo.core.cache.SessionCacheStats
 import org.ivcode.aimo.core.cache.SessionTokenCalibration
 import java.time.Duration
 import java.util.UUID
@@ -34,33 +35,33 @@ internal class EhcacheSessionCache(
         EhcacheCachedSessionState::class.java,
     )
 
-    override fun getMetadata(chatId: UUID): Map<String, Any>? {
-        return cache.get(chatId)?.metadata?.toMap()
+    override fun getRuntimeMetadata(chatId: UUID): Map<String, Any>? {
+        return cache.get(chatId)?.runtimeMetadata?.toMap()
     }
 
-    override fun putMetadata(chatId: UUID, metadata: Map<String, Any>) {
+    override fun putRuntimeMetadata(chatId: UUID, metadata: Map<String, Any>) {
         synchronized(lock) {
             val current = cache.get(chatId) ?: EhcacheCachedSessionState()
-            cache.put(chatId, current.copy(metadata = metadata.toMap()))
+            cache.put(chatId, current.copy(runtimeMetadata = metadata.toMap()))
         }
     }
 
-    override fun upsertMetadata(chatId: UUID, metadata: Map<String, Any>) {
+    override fun upsertRuntimeMetadata(chatId: UUID, metadata: Map<String, Any>) {
         if (metadata.isEmpty()) return
 
         synchronized(lock) {
             val current = cache.get(chatId) ?: EhcacheCachedSessionState()
-            cache.put(chatId, current.copy(metadata = current.metadata + metadata))
+            cache.put(chatId, current.copy(runtimeMetadata = current.runtimeMetadata + metadata))
         }
     }
 
-    override fun removeMetadata(chatId: UUID, keys: List<String>) {
+    override fun removeRuntimeMetadata(chatId: UUID, keys: List<String>) {
         if (keys.isEmpty()) return
 
         synchronized(lock) {
             val current = cache.get(chatId) ?: return
-            val updated = current.metadata.toMutableMap().apply { keys.forEach { remove(it) } }
-            cache.put(chatId, current.copy(metadata = updated.toMap()))
+            val updated = current.runtimeMetadata.toMutableMap().apply { keys.forEach { remove(it) } }
+            cache.put(chatId, current.copy(runtimeMetadata = updated.toMap()))
         }
     }
 
@@ -95,6 +96,17 @@ internal class EhcacheSessionCache(
         }
     }
 
+    override fun getCacheStats(chatId: UUID): SessionCacheStats? {
+        return cache.get(chatId)?.cacheStats
+    }
+
+    override fun putCacheStats(chatId: UUID, stats: SessionCacheStats) {
+        synchronized(lock) {
+            val current = cache.get(chatId) ?: EhcacheCachedSessionState()
+            cache.put(chatId, current.copy(cacheStats = stats))
+        }
+    }
+
     override fun evict(chatId: UUID) {
         cache.remove(chatId)
     }
@@ -109,8 +121,9 @@ internal class EhcacheSessionCache(
 }
 
 private data class EhcacheCachedSessionState(
-    val metadata: Map<String, Any> = emptyMap(),
+    val runtimeMetadata: Map<String, Any> = emptyMap(),
     val messages: List<AimoChatMessage> = emptyList(),
     val tokenCalibration: SessionTokenCalibration? = null,
+    val cacheStats: SessionCacheStats? = null,
 )
 

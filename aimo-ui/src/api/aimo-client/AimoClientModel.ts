@@ -28,7 +28,7 @@ export interface ChatHistoryRequest {
     createdAt: Date,
 }
 
-export interface ChatSession {
+export interface ChatConversationInfo {
     chatId: string,
 }
 

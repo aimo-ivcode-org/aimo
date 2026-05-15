@@ -4,69 +4,69 @@ import java.util.UUID
 
 class AimoChatClientDaoMemory: AimoChatClientDao {
     
-    private val sessions: MutableMap<UUID, ChatSessionEntity> = mutableMapOf()
+    private val conversations: MutableMap<UUID, ChatConversationEntity> = mutableMapOf()
     private val requests: MutableMap<UUID, MutableList<ChatRequestEntity>> = mutableMapOf()
     
-    override fun createChatSession(): ChatSessionEntity {
+    override fun createChatConversation(): ChatConversationEntity {
         val chatId = UUID.randomUUID()
-        val session = ChatSessionEntity(
+        val conversation = ChatConversationEntity(
             chatId = chatId,
             metadata = mapOf()
         )
         
-        sessions[chatId] = session
-        return session
+        conversations[chatId] = conversation
+        return conversation
     }
 
-    override fun createChatSession(metadata: Map<String, String>): ChatSessionEntity {
+    override fun createChatConversation(metadata: Map<String, String>): ChatConversationEntity {
         val chatId = UUID.randomUUID()
-        val session = ChatSessionEntity(
+        val conversation = ChatConversationEntity(
             chatId = chatId,
             metadata = metadata
         )
 
-        sessions[chatId] = session
-        return session
+        conversations[chatId] = conversation
+        return conversation
     }
 
-    override fun getChatSessions(): List<ChatSessionEntity> {
-        return sessions.values.toList()
+    override fun getChatConversations(): List<ChatConversationEntity> {
+        return conversations.values.toList()
     }
 
-    override fun getChatSession(chatId: UUID): ChatSessionEntity? {
-        return sessions[chatId]
+    override fun getChatConversation(chatId: UUID): ChatConversationEntity? {
+        return conversations[chatId]
     }
 
-    override fun getChatSession(
+    override fun getChatConversation(
         chatId: UUID,
         metadata: Map<String, String>
-    ): ChatSessionEntity? {
-        val session = sessions[chatId] ?: return null
-        
+    ): ChatConversationEntity? {
+        val conversation = conversations[chatId] ?: return null
+
         for(md in metadata) {
-            val sessionValue = session.metadata[md.key] ?: return null
-            if (sessionValue != md.value) return null
+            val conversationValue = conversation.metadata[md.key] ?: return null
+            if (conversationValue != md.value) return null
         }
         
-        return session
+        return conversation
     }
 
-    override fun deleteChatSession(chatId: UUID): Boolean {
-        return sessions.remove(chatId) != null
+    override fun deleteChatConversation(chatId: UUID): Boolean {
+        return conversations.remove(chatId) != null
     }
 
-    override fun deleteChatSession(
+    override fun deleteChatConversation(
         chatId: UUID,
         metadata: Map<String, String>
     ): Boolean {
-        val session = sessions[chatId] ?: return false
-        
+        val conversation = conversations[chatId] ?: return false
+
         for(md in metadata) {
-            val sessionValue = session.metadata[md.key] ?: return false
-            if (sessionValue != md.value) return false
+            val conversationValue = conversation.metadata[md.key] ?: return false
+            if (conversationValue != md.value) return false
         }
         
-        return sessions.remove(chatId) != null
+        return conversations.remove(chatId) != null
     }
 
     override fun addChatRequest(request: ChatRequestEntity) {
@@ -116,13 +116,13 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         return requests[chatId]?.flatMap { it.messages } ?: emptyList()
     }
 
-    override fun upsertSessionMetadata(
+    override fun upsertConversationMetadata(
         chatId: UUID,
         metadata: Map<String, Any>
     ): Boolean {
-        // If the session does not exist we do not create one; return false to indicate
+        // If the conversation does not exist we do not create one; return false to indicate
         // the operation was not performed per the user's requirement.
-        val existing = sessions[chatId] ?: return false
+        val existing = conversations[chatId] ?: return false
 
         // If metadata is empty, nothing to do; treat as successful no-op
         if (metadata.isEmpty()) return true
@@ -132,16 +132,16 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         for ((k, v) in metadata) {
             merged[k] = v
         }
-        sessions[chatId] = existing.copy(metadata = merged.toMap())
+        conversations[chatId] = existing.copy(metadata = merged.toMap())
         return true
     }
 
-    override fun deleteSessionMetadata(
+    override fun deleteConversationMetadata(
         chatId: UUID,
         keys: List<String>
     ): Boolean {
-        // If the session does not exist, indicate failure
-        val existing = sessions[chatId] ?: return false
+        // If the conversation does not exist, indicate failure
+        val existing = conversations[chatId] ?: return false
 
         // If no keys provided, nothing to do; treat as successful no-op
         if (keys.isEmpty()) return true
@@ -151,7 +151,7 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
             updated.remove(k)
         }
 
-        sessions[chatId] = existing.copy(metadata = updated.toMap())
+        conversations[chatId] = existing.copy(metadata = updated.toMap())
         return true
     }
 }

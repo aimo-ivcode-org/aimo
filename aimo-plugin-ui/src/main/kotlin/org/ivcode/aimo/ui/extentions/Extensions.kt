@@ -1,19 +1,19 @@
 package org.ivcode.aimo.ui.extentions
 
-import org.ivcode.aimo.core.AimoSession
-import org.ivcode.aimo.core.AimoSessionClient
-import org.ivcode.aimo.ui.model.SessionTitle
+import org.ivcode.aimo.core.AimoConversationInfo
+import org.ivcode.aimo.core.AimoConversationClient
+import org.ivcode.aimo.ui.model.ConversationTitle
 import java.util.UUID
 
 internal const val PROPERTY_NAME__TITLE: String = "title"
 
 private const val DEFAULT_TITLE_SOURCE = "USER"
 
-private fun toSessionTitle(raw: Any?, chatId: UUID): SessionTitle? {
+private fun toConversationTitle(raw: Any?, chatId: UUID): ConversationTitle? {
     return when (raw) {
         null -> null
-        is SessionTitle -> raw
-        is String -> SessionTitle(chatId = chatId, source = DEFAULT_TITLE_SOURCE, title = raw)
+        is ConversationTitle -> raw
+        is String -> ConversationTitle(chatId = chatId, source = DEFAULT_TITLE_SOURCE, title = raw)
         is Map<*, *> -> {
             val source = (raw["source"] as? String) ?: DEFAULT_TITLE_SOURCE
             val title = raw["title"] as? String
@@ -23,27 +23,27 @@ private fun toSessionTitle(raw: Any?, chatId: UUID): SessionTitle? {
                 else -> null
             } ?: chatId
 
-            SessionTitle(chatId = parsedChatId, source = source, title = title)
+            ConversationTitle(chatId = parsedChatId, source = source, title = title)
         }
         else -> null
     }
 }
 
-fun AimoSession.getTitle(): SessionTitle? {
-    return toSessionTitle(this.metadata[PROPERTY_NAME__TITLE], this.chatId)
+fun AimoConversationInfo.getTitle(): ConversationTitle? {
+    return toConversationTitle(this.metadata[PROPERTY_NAME__TITLE], this.chatId)
 }
 
-fun AimoSessionClient.getTitle(): SessionTitle? {
-    return toSessionTitle(this.getProperty(PROPERTY_NAME__TITLE), this.chatId)
+fun AimoConversationClient.getTitle(): ConversationTitle? {
+    return toConversationTitle(this.readChatProperty(PROPERTY_NAME__TITLE), this.chatId)
 }
 
-fun AimoSessionClient.setTitle(title: String, source: String = DEFAULT_TITLE_SOURCE): SessionTitle {
-    val sessionTitle = SessionTitle(
+fun AimoConversationClient.setTitle(title: String, source: String = DEFAULT_TITLE_SOURCE): ConversationTitle {
+    val conversationTitle = ConversationTitle(
         chatId = this.chatId,
         source = source,
         title = title
     )
 
-    this.writeProperty(PROPERTY_NAME__TITLE, sessionTitle)
-    return sessionTitle
+    this.writeChatProperty(PROPERTY_NAME__TITLE, conversationTitle)
+    return conversationTitle
 }

@@ -2,7 +2,7 @@ import {aimoClient} from '../../api/aimo-client/AimoClient'
 import type {ChatHistoryRequest, ChatMessage, ChatResponse} from '../../api/aimo-client/AimoClientModel'
 import type {ChatHandle} from '../../components/chat/Chat'
 import React from "react";
-import {chatSession} from "../chat-session-service/ChatSession";
+import {chatConversation} from "../chat-conversation-service/ChatConversation";
 import { historyService } from "../history-service/HistoryService";
 import { chatService } from "./ChatService";
 
@@ -94,7 +94,7 @@ function streamAccKey(responseId: string, msg: ChatMessage): string {
  *
  * Responsibilities:
  * - Attaches/detaches to a Chat component via React refs
- * - Listens for chat session changes and fetches history
+ * - Listens for chat conversation changes and fetches history
  * - Handles sending user messages and streaming responses back to the Chat component
  * - Manages error handling and UI state (busy, input disabled)
  *
@@ -104,17 +104,17 @@ function streamAccKey(responseId: string, msg: ChatMessage): string {
 export class ChatController {
     private chatHandle?: React.RefObject<ChatHandle | null> | null
 
-    private unsubscribeSessionChange: (() => void) | null = null
+    private unsubscribeConversationChange: (() => void) | null = null
 
     /**
      * Attaches the controller to a Chat component.
-     * Sets up a listener for chat session changes that automatically loads chat history
-     * when a new session is selected. If already attached, this is a no-op.
+     * Sets up a listener for chat conversation changes that automatically loads chat history
+     * when a new conversation is selected. If already attached, this is a no-op.
      *
      * Behavior:
-     * - When the session ID changes to null, clears all responses from the Chat component
-     * - When a valid session ID is set, disables input, fetches history, and updates the component
-     * - If history fetch fails, clears the session and re-throws the error
+     * - When the conversation ID changes to null, clears all responses from the Chat component
+     * - When a valid conversation ID is set, disables input, fetches history, and updates the component
+     * - If history fetch fails, clears the selected conversation and re-throws the error
      *
      * @param {React.RefObject<ChatHandle | null>} chatHandle - Ref to the Chat component's imperative API
      */
@@ -122,12 +122,12 @@ export class ChatController {
         if (this.chatHandle) {
             return
         }
-        if (this.unsubscribeSessionChange) {
-            this.unsubscribeSessionChange()
+        if (this.unsubscribeConversationChange) {
+            this.unsubscribeConversationChange()
         }
 
         this.chatHandle = chatHandle
-        this.unsubscribeSessionChange = chatSession.onChange(async (id: string | null) => {
+        this.unsubscribeConversationChange = chatConversation.onChange(async (id: string | null) => {
             if (!id) {
                 this.chatHandle?.current?.setResponses([])
             } else {
@@ -139,7 +139,7 @@ export class ChatController {
 
                     void historyService.fetchHistory()
                 } catch (error) {
-                    void chatSession.clear(false)
+                    void chatConversation.clear(false)
                     throw error
                 } finally {
                     enableInput?.()
@@ -150,15 +150,15 @@ export class ChatController {
 
     /**
      * Detaches the controller from the Chat component.
-     * Clears the reference to the Chat handle and unsubscribes from session changes.
+     * Clears the reference to the Chat handle and unsubscribes from conversation changes.
      * After this method is called, the controller will no longer respond to chat events.
      */
     detach() {
         this.chatHandle = undefined
 
-        if (this.unsubscribeSessionChange) {
-            this.unsubscribeSessionChange()
-            this.unsubscribeSessionChange = null
+        if (this.unsubscribeConversationChange) {
+            this.unsubscribeConversationChange()
+            this.unsubscribeConversationChange = null
         }
     }
 
@@ -166,7 +166,7 @@ export class ChatController {
      * Callback handler for sending chat messages. Pass this method to the Chat component as `onSend`.
      *
      * Workflow:
-     * 1. Creates a new chat session if one doesn't exist
+     * 1. Creates a new conversation if one doesn't exist
      * 2. Adds the user message to the chat display
      * 3. Sends the message to the backend API with streaming enabled
      * 4. Appends streamed message chunks in real-time to the Chat component
@@ -178,12 +178,12 @@ export class ChatController {
      * @throws {Error} If the Chat component is not attached or if the API request fails
      */
     onSend = async (userMsg: ChatMessage): Promise<ChatMessage | undefined> => {
-        let id = chatSession.id
+        let id = chatConversation.id
         if (!id) {
-            const newChat = await aimoClient.createChatSession()
+            const newChat = await aimoClient.createChatConversation()
 
             // TODO: I need all listeners to finish before proceeding
-            id = await chatSession.setId(newChat.chatId)
+            id = await chatConversation.setId(newChat.chatId)
             // Create a response wrapper for the user message
             const userResponse: ChatResponse = {
                 chatId: id,

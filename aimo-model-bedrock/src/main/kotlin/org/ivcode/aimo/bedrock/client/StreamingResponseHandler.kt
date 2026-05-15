@@ -109,6 +109,8 @@ internal class StreamingResponseHandler(
                         usage = Usage(
                             inputTokens = metaUsage?.inputTokens() ?: usage.inputTokens,
                             outputTokens = metaUsage?.outputTokens() ?: usage.outputTokens,
+                            cacheReadInputTokens = metaUsage?.cacheReadInputTokens() ?: usage.cacheReadInputTokens,
+                            cacheWriteInputTokens = metaUsage?.cacheWriteInputTokens() ?: usage.cacheWriteInputTokens,
                         )
                         if (log.isTraceEnabled) {
                             log.trace("Bedrock stream event onMetadata modelId={} payload={}", modelId, asLogValue(event))
@@ -154,5 +156,4 @@ internal class StreamingResponseHandler(
         }
     }
 }
-
 

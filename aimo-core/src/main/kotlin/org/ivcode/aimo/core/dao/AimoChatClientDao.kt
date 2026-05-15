@@ -4,67 +4,67 @@ import java.util.UUID
 
 interface AimoChatClientDao {
 
-    fun createChatSession(): ChatSessionEntity
+    fun createChatConversation(): ChatConversationEntity
 
     /**
-     * Create a new chat session and persist the provided [metadata] with it.
+     * Create a new conversation and persist the provided [metadata] with it.
      *
-     * The [metadata] map contains initial or additional session information that
-     * implementations should store with the newly created session (for example,
+     * The [metadata] map contains initial or additional conversation information that
+     * implementations should store with the newly created conversation (for example,
      * "user" -> "isaiah" or "tenant" -> "acme"). These metadata entries can
-     * later be used to scope or filter lookups (see [getChatSession]) — callers
+     * later be used to scope or filter lookups (see [getChatConversation]) - callers
      * should include any attributes they want persisted or used for future scoping.
      *
      * Implementations must store the metadata as-is (string key/value pairs) and
      * may perform any validation required (e.g., required keys, value formats).
-     * This method returns the persisted [ChatSessionEntity] (including any generated
-     * identifiers) so the caller can reference the session immediately.
+     * This method returns the persisted [ChatConversationEntity] (including any generated
+     * identifiers) so the caller can reference the conversation immediately.
      *
      * Example:
-     * val session = createChatSession(mapOf("user" to "isaiah", "locale" to "en-US"))
-     * // The returned session will have those metadata entries persisted and future
-     * // calls to getChatSession(session.id, mapOf("user" to "isaiah")) should match.
+     * val conversation = createChatConversation(mapOf("user" to "isaiah", "locale" to "en-US"))
+     * // The returned conversation will have those metadata entries persisted and future
+     * // calls to getChatConversation(conversation.id, mapOf("user" to "isaiah")) should match.
      *
-     * @param metadata initial key/value pairs to persist with the new session; must not be null
-     * @return the newly created and persisted [ChatSessionEntity]
+     * @param metadata initial key/value pairs to persist with the new conversation; must not be null
+     * @return the newly created and persisted [ChatConversationEntity]
      */
-    fun createChatSession(metadata: Map<String, String>): ChatSessionEntity
+    fun createChatConversation(metadata: Map<String, String>): ChatConversationEntity
 
-    fun getChatSessions(): List<ChatSessionEntity>
+    fun getChatConversations(): List<ChatConversationEntity>
 
-    fun getChatSession(chatId: UUID): ChatSessionEntity?
+    fun getChatConversation(chatId: UUID): ChatConversationEntity?
 
     /**
-     * Retrieve a chat session by its [chatId], optionally scoped by the provided [metadata].
+     * Retrieve a conversation by its [chatId], optionally scoped by the provided [metadata].
      *
      * The implementation should only return a session when all metadata constraints match
-     * the stored session's metadata. Metadata acts as a scoping/filtering map: every
-     * entry in the provided [metadata] must be present and equal in the stored session's
+     * the stored conversation metadata. Metadata acts as a scoping/filtering map: every
+     * entry in the provided [metadata] must be present and equal in the stored conversation
      * metadata for a match to occur.
      *
-     * Metadata is also used to carry initial or additional session information. For example,
-     * callers may include attributes that should be stored with the session at creation
+     * Metadata is also used to carry initial or additional conversation information. For example,
+     * callers may include attributes that should be stored with the conversation at creation
      * (e.g. "user", "tenant", or other context). Implementations may persist these
-     * values when creating or updating sessions. When provided to this lookup method,
+     * values when creating or updating conversations. When provided to this lookup method,
      * however, metadata is treated primarily as a filter: the lookup will only succeed
-     * if the stored session's metadata contains matching entries.
+     * if the stored conversation metadata contains matching entries.
      *
      * Example:
-     * getChatSession(id, mapOf("user" to "isaiah"))
-     * will return a session only if the session's metadata contains the entry
+     * getChatConversation(id, mapOf("user" to "isaiah"))
+     * will return a conversation only if the stored metadata contains the entry
      * "user" -> "isaiah".
      *
-     * @param chatId the unique identifier of the chat session to retrieve
+     * @param chatId the unique identifier of the conversation to retrieve
      * @param metadata key/value pairs used to scope or filter the lookup. When empty,
      *                 implementations should ignore metadata and match by id only. Implementations
-     *                 may also persist metadata as extra session information when creating/updating sessions.
-     * @return the matching [ChatSessionEntity] when found and matching the provided metadata,
-     *         or null if no matching session exists
+     *                 may also persist metadata as extra conversation information when creating/updating conversations.
+     * @return the matching [ChatConversationEntity] when found and matching the provided metadata,
+     *         or null if no matching conversation exists
      */
-    fun getChatSession(chatId: UUID, metadata: Map<String, String>): ChatSessionEntity?
+    fun getChatConversation(chatId: UUID, metadata: Map<String, String>): ChatConversationEntity?
 
-    fun deleteChatSession(chatId: UUID): Boolean
-    fun deleteChatSession(chatId: UUID, metadata: Map<String, String>): Boolean
+    fun deleteChatConversation(chatId: UUID): Boolean
+    fun deleteChatConversation(chatId: UUID, metadata: Map<String, String>): Boolean
 
 
     fun addChatRequest(request: ChatRequestEntity)
@@ -74,15 +74,15 @@ interface AimoChatClientDao {
 
     
     /**
-     * Upsert session metadata for an existing chat session.
+     * Upsert metadata for an existing conversation.
      *
      * Performs an "upsert" (insert or update) of the provided key/value metadata for
-     * the session identified by [chatId]. Implementations should persist each entry
+     * the conversation identified by [chatId]. Implementations should persist each entry
      * in [metadata] as string key/value pairs so subsequent lookups (for example via
-     * [getChatSession]) can observe the stored values.
+     * [getChatConversation]) can observe the stored values.
      *
      * Behavior expectations
-     * - Insert or update: if a key from [metadata] does not exist for the session it
+     * - Insert or update: if a key from [metadata] does not exist for the conversation it
      *   should be created; if it already exists it should be updated to the new value.
      * - Atomicity: callers should prefer implementations that provide atomic semantics
      *   (all entries applied or none). If atomic updates are not possible the
@@ -106,15 +106,15 @@ interface AimoChatClientDao {
      *
      * Example
      * ```kotlin
-     * dao.upsertSessionMetadata(chatId, mapOf("user" to "isaiah", "locale" to "en-US"))
+     * dao.upsertConversationMetadata(chatId, mapOf("user" to "isaiah", "locale" to "en-US"))
      * ```
      *
-     * @param chatId the unique identifier of the chat session whose metadata will be modified
-     * @param metadata a non-null map of keys and values to insert or update for the session
+      * @param chatId the unique identifier of the conversation whose metadata will be modified
+     * @param metadata a non-null map of keys and values to insert or update for the conversation
      * @return true when the metadata was applied to an existing session, false when the
-     *         session identified by [chatId] does not exist and no update was performed
+     *         conversation identified by [chatId] does not exist and no update was performed
      */
-    fun upsertSessionMetadata(chatId: UUID, metadata: Map<String, Any>): Boolean
+    fun upsertConversationMetadata(chatId: UUID, metadata: Map<String, Any>): Boolean
 
-    fun deleteSessionMetadata(chatId: UUID, keys: List<String>): Boolean
+    fun deleteConversationMetadata(chatId: UUID, keys: List<String>): Boolean
 }

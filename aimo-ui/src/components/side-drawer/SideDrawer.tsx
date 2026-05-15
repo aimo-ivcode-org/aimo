@@ -25,8 +25,8 @@ import {
 } from '@mui/icons-material'
 
 import {CSSObject, styled, Theme, useTheme} from '@mui/material/styles';
-import {chatSession} from '../../services/chat-session-service/ChatSession';
-import ChatSessionList from "./chat-session-list/ChatSessionList";
+import {chatConversation} from '../../services/chat-conversation-service/ChatConversation';
+import ChatConversationList from "./chat-conversation-list/ChatConversationList";
 
 const drawerWidth = 260;
 
@@ -165,7 +165,7 @@ export default function SideDrawer({ children }: SideDrawerProps) {
                     aria-labelledby="nested-list-subheader"
                 >
                     <Tooltip title={"New Chat"} placement="right" disableHoverListener={open} disableFocusListener={open}>
-                        <ListItemButton onClick={ async () => { await chatSession.clear(false) } }>
+                        <ListItemButton onClick={ async () => { await chatConversation.clear(false) } }>
                             <ListItemIcon>
                                 <TryIcon />
                             </ListItemIcon>
@@ -174,7 +174,7 @@ export default function SideDrawer({ children }: SideDrawerProps) {
                     </Tooltip>
                 </List>
                 <Divider />
-                <ChatSessionList
+                <ChatConversationList
                     drawerOpen={open}
                     onOpenDrawer = {() => { setOpen(true); }}
                 />

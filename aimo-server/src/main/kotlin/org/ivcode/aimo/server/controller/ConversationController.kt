@@ -1,8 +1,8 @@
 package org.ivcode.aimo.server.controller
 
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
-import org.ivcode.aimo.server.model.ChatSession
-import org.ivcode.aimo.server.service.SessionService
+import org.ivcode.aimo.server.model.ChatConversationInfo
+import org.ivcode.aimo.server.service.ConversationService
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -12,26 +12,25 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
-@RequestMapping("/$API_CONTROLLER_CONTEXT/session")
-class SessionController (
-    private val chatSessionService: SessionService,
+@RequestMapping("/$API_CONTROLLER_CONTEXT/conversation")
+class ConversationController (
+    private val conversationService: ConversationService,
 ) {
 
     @PostMapping("/")
-    fun createChatSession (
-    ): ChatSession {
-        return chatSessionService.createSession()
+    fun createChatConversation(): ChatConversationInfo {
+        return conversationService.createConversation()
     }
 
     @GetMapping("/")
-    fun getChatSessions (): List<ChatSession> {
-        return chatSessionService.getSessions()
+    fun getChatConversations(): List<ChatConversationInfo> {
+        return conversationService.getConversations()
     }
 
     @DeleteMapping("/{chatId}")
-    fun deleteChatSession (
+    fun deleteChatConversation(
         @PathVariable chatId: UUID
     ) {
-        chatSessionService.deleteSession(chatId)
+        conversationService.deleteConversation(chatId)
     }
 }

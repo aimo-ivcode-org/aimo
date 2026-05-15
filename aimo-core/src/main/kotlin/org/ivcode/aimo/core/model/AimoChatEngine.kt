@@ -93,7 +93,7 @@ const val DEFAULT_JSON_SCHEMA_DIALECT: String = "https://json-schema.org/draft/2
  * not a Kotlin map wrapper, so the schema is preserved exactly as JSON.
  *
  * Storing schemas as [JsonNode] keeps this portable across providers and stable across
- * chat sessions, because downstream code can serialize/validate the same schema document
+ * conversations, because downstream code can serialize/validate the same schema document
  * without lossy type conversions.
  */
 data class AimoToolDefinition (

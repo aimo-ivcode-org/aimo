@@ -6,11 +6,11 @@ import org.springframework.context.annotation.Import
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 import org.ivcode.aimo.server.controller.ChatController
+import org.ivcode.aimo.server.controller.ConversationController
 import org.ivcode.aimo.server.controller.HistoryController
-import org.ivcode.aimo.server.controller.SessionController
 import org.ivcode.aimo.server.service.ChatService
+import org.ivcode.aimo.server.service.ConversationService
 import org.ivcode.aimo.server.service.HistoryService
-import org.ivcode.aimo.server.service.SessionService
 
 @Configuration
 @Import(value = [
@@ -18,8 +18,8 @@ import org.ivcode.aimo.server.service.SessionService
     ChatService::class,
     HistoryController::class,
     HistoryService::class,
-    SessionController::class,
-    SessionService::class
+    ConversationController::class,
+    ConversationService::class
 ])
 class ServerConfig {
 

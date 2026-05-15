@@ -122,7 +122,7 @@ Once running, the application listens on `http://localhost:8080`.
 
 - **Web UI**: `http://localhost:8080`
 - **API Base**: `/aimo-api`
-- **Session endpoints**: `/aimo-api/session/*`
+- **Conversation endpoints**: `/aimo-api/conversation/*`
 - **Chat streaming**: `POST /aimo-api/chat/{chatId}`
 
 ## Troubleshooting

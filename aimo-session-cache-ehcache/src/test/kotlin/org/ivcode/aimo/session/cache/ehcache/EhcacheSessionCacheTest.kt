@@ -29,14 +29,14 @@ class EhcacheSessionCacheTest {
     }
 
     @Test
-    fun `upserts metadata and stores token calibration`() {
+    fun `upserts runtime metadata and stores token calibration`() {
         val cache = EhcacheSessionCache(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
         try {
             val chatId = UUID.randomUUID()
-            cache.putMetadata(chatId, mapOf("a" to 1))
-            cache.upsertMetadata(chatId, mapOf("b" to 2, "a" to 3))
+            cache.putRuntimeMetadata(chatId, mapOf("a" to 1))
+            cache.upsertRuntimeMetadata(chatId, mapOf("b" to 2, "a" to 3))
 
-            val metadata = cache.getMetadata(chatId)
+            val metadata = cache.getRuntimeMetadata(chatId)
             assertNotNull(metadata)
             assertEquals(3, metadata["a"])
             assertEquals(2, metadata["b"])
@@ -57,12 +57,12 @@ class EhcacheSessionCacheTest {
         val cache = EhcacheSessionCache(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
         try {
             val chatId = UUID.randomUUID()
-            cache.putMetadata(chatId, mapOf("x" to "y"))
+            cache.putRuntimeMetadata(chatId, mapOf("x" to "y"))
             cache.putMessages(chatId, listOf(message(1, "hello")))
 
             cache.evict(chatId)
 
-            assertNull(cache.getMetadata(chatId))
+            assertNull(cache.getRuntimeMetadata(chatId))
             assertNull(cache.getMessages(chatId))
             assertNull(cache.getTokenCalibration(chatId))
         } finally {

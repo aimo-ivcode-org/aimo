@@ -1,10 +1,10 @@
-import { ChatSessionImpl } from './ChatSessionImpl.js'
+import { ChatConversationImpl } from './ChatConversationImpl.js'
 
-export interface ChatSession {
+export interface ChatConversation {
     get id(): string | null
     setId(id?: string, push?: boolean): Promise<string>
     clear(push?: boolean): Promise<void>
     onChange(cb: (id: string | null) => Promise<void>): () => void
 }
 
-export const chatSession: ChatSession = new ChatSessionImpl()
+export const chatConversation: ChatConversation = new ChatConversationImpl()

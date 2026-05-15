@@ -5,11 +5,11 @@ import org.ivcode.aimo.core.AimoChatMessageType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class ChatInputTokenBudgeterTest {
+class ContextWindowPromptBudgeterTest {
 
     @Test
     fun `historyForPrompt keeps newest history within default budget`() {
-        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 5)
+        val budgeter = ContextWindowPromptBudgeter(maxInputTokens = 5)
         val history = listOf(
             message(1, "123456789"),
             message(2, "abcdefghi"),
@@ -29,7 +29,7 @@ class ChatInputTokenBudgeterTest {
 
     @Test
     fun `historyForPrompt returns empty when prompt and task messages use full budget`() {
-        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 6)
+        val budgeter = ContextWindowPromptBudgeter(maxInputTokens = 6)
         val history = listOf(message(1, "123456789"))
 
         val result = budgeter.historyForPrompt(
@@ -44,42 +44,8 @@ class ChatInputTokenBudgeterTest {
     }
 
     @Test
-    fun `recordPromptUsage refines token estimate for future requests`() {
-        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 4)
-        val history = listOf(
-            message(1, "123456789"),
-            message(2, "abcdefghi"),
-        )
-
-        val beforeCalibration = budgeter.historyForPrompt(
-            systemMessages = emptyList(),
-            history = history,
-            prompt = message(99, ""),
-            taskMessages = emptyList(),
-            tools = emptyList(),
-        )
-        assertEquals(listOf(history.last()), beforeCalibration)
-
-        budgeter.recordPromptUsage(
-            promptMessages = listOf(message(100, "123456789012345678")),
-            tools = emptyList(),
-            promptTokens = 2,
-        )
-
-        val afterCalibration = budgeter.historyForPrompt(
-            systemMessages = emptyList(),
-            history = history,
-            prompt = message(99, ""),
-            taskMessages = emptyList(),
-            tools = emptyList(),
-        )
-        assertEquals(history, afterCalibration)
-    }
-
-
-    @Test
     fun `seeded calibration is applied in new budgeter instance`() {
-        val seeded = ChatInputTokenBudgeter(
+        val seeded = ContextWindowPromptBudgeter(
             maxInputTokens = 4,
             initialObservedPromptCharacters = 18,
             initialObservedPromptTokens = 2,
@@ -102,7 +68,7 @@ class ChatInputTokenBudgeterTest {
 
     @Test
     fun `historyForPrompt trims flat history messages from the oldest side`() {
-        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 3)
+        val budgeter = ContextWindowPromptBudgeter(maxInputTokens = 3)
         val history = listOf(
             message(1, "1234"),
             message(2, "1234"),
@@ -123,7 +89,7 @@ class ChatInputTokenBudgeterTest {
 
     @Test
     fun `promptMessagesForCall keeps thinking when exclusion is disabled`() {
-        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 10, excludeThinking = false)
+        val budgeter = ContextWindowPromptBudgeter(maxInputTokens = 10, excludeThinking = false)
         val history = listOf(
             message(1, "old", thinking = "old-thought"),
         )
@@ -131,10 +97,10 @@ class ChatInputTokenBudgeterTest {
 
         val result = budgeter.promptMessagesForCall(
             systemMessages = emptyList(),
-            history = history,
             prompt = prompt,
             taskMessages = emptyList(),
             tools = emptyList(),
+            historyProvider = { history },
         )
 
         assertEquals("old-thought", result[0].thinking)
@@ -143,7 +109,7 @@ class ChatInputTokenBudgeterTest {
 
     @Test
     fun `promptMessagesForCall removes thinking when exclusion is enabled`() {
-        val budgeter = ChatInputTokenBudgeter(maxInputTokens = 10, excludeThinking = true)
+        val budgeter = ContextWindowPromptBudgeter(maxInputTokens = 10, excludeThinking = true)
         val history = listOf(
             message(1, "old", thinking = "old-thought"),
         )
@@ -151,10 +117,10 @@ class ChatInputTokenBudgeterTest {
 
         val result = budgeter.promptMessagesForCall(
             systemMessages = emptyList(),
-            history = history,
             prompt = prompt,
             taskMessages = emptyList(),
             tools = emptyList(),
+            historyProvider = { history },
         )
 
         assertEquals(null, result[0].thinking)
@@ -170,3 +136,6 @@ class ChatInputTokenBudgeterTest {
         done = true,
     )
 }
+
+
+

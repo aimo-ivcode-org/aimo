@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import {chatSession} from "../../../services/chat-session-service/ChatSession";
+import {chatConversation} from "../../../services/chat-conversation-service/ChatConversation";
 import {HistoryEntry, historyService} from "../../../services/history-service/HistoryService";
 import {
     Button,
@@ -17,15 +17,15 @@ import {aimoClient} from "../../../api/aimo-client/AimoClient";
 import {aimoUiClient} from "../../../api/aimo-ui-client/AimoUiClient";
 import {chatService} from "../../../services/chat-service/ChatService";
 
-export interface ChatSessionListProps {
+export interface ChatConversationListProps {
     drawerOpen?: boolean;
     onOpenDrawer?: () => void;
 }
 
-export default function ChatSessionList(props: ChatSessionListProps) {
+export default function ChatConversationList(props: ChatConversationListProps) {
     const [open, setOpen] = React.useState(false);
     const [historyItems, setHistoryItems] = React.useState<HistoryEntry[]>([]);
-    const [sessionId, setSessionId] = React.useState<string | null>( chatSession.id );
+    const [conversationId, setConversationId] = React.useState<string | null>(chatConversation.id);
     const [hoveredId, setHoveredId] = React.useState<string | null>(null);
     const [editingId, setEditingId] = React.useState<string | null>(null);
 
@@ -36,9 +36,9 @@ export default function ChatSessionList(props: ChatSessionListProps) {
         })
     }, []);
     useEffect(() => {
-        // when chatSession updates, update local state
-        return chatSession.onChange(async (id: string | null) => {
-            setSessionId(id);
+        // when chatConversation updates, update local state
+        return chatConversation.onChange(async (id: string | null) => {
+            setConversationId(id);
         })
     }, []);
     useEffect(() => {
@@ -49,20 +49,20 @@ export default function ChatSessionList(props: ChatSessionListProps) {
         })
     }, []);
 
-    const onDeleteSession = async (id: string) => {
-        await aimoClient.deleteChatSession(id);
+    const onDeleteConversation = async (id: string) => {
+        await aimoClient.deleteChatConversation(id);
         void historyService.fetchHistory()
 
-        if(sessionId === id) {
-            await chatSession.clear(false)
+        if (conversationId === id) {
+            await chatConversation.clear(false)
         }
     }
 
-    const onEditSession = (id: string | null) => {
+    const onEditConversation = (id: string | null) => {
         setEditingId(id);
     }
 
-    const onEditSessionTitle = async (id: string, newTitle: string) => {
+    const onEditConversationTitle = async (id: string, newTitle: string) => {
         await aimoUiClient.setTitle(id, newTitle);
         void historyService.fetchHistory()
     }
@@ -123,15 +123,15 @@ export default function ChatSessionList(props: ChatSessionListProps) {
                                         fullWidth
                                         onFocus={(e) => (e.target as HTMLInputElement).select()}
                                         onBlur={(e) => {
-                                            onEditSession(null);
+                                            onEditConversation(null);
                                         }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 const newTitle = (e.target as HTMLInputElement).value;
-                                                void onEditSessionTitle(item.id, newTitle);
+                                                void onEditConversationTitle(item.id, newTitle);
                                                 (e.target as HTMLInputElement).blur();
                                             } else if (e.key === 'Escape') {
-                                                onEditSession(null);
+                                                onEditConversation(null);
                                             }
                                         }}
                                     />
@@ -143,8 +143,8 @@ export default function ChatSessionList(props: ChatSessionListProps) {
                         <ListItemButton
                             key={item.id}
                             sx={{ pl: 2, pr: "2px" }}
-                            onClick={ async () => { await chatSession.setId(item.id, false); } }
-                            selected={sessionId === item.id}
+                            onClick={ async () => { await chatConversation.setId(item.id, false); } }
+                            selected={conversationId === item.id}
                             onMouseEnter={() => setHoveredId(item.id)}
                             onMouseLeave={() => setHoveredId(null)}
                         >
@@ -161,7 +161,7 @@ export default function ChatSessionList(props: ChatSessionListProps) {
                                             size="small"
                                             style={{ minWidth: "30px", border: 'none', margin: 0, opacity: "65%" }}
                                             onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                                                onEditSession(item.id);
+                                                onEditConversation(item.id);
                                                 e.stopPropagation();
                                                 e.preventDefault();
                                             }}
@@ -177,7 +177,7 @@ export default function ChatSessionList(props: ChatSessionListProps) {
                                             onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
                                                 e.stopPropagation();
                                                 e.preventDefault();
-                                                await onDeleteSession(item.id);
+                                                await onDeleteConversation(item.id);
                                             }}
                                         >
                                             <DeleteForeverIcon/>
