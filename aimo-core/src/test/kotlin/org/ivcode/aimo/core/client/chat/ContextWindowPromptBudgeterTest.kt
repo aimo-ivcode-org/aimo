@@ -1,7 +1,15 @@
 package org.ivcode.aimo.core.client.chat
 
+import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
+import org.ivcode.aimo.core.AimoChatResponse
+import org.ivcode.aimo.core.AimoConversationClient
+import org.ivcode.aimo.core.AimoUsage
+import org.ivcode.aimo.core.cache.AimoSessionCache
+import org.ivcode.aimo.core.cache.SessionTokenCalibration
+import java.time.Instant
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -127,6 +135,40 @@ class ContextWindowPromptBudgeterTest {
         assertEquals(null, result[1].thinking)
     }
 
+    @Test
+    fun `withPromptForCall updates calibration in cache and metadata`() {
+        val conversation = TestConversationClient()
+        val sessionCache = TestSessionCache()
+        val budgeter = ContextWindowPromptBudgeter(
+            maxInputTokens = 100,
+            conversation = conversation,
+            sessionCache = sessionCache,
+        )
+
+        budgeter.withPromptForCall(
+            systemMessages = emptyList(),
+            prompt = message(1, "abcdefghij"),
+            taskMessages = emptyList(),
+            tools = emptyList(),
+            historyProvider = { emptyList() },
+            execute = {
+                AimoChatResponse(
+                    chatId = UUID.randomUUID(),
+                    responseId = UUID.randomUUID(),
+                    messages = emptyList(),
+                    createdAt = Instant.now(),
+                    usage = AimoUsage(inputTokens = 2),
+                )
+            },
+        )
+
+        val calibration = sessionCache.getRuntimeProperty("chat.tokenCalibration") as? SessionTokenCalibration
+        assertEquals(10L, calibration?.observedPromptCharacters)
+        assertEquals(2L, calibration?.observedPromptTokens)
+        assertEquals(10L, conversation.getChatProperty("chat.inputTokenBudgeter.observedPromptCharacters"))
+        assertEquals(2L, conversation.getChatProperty("chat.inputTokenBudgeter.observedPromptTokens"))
+    }
+
     private fun message(id: Int, content: String, thinking: String? = null) = AimoChatMessage(
         messageId = id,
         type = AimoChatMessageType.USER,
@@ -135,6 +177,44 @@ class ContextWindowPromptBudgeterTest {
         toolName = null,
         done = true,
     )
+
+    private class TestConversationClient : AimoConversationClient {
+        override val chatId: UUID = UUID.randomUUID()
+        private val chatMetadata = mutableMapOf<String, Any>()
+        private val runtimeMetadata = mutableMapOf<String, Any>()
+
+        override fun createChatClient(): AimoChatClient = throw UnsupportedOperationException()
+        override fun addMessages(messages: List<AimoChatMessage>) = throw UnsupportedOperationException()
+        override fun getChatMetadata(): Map<String, Any> = chatMetadata.toMap()
+        override fun readChatMetadata(): Map<String, Any> = chatMetadata.toMap()
+        override fun getChatProperty(property: String): Any? = chatMetadata[property]
+        override fun readChatProperty(property: String): Any? = chatMetadata[property]
+        override fun writeChatProperty(property: String, value: Any) {
+            chatMetadata[property] = value
+        }
+        override fun deleteChatProperty(property: String): Boolean = chatMetadata.remove(property) != null
+        override fun getRuntimeMetadata(): Map<String, Any> = runtimeMetadata.toMap()
+        override fun getRuntimeProperty(property: String): Any? = runtimeMetadata[property]
+        override fun writeRuntimeProperty(property: String, value: Any) {
+            runtimeMetadata[property] = value
+        }
+        override fun deleteRuntimeProperty(property: String): Boolean = runtimeMetadata.remove(property) != null
+    }
+
+    private class TestSessionCache : AimoSessionCache {
+        override val chatId: UUID = UUID.randomUUID()
+        private val runtimeMetadata = mutableMapOf<String, Any>()
+
+        override fun getRuntimeProperty(key: String): Any? = runtimeMetadata[key]
+        override fun getRuntimeProperties(): Map<String, Any> = runtimeMetadata.toMap()
+        override fun writeRuntimeProperty(key: String, value: Any) {
+            runtimeMetadata[key] = value
+        }
+        override fun deleteRuntimeProperty(key: String): Boolean = runtimeMetadata.remove(key) != null
+        override fun evict() {
+            runtimeMetadata.clear()
+        }
+    }
 }
 
 

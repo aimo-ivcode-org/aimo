@@ -1,20 +1,20 @@
 package org.ivcode.aimo.core.client.chat
 
 import org.ivcode.aimo.core.AimoChatMessage
+import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.cache.AimoSessionCache
 import org.ivcode.aimo.core.cache.SessionTokenCalibration
 import org.ivcode.aimo.core.model.AimoToolCallback
 import kotlin.math.ceil
-import java.util.UUID
-
-// ...existing code...
 
 internal class ContextWindowPromptBudgeter(
     private val maxInputTokens: Int,
     initialObservedPromptCharacters: Long = 0,
     initialObservedPromptTokens: Long = 0,
     private val excludeThinking: Boolean = false,
+    private val calibrationConversation: AimoConversationClient? = null,
+    private val calibrationSessionCache: AimoSessionCache? = null,
 ) : PromptBudgeter {
     constructor(
         maxInputTokens: Int,
@@ -26,6 +26,8 @@ internal class ContextWindowPromptBudgeter(
         initialObservedPromptCharacters = resolveObservedPromptCharacters(conversation, sessionCache),
         initialObservedPromptTokens = resolveObservedPromptTokens(conversation, sessionCache),
         excludeThinking = excludeThinking,
+        calibrationConversation = conversation,
+        calibrationSessionCache = sessionCache,
     )
 
     private var observedPromptCharacters: Long = initialObservedPromptCharacters.coerceAtLeast(0)
@@ -82,6 +84,32 @@ internal class ContextWindowPromptBudgeter(
             taskMessages = taskMessages,
             tools = tools,
         ).promptMessages
+    }
+
+    override fun withPromptForCall(
+        systemMessages: List<AimoChatMessage>,
+        prompt: AimoChatMessage,
+        taskMessages: List<AimoChatMessage>,
+        tools: List<AimoToolCallback>,
+        historyProvider: (chars: Long?) -> List<AimoChatMessage>,
+        execute: (promptMessages: List<AimoChatMessage>) -> AimoChatResponse,
+    ): AimoChatResponse {
+        val history = historyProvider(maxRequestCharactersForLookup().toLong())
+        val plan = createPromptPlan(
+            systemMessages = systemMessages,
+            history = history,
+            prompt = prompt,
+            taskMessages = taskMessages,
+            tools = tools,
+        )
+
+        val response = execute(plan.promptMessages)
+        val observedInputTokens = response.usage?.inputTokens?.toLong()
+        updateCalibration(
+            observedPromptCharacters = plan.promptCharacters.toLong(),
+            observedPromptTokens = observedInputTokens,
+        )
+        return response
     }
 
     private fun maxRequestCharactersForLookup(): Int {
@@ -236,6 +264,32 @@ internal class ContextWindowPromptBudgeter(
         }
 
         return DEFAULT_CHARACTERS_PER_TOKEN
+    }
+
+    private fun updateCalibration(observedPromptCharacters: Long, observedPromptTokens: Long?) {
+        val tokens = (observedPromptTokens ?: 0L).coerceAtLeast(0L)
+        if (observedPromptCharacters <= 0L || tokens <= 0L) {
+            return
+        }
+
+        val updated = synchronized(this) {
+            this.observedPromptCharacters += observedPromptCharacters
+            this.observedPromptTokens += tokens
+            SessionTokenCalibration(
+                observedPromptCharacters = this.observedPromptCharacters,
+                observedPromptTokens = this.observedPromptTokens,
+            )
+        }
+
+        calibrationSessionCache?.writeRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION, updated)
+        calibrationConversation?.writeChatProperty(
+            METADATA_KEY__OBSERVED_PROMPT_CHARACTERS,
+            updated.observedPromptCharacters,
+        )
+        calibrationConversation?.writeChatProperty(
+            METADATA_KEY__OBSERVED_PROMPT_TOKENS,
+            updated.observedPromptTokens,
+        )
     }
 
     private companion object {
