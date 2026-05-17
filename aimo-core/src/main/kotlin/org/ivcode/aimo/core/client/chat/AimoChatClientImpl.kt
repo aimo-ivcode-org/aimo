@@ -12,13 +12,11 @@ import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.controller.SystemMessageContext
 import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.model.AimoToolDefinition
 import org.ivcode.aimo.core.toAimoChatMessage
-import org.ivcode.aimo.core.toChatMessageEntity
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CHAT_ID
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CONVERSATION
 import org.ivcode.aimo.core.util.CONTEXT_KEY__REQUEST_ID
@@ -146,14 +144,7 @@ internal class AimoChatClientImpl (
 
         val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
         val allMessages = listOf(promptMessage) + persistedTaskMessages
-        dao.addChatRequest(ChatRequestEntity(
-            chatId = chatId,
-            requestId = responseId,
-            messages = allMessages.map { it.toChatMessageEntity(responseId) },
-            requestCharacters = allMessages.sumOf { it.content?.length ?: 0 },
-            createdAt = Instant.now(),
-        ))
-        appendCachedMessages(allMessages)
+        conversation.addMessages(allMessages)
 
         return AimoChatResponse(
             chatId = chatId,
@@ -316,9 +307,6 @@ internal class AimoChatClientImpl (
         sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, messages.toList())
     }
 
-    private fun appendCachedMessages(messages: List<AimoChatMessage>) {
-        sessionCache.appendToSessionProperty(CACHE_KEY__MESSAGES, messages.map { it as Any })
-    }
 
     private companion object {
         const val CACHE_KEY__MESSAGES = "chat.messages"

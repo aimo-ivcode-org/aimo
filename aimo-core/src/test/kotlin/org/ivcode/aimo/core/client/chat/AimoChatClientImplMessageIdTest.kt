@@ -10,11 +10,13 @@ import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.controller.Tool
 import org.ivcode.aimo.core.controller.toAimoToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
+import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoPrompt
+import org.ivcode.aimo.core.toChatMessageEntity
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -33,7 +35,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(simpleResponse())),
             tools = emptyList(),
@@ -53,7 +55,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(simpleResponse()), contextSize = 0),
             tools = emptyList(),
@@ -73,7 +75,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(
                 engine = SequencedResponseEngine(
@@ -104,7 +106,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(responseWithThinking("I thought about it", "the answer")), contextSize = 4000),
             tools = emptyList(),
@@ -125,7 +127,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(engine = FixedResponseEngine(simpleResponse(content = "")), contextSize = 4000),
             tools = emptyList(),
@@ -146,7 +148,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
@@ -175,7 +177,7 @@ class AimoChatClientImplMessageIdTest {
 
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(
@@ -208,7 +210,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(
                 engine = SequencedResponseEngine(
@@ -239,7 +241,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(
                 engine = SequencedResponseEngine(
@@ -273,7 +275,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
@@ -307,7 +309,7 @@ class AimoChatClientImplMessageIdTest {
         val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            conversation = TestSessionClient(chatId),
+            conversation = TestSessionClient(chatId, dao),
             dao = dao,
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
@@ -485,12 +487,25 @@ class AimoChatClientImplMessageIdTest {
 
     private class TestSessionClient(
         override val chatId: UUID,
+        private val dao: AimoChatClientDaoMemory? = null,
     ) : AimoConversationClient {
         private val metadata = mutableMapOf<String, Any>()
         private val runtimeMetadata = mutableMapOf<String, Any>()
 
         override fun createChatClient(): AimoChatClient = throw UnsupportedOperationException()
-        override fun addMessages(messages: List<AimoChatMessage>) = throw UnsupportedOperationException()
+        override fun addMessages(messages: List<AimoChatMessage>) {
+            if (messages.isEmpty()) return
+            val requestId = UUID.randomUUID()
+            dao?.addChatRequest(
+                ChatRequestEntity(
+                    chatId = chatId,
+                    requestId = requestId,
+                    messages = messages.map { it.toChatMessageEntity(requestId) },
+                    requestCharacters = messages.sumOf { it.content?.length ?: 0 },
+                    createdAt = Instant.now(),
+                )
+            )
+        }
         override fun getChatMetadata(): Map<String, Any> = metadata.toMap()
         override fun readChatMetadata(): Map<String, Any> = metadata.toMap()
         override fun getChatProperty(property: String): Any? = metadata[property]
@@ -504,3 +519,4 @@ class AimoChatClientImplMessageIdTest {
 
     }
 }
+
