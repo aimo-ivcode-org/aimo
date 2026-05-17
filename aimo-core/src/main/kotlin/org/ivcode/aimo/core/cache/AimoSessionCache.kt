@@ -24,6 +24,17 @@ interface AimoSessionCache {
     fun writeSessionProperty(key: String, value: Any)
     fun deleteSessionProperty(key: String): Boolean
 
+    /**
+     * Atomically appends items to a list property.
+     *
+     * This is an atomic read-modify-write operation: the current list is fetched,
+     * items are appended, and the updated list is written back as a single unit.
+     * Concurrent calls are serialized to prevent lost updates.
+     *
+     * @param key The property key (should reference a List<T>).
+     * @param items The items to append.
+     */
+    fun appendToSessionProperty(key: String, items: List<Any>)
 
     fun evict()
 }

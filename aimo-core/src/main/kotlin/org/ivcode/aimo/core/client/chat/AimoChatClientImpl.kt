@@ -335,8 +335,7 @@ internal class AimoChatClientImpl (
     }
 
     private fun appendCachedMessages(messages: List<AimoChatMessage>) {
-        if (messages.isEmpty()) return
-        putCachedMessages(getCachedMessages().orEmpty() + messages)
+        sessionCache.appendToSessionProperty(CACHE_KEY__MESSAGES, messages.map { it as Any })
     }
 
     private fun getCachedSessionStats(): SessionCacheStats? {

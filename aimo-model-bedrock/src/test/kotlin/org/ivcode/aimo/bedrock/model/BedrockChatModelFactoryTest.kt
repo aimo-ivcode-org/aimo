@@ -221,10 +221,10 @@ class BedrockChatModelFactoryTest {
 
         val factory = BedrockChatModelFactory(properties)
         val model = assertNotNull(factory.createAimoChatModel("model-a"))
-        val request = buildRequest(model)
+        val request = buildRequestWithTool(model)
 
         assertEquals(true, request.cachePointAfterSystem)
-        assertEquals(false, request.cachePointAfterTools)
+        assertEquals(true, request.cachePointAfterTools)
     }
 
     private fun bedrockProps(

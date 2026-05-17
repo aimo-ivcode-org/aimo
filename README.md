@@ -10,6 +10,7 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 | --- | --- |
 | `aimo-core` | Core abstractions and runtime (`Aimo`, conversations, chat clients, model-facing prompt flow, tool/system-message annotations). |
 | `aimo-model-ollama` | Ollama-backed Aimo model integration. |
+| `aimo-session-cache-ehcache` | Ehcache-backed session cache implementation for persisting conversation session state across requests. |
 | `aimo-server` | REST API layer for conversations, chat streaming, and history. |
 | `aimo-plugin-ui` | UI-specific server plugin (title endpoints + title tool controller). |
 | `aimo-ui` | React + Vite frontend packaged into resources for server distribution. |
@@ -113,6 +114,7 @@ npm run build
 aimo/
   aimo-core/
   aimo-model-ollama/
+  aimo-session-cache-ehcache/
   aimo-server/
   aimo-plugin-ui/
   aimo-ui/

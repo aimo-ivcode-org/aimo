@@ -2,6 +2,7 @@ package org.ivcode.aimo.session.cache.ehcache
 
 import org.ehcache.Cache
 import org.ivcode.aimo.core.cache.AimoSessionCache
+import org.ivcode.aimo.session.cache.ehcache.utils.KeyedReentrantLock
 import java.util.UUID
 
 /**
@@ -15,8 +16,6 @@ internal class EhcacheSessionCache(
     private val globalCache: Cache<UUID, EhcacheCachedSessionState>,
 ) : AimoSessionCache {
 
-    private val lock = Any()
-
     override fun getSessionProperty(key: String): Any? {
         return globalCache.get(chatId)?.runtimeMetadata?.get(key)
     }
@@ -26,26 +25,53 @@ internal class EhcacheSessionCache(
     }
 
     override fun writeSessionProperty(key: String, value: Any) {
-        synchronized(lock) {
+        val lock = keyedLock.acquire(chatId)
+        try {
             val current = globalCache.get(chatId) ?: EhcacheCachedSessionState()
             val updated = current.runtimeMetadata.toMutableMap().apply { this[key] = value }
             globalCache.put(chatId, current.copy(runtimeMetadata = updated.toMap()))
+        } finally {
+            keyedLock.release(chatId, lock)
         }
     }
 
     override fun deleteSessionProperty(key: String): Boolean {
-        synchronized(lock) {
-            val current = globalCache.get(chatId) ?: return false
-            if (!current.runtimeMetadata.containsKey(key)) return false
-            val updated = current.runtimeMetadata.toMutableMap().apply { remove(key) }
-            globalCache.put(chatId, current.copy(runtimeMetadata = updated.toMap()))
-            return true
+        val lock = keyedLock.acquire(chatId)
+        return try {
+            val current = globalCache.get(chatId)
+            if (current == null || !current.runtimeMetadata.containsKey(key)) {
+                false
+            } else {
+                val updated = current.runtimeMetadata.toMutableMap().apply { remove(key) }
+                globalCache.put(chatId, current.copy(runtimeMetadata = updated.toMap()))
+                true
+            }
+        } finally {
+            keyedLock.release(chatId, lock)
         }
     }
 
+    override fun appendToSessionProperty(key: String, items: List<Any>) {
+        if (items.isEmpty()) return
+        val lock = keyedLock.acquire(chatId)
+        try {
+            val current = globalCache.get(chatId) ?: EhcacheCachedSessionState()
+            @Suppress("UNCHECKED_CAST")
+            val existingList = (current.runtimeMetadata[key] as? List<Any>).orEmpty()
+            val updated = current.runtimeMetadata.toMutableMap().apply {
+                this[key] = existingList + items
+            }
+            globalCache.put(chatId, current.copy(runtimeMetadata = updated.toMap()))
+        } finally {
+            keyedLock.release(chatId, lock)
+        }
+    }
 
     override fun evict() {
         globalCache.remove(chatId)
     }
-}
 
+    companion object {
+        private val keyedLock = KeyedReentrantLock<UUID>()
+    }
+}

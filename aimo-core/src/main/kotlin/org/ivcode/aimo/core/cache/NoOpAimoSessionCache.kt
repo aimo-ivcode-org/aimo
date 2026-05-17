@@ -8,7 +8,7 @@ class NoOpAimoSessionCache(override val chatId: UUID) : AimoSessionCache {
     override fun getSessionProperties(): Map<String, Any> = emptyMap()
     override fun writeSessionProperty(key: String, value: Any) = Unit
     override fun deleteSessionProperty(key: String): Boolean = false
-
+    override fun appendToSessionProperty(key: String, items: List<Any>) = Unit
 
     override fun evict() = Unit
 }

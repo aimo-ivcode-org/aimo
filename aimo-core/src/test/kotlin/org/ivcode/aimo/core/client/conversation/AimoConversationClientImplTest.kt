@@ -104,6 +104,13 @@ class AimoConversationClientImplTest {
             return runtimeMetadata.remove(key) != null
         }
 
+        override fun appendToSessionProperty(key: String, items: List<Any>) {
+            if (items.isEmpty()) return
+            @Suppress("UNCHECKED_CAST")
+            val existingList = (runtimeMetadata[key] as? List<Any>).orEmpty()
+            runtimeMetadata[key] = existingList + items
+        }
+
         override fun evict() {
             runtimeMetadata.clear()
         }

@@ -20,7 +20,7 @@ aimo:
 
 ## Usage
 
-Add the module dependency to your app. Auto-configuration will provide an `AimoSessionCache` bean.
+Add the module dependency to your app. Auto-configuration will provide an `AimoSessionCacheProvider` bean.
 
 ```kotlin
 implementation(project(":aimo-session-cache-ehcache"))
