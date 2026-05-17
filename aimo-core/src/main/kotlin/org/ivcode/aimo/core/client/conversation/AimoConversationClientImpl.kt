@@ -101,10 +101,7 @@ internal class AimoConversationClientImpl(
         ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
 
     private fun appendCachedMessages(messages: List<AimoChatMessage>) {
-        if (messages.isEmpty()) return
-        @Suppress("UNCHECKED_CAST")
-        val current = sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
-        sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, current.orEmpty() + messages)
+        sessionCache.appendToSessionProperty(CACHE_KEY__MESSAGES, messages.map { it as Any })
     }
 
     private companion object {
