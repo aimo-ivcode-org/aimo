@@ -9,7 +9,6 @@ import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.cache.AimoSessionCache
 import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
 import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
-import org.ivcode.aimo.core.cache.SessionCacheStats
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.controller.SystemMessageContext
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -87,8 +86,6 @@ internal class AimoChatClientImpl (
         val promptMessage = createUserMessage(messageId = 1, content = request.prompt)
         val taskMessages = mutableListOf<AimoChatMessage>()
         var assistantMessage: AimoChatMessage? = null
-        var accCacheReadTokens = 0L
-        var accCacheWriteTokens = 0L
 
         while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
             val messageId = 2 + taskMessages.size
@@ -108,10 +105,6 @@ internal class AimoChatClientImpl (
                     call(responseId, messageId, prompt, callback)
                 }
             )
-
-            // Accumulate prompt-cache usage stats returned by the model.
-            accCacheReadTokens += engineResponse.usage?.promptCache?.cacheReadInputTokens?.toLong() ?: 0L
-            accCacheWriteTokens += engineResponse.usage?.promptCache?.cacheWriteInputTokens?.toLong() ?: 0L
 
             assistantMessage = engineResponse.extractAssistantMessage(messageId)
             if (!assistantMessage.isEmptyPayload()) {
@@ -150,7 +143,6 @@ internal class AimoChatClientImpl (
             }
         }
 
-        persistCacheStats(accCacheReadTokens, accCacheWriteTokens)
 
         val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
         val allMessages = listOf(promptMessage) + persistedTaskMessages
@@ -314,16 +306,6 @@ internal class AimoChatClientImpl (
             toolCallId.isNullOrBlank()
     }
 
-    private fun persistCacheStats(cacheReadTokens: Long, cacheWriteTokens: Long) {
-        if (cacheReadTokens <= 0L && cacheWriteTokens <= 0L) return
-        val current = getCachedSessionStats() ?: SessionCacheStats()
-        putCachedSessionStats(
-            current.copy(
-                totalCacheReadTokens = current.totalCacheReadTokens + cacheReadTokens,
-                totalCacheWriteTokens = current.totalCacheWriteTokens + cacheWriteTokens,
-            )
-        )
-    }
 
     private fun getCachedMessages(): List<AimoChatMessage>? {
         @Suppress("UNCHECKED_CAST")
@@ -338,17 +320,8 @@ internal class AimoChatClientImpl (
         sessionCache.appendToSessionProperty(CACHE_KEY__MESSAGES, messages.map { it as Any })
     }
 
-    private fun getCachedSessionStats(): SessionCacheStats? {
-        return sessionCache.getSessionProperty(CACHE_KEY__CACHE_STATS) as? SessionCacheStats
-    }
-
-    private fun putCachedSessionStats(stats: SessionCacheStats) {
-        sessionCache.writeSessionProperty(CACHE_KEY__CACHE_STATS, stats)
-    }
-
     private companion object {
         const val CACHE_KEY__MESSAGES = "chat.messages"
-        const val CACHE_KEY__CACHE_STATS = "chat.cacheStats"
     }
 }
 
