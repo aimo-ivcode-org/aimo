@@ -2,37 +2,45 @@ package org.ivcode.aimo.core.client.chat
 
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoConversationClient
-import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.SessionTokenCalibration
 import org.ivcode.aimo.core.model.AimoToolCallback
+import org.slf4j.LoggerFactory
 import kotlin.math.ceil
 
+/**
+ * The `ContextWindowPromptBudgeter` is responsible for managing the token budget of a chat‑based
+ * prompt.  It ensures that the final prompt sent to the language model never exceeds
+ * `maxInputTokens`, while preserving as much recent conversational context as possible.
+ *
+ * The budgeting works by:
+ *  1. Estimating the token cost of fixed messages (system, user, task, and tool metadata).
+ *  2. Truncating the historical conversation from oldest to newest until the remaining
+ *     token budget is satisfied.
+ *
+ * @property maxInputTokens The maximum number of tokens allowed in the input.
+ * @property charsPerToken  Average number of characters that map to one token
+ *                          (used for a lightweight token estimation heuristic).
+ * @property excludeThinking Whether to ignore the `thinking` field when estimating
+ *                          token usage.  When `true` only the actual message
+ *                          content is counted.
+ */
 internal class ContextWindowPromptBudgeter(
     private val maxInputTokens: Int,
-    initialObservedPromptCharacters: Long = 0,
-    initialObservedPromptTokens: Long = 0,
+    private val charsPerToken: Double = DEFAULT_CHARACTERS_PER_TOKEN,
     private val excludeThinking: Boolean = false,
-    private val calibrationConversation: AimoConversationClient? = null,
-    private val calibrationSessionCache: AimoSessionCache? = null,
 ) : PromptBudgeter {
-    constructor(
-        maxInputTokens: Int,
-        conversation: AimoConversationClient,
-        sessionCache: AimoSessionCache,
-        excludeThinking: Boolean = false,
-    ) : this(
-        maxInputTokens = maxInputTokens,
-        initialObservedPromptCharacters = resolveObservedPromptCharacters(conversation, sessionCache),
-        initialObservedPromptTokens = resolveObservedPromptTokens(conversation, sessionCache),
-        excludeThinking = excludeThinking,
-        calibrationConversation = conversation,
-        calibrationSessionCache = sessionCache,
-    )
 
-    private var observedPromptCharacters: Long = initialObservedPromptCharacters.coerceAtLeast(0)
-    private var observedPromptTokens: Long = initialObservedPromptTokens.coerceAtLeast(0)
+    private companion object {
+        const val DEFAULT_CHARACTERS_PER_TOKEN = 4.0
+        private val logger = LoggerFactory.getLogger(ContextWindowPromptBudgeter::class.java)
+    }
 
+    /**
+     * Internal representation of a budgeting plan.
+     *
+     * @property history          The subset of historical messages that will be sent.
+     * @property promptMessages   The full list of messages that will be included in the model call.
+     * @property promptCharacters The estimated character count of the prompt (including tools).
+     */
     private data class PromptPlan(
         val history: List<AimoChatMessage>,
         val promptMessages: List<AimoChatMessage>,
@@ -69,6 +77,22 @@ internal class ContextWindowPromptBudgeter(
         ).history
     }
 
+    /**
+     * Builds the list of messages that will be sent to the model.
+     *
+     * The method obtains a history slice that respects the token budget and then
+     * concatenates system messages, the chosen history, the current prompt, and
+     * any task messages.  It also removes empty payloads and optionally strips
+     * the `thinking` field when `excludeThinking` is `true`.
+     *
+     * @param systemMessages System messages included on this model call.
+     * @param prompt          Current user prompt message.
+     * @param taskMessages    Messages generated during the current request loop (assistant/tool).
+     * @param tools           Tool callbacks available to this model call.
+     * @param historyProvider Function that supplies historical messages based on a
+     *                        character limit (used for incremental look‑ups).
+     * @return List of messages to be included in the prompt.
+     */
     override fun promptMessagesForCall(
         systemMessages: List<AimoChatMessage>,
         prompt: AimoChatMessage,
@@ -86,6 +110,21 @@ internal class ContextWindowPromptBudgeter(
         ).promptMessages
     }
 
+    /**
+     * Executes a model call with the constructed prompt.
+     *
+     * This method constructs a prompt plan by combining system messages, user prompts, task messages, and historical
+     * context. It then invokes the provided `execute` lambda with the finalized list of messages and returns the
+     * resulting `AimoChatResponse`.
+     *
+     * @param systemMessages System messages to include in the model call.
+     * @param prompt          The current user prompt message.
+     * @param taskMessages    Messages generated during the current request loop (e.g., assistant or tool messages).
+     * @param tools           Tool callbacks available for this model call.
+     * @param historyProvider A function that supplies historical messages based on a character limit for incremental lookups.
+     * @param execute         A lambda function that performs the actual model call with the constructed prompt messages.
+     * @return The response from the model call as an `AimoChatResponse` object.
+     */
     override fun withPromptForCall(
         systemMessages: List<AimoChatMessage>,
         prompt: AimoChatMessage,
@@ -104,16 +143,22 @@ internal class ContextWindowPromptBudgeter(
         )
 
         val response = execute(plan.promptMessages)
-        val observedInputTokens = response.usage?.inputTokens?.toLong()
-        updateCalibration(
-            observedPromptCharacters = plan.promptCharacters.toLong(),
-            observedPromptTokens = observedInputTokens,
-        )
+
         return response
     }
 
+    /**
+     * Computes the maximum number of characters that can be safely requested
+     * from the history lookup service.
+     *
+     * The calculation is a simple ceiling division of the remaining token budget
+     * by the average characters per token.  It is used to limit the size of the
+     * history returned by `historyProvider`.
+     *
+     * @return The maximum number of characters that can be requested.
+     */
     private fun maxRequestCharactersForLookup(): Int {
-        return ceil(maxInputTokens * charactersPerToken()).toInt().coerceAtLeast(0)
+        return ceil(maxInputTokens * charsPerToken).toInt().coerceAtLeast(0)
     }
 
     /**
@@ -132,9 +177,9 @@ internal class ContextWindowPromptBudgeter(
         val result = mutableListOf<AimoChatMessage>()
 
         for (message in history.asReversed()) {
-            val messageTokens = estimateTokens(messageTextForBudgeting(message))
+            val messageTokens = estimateTokens(messagePayloadForBudgeting(message))
             if (tokenCount + messageTokens > tokenBudget) {
-                break
+                return result.asReversed() // Return what fits; don't add this message
             }
             result.add(message)
             tokenCount += messageTokens
@@ -150,32 +195,76 @@ internal class ContextWindowPromptBudgeter(
      * @return Estimated aggregate token count.
      */
     private fun estimateMessagesTokens(messages: List<AimoChatMessage>): Int {
-        return messages.sumOf { estimateTokens(messageTextForBudgeting(it)) }
-    }
-
-    private fun countMessageCharacters(messages: List<AimoChatMessage>): Int {
-        return messages.sumOf { countCharacters(messageTextForBudgeting(it)) }
-    }
-
-    private fun messageTextForBudgeting(message: AimoChatMessage): String {
-        val content = message.content.orEmpty()
-        if (excludeThinking) {
-            return content
-        }
-
-        val thinking = message.thinking.orEmpty()
-        if (thinking.isBlank()) {
-            return content
-        }
-
-        return if (content.isBlank()) thinking else "$content\n$thinking"
+        return messages.sumOf { estimateTokens(messagePayloadForBudgeting(it)) }
     }
 
     /**
-     * Estimates input cost of tool metadata sent alongside prompts.
+     * Counts the number of characters in a list of chat messages.
      *
-     * @param tools Tool callbacks included in prompt options.
-     * @return Estimated aggregate token count for tool definitions.
+     * @param messages List of messages.
+     * @return Total character count.
+     */
+    private fun countMessageCharacters(messages: List<AimoChatMessage>): Int {
+        return messages.sumOf { countCharacters(messagePayloadForBudgeting(it)) }
+    }
+
+    /**
+     * Builds a deterministic string representation of an [AimoChatMessage] used for
+     * prompt token budgeting.
+     *
+     * This method is NOT used for model input directly. Instead, it is used to estimate
+     * the approximate token cost of a message before constructing the final prompt.
+     *
+     * The output includes all fields that may contribute to the serialized request payload:
+     *
+     * - Message content (`content`)
+     * - Optional reasoning content (`thinking`) when enabled
+     * - Tool metadata (`toolName`, `toolCallId`)
+     * - Tool calls (`toolCalls`) including id, name, and arguments
+     *
+     * Fields are concatenated without separators. While this is a simpler approach,
+     * it may reduce estimation accuracy for cases where fields would naturally merge
+     * character sequences.
+     *
+     * Note: This is a heuristic estimator. Actual tokenization will vary depending on the
+     * target model tokenizer, especially for JSON-heavy tool arguments or multilingual text.
+     *
+     * @param message The chat message to estimate token cost for.
+     * @return A structured string used solely for token/character budgeting.
+     */
+    private fun messagePayloadForBudgeting(message: AimoChatMessage): String {
+        return buildString {
+            append(message.content.orEmpty())
+
+            if (!excludeThinking) {
+                append(message.thinking.orEmpty())
+            }
+
+            append(message.toolName.orEmpty())
+            append(message.toolCallId.orEmpty())
+
+            message.toolCalls?.forEach { toolCall ->
+                append(toolCall.id)
+                append(toolCall.name)
+                append(toolCall.arguments)
+            }
+        }
+    }
+
+    /**
+     * Estimates token count for a collection of tool definitions.
+     *
+     * Tool schemas can consume a substantial portion of the context window,
+     * especially when JSON schemas are verbose.  This method approximates
+     * the cost of serializing tool metadata into the request payload.
+     *
+     * The estimate includes:
+     *  - Tool name
+     *  - Tool description
+     *  - Serialized input schema
+     *
+     * @param tools Tool callbacks available to the model call.
+     * @return Estimated aggregate token count for all tool definitions.
      */
     private fun estimateToolTokens(tools: List<AimoToolCallback>): Int {
         return tools.sumOf { toolCallback ->
@@ -188,6 +277,15 @@ internal class ContextWindowPromptBudgeter(
         }
     }
 
+    /**
+     * Counts the approximate number of characters contributed by tool metadata.
+     *
+     * This mirrors the fields included in [estimateToolTokens] and is mainly
+     * used for diagnostics and prompt sizing telemetry.
+     *
+     * @param tools Tool callbacks included in the request.
+     * @return Total estimated character count for serialized tool metadata.
+     */
     private fun countToolCharacters(tools: List<AimoToolCallback>): Int {
         return tools.sumOf { toolCallback ->
             val def = toolCallback.toolDefinition
@@ -199,10 +297,17 @@ internal class ContextWindowPromptBudgeter(
     }
 
     /**
-     * Estimates token count for a text fragment using a simple character heuristic.
+     * Estimates token usage using a lightweight character-based heuristic.
      *
-     * @param text Input text.
-     * @return Estimated token count.
+     * The estimator assumes that one token corresponds to approximately
+     * `charsPerToken` characters.  While less accurate than tokenizer-specific
+     * counting, this approach is fast, allocation-free, and model-agnostic.
+     *
+     * The estimate is rounded upward to avoid accidentally exceeding the
+     * configured context window.
+     *
+     * @param text Text fragment to estimate.
+     * @return Estimated number of tokens required to encode the text.
      */
     private fun estimateTokens(text: String): Int {
         val characterCount = countCharacters(text)
@@ -210,13 +315,47 @@ internal class ContextWindowPromptBudgeter(
             return 0
         }
 
-        return ceil(characterCount / charactersPerToken()).toInt()
+        return ceil(characterCount / charsPerToken).toInt()
     }
 
+    /**
+     * Counts raw characters in a text fragment.
+     *
+     * This method exists primarily to centralize character counting logic
+     * and provide a single extension point for future normalization or
+     * preprocessing behavior.
+     *
+     * @param text Input text.
+     * @return Number of characters in the text.
+     */
     private fun countCharacters(text: String): Int {
         return text.length
     }
 
+    /**
+     * Creates a finalized prompt budgeting plan for a model invocation.
+     *
+     * The plan is built in several stages:
+     *
+     *  1. Estimate token usage for fixed prompt components
+     *     (system messages, current prompt, task messages, and tools).
+     *  2. Compute remaining token budget available for history.
+     *  3. Truncate conversation history from oldest to newest while
+     *     preserving the most recent exchanges.
+     *  4. Normalize messages by optionally stripping `thinking`
+     *     content and removing empty payloads.
+     *  5. Compute final prompt character counts for diagnostics.
+     *
+     * The resulting [PromptPlan] contains both the selected history subset
+     * and the fully normalized message list that should be sent to the model.
+     *
+     * @param systemMessages System messages included in the request.
+     * @param history Full persisted conversation history.
+     * @param prompt Current user prompt.
+     * @param taskMessages Messages generated during the active execution loop.
+     * @param tools Tool callbacks available to the model.
+     * @return Finalized prompt budgeting plan.
+     */
     private fun createPromptPlan(
         systemMessages: List<AimoChatMessage>,
         history: List<AimoChatMessage>,
@@ -226,6 +365,14 @@ internal class ContextWindowPromptBudgeter(
     ): PromptPlan {
         val fixedMessages = systemMessages + listOf(prompt) + taskMessages
         val fixedInputTokens = estimateMessagesTokens(fixedMessages) + estimateToolTokens(tools)
+
+        if (fixedInputTokens > maxInputTokens) {
+            logger.warn(
+                "Fixed request components (system messages, prompt, task messages, and tools) exceed context window. " +
+                "Fixed tokens: $fixedInputTokens, max input tokens: $maxInputTokens. Proceeding without history."
+            )
+        }
+
         val historyForPrompt = truncateHistoryByTokens(history, maxInputTokens - fixedInputTokens)
         val promptMessages = systemMessages + historyForPrompt + prompt + taskMessages
         val normalizedPromptMessages = promptMessages
@@ -247,6 +394,14 @@ internal class ContextWindowPromptBudgeter(
         )
     }
 
+    /**
+     * Determines whether a chat message contains any meaningful payload.
+     *
+     * Messages with no content, reasoning text, tool calls, or tool metadata
+     * are removed from the final prompt before execution.
+     *
+     * @return `true` when the message contains no serializable payload.
+     */
     private fun AimoChatMessage.isEmptyPayload(): Boolean {
         return content.isNullOrBlank() &&
             thinking.isNullOrBlank() &&
@@ -254,85 +409,5 @@ internal class ContextWindowPromptBudgeter(
             toolName.isNullOrBlank() &&
             toolCallId.isNullOrBlank()
     }
-
-    private fun charactersPerToken(): Double {
-        synchronized(this) {
-            if (observedPromptTokens > 0) {
-                return (observedPromptCharacters.toDouble() / observedPromptTokens.toDouble())
-                    .coerceIn(MIN_CHARACTERS_PER_TOKEN, MAX_CHARACTERS_PER_TOKEN)
-            }
-        }
-
-        return DEFAULT_CHARACTERS_PER_TOKEN
-    }
-
-    private fun updateCalibration(observedPromptCharacters: Long, observedPromptTokens: Long?) {
-        val tokens = (observedPromptTokens ?: 0L).coerceAtLeast(0L)
-        if (observedPromptCharacters <= 0L || tokens <= 0L) {
-            return
-        }
-
-        val updated = synchronized(this) {
-            this.observedPromptCharacters += observedPromptCharacters
-            this.observedPromptTokens += tokens
-            SessionTokenCalibration(
-                observedPromptCharacters = this.observedPromptCharacters,
-                observedPromptTokens = this.observedPromptTokens,
-            )
-        }
-
-        calibrationSessionCache?.writeRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION, updated)
-        calibrationConversation?.writeChatProperty(
-            METADATA_KEY__OBSERVED_PROMPT_CHARACTERS,
-            updated.observedPromptCharacters,
-        )
-        calibrationConversation?.writeChatProperty(
-            METADATA_KEY__OBSERVED_PROMPT_TOKENS,
-            updated.observedPromptTokens,
-        )
-    }
-
-    private companion object {
-        const val DEFAULT_CHARACTERS_PER_TOKEN = 4.0
-        const val MIN_CHARACTERS_PER_TOKEN = 1.0
-        const val MAX_CHARACTERS_PER_TOKEN = 12.0
-        const val CACHE_KEY__TOKEN_CALIBRATION = "chat.tokenCalibration"
-        const val METADATA_KEY__OBSERVED_PROMPT_CHARACTERS = "chat.inputTokenBudgeter.observedPromptCharacters"
-        const val METADATA_KEY__OBSERVED_PROMPT_TOKENS = "chat.inputTokenBudgeter.observedPromptTokens"
-
-        private fun resolveObservedPromptCharacters(
-            conversation: AimoConversationClient,
-            sessionCache: AimoSessionCache,
-        ): Long {
-            return getTokenCalibration(sessionCache)?.observedPromptCharacters
-                ?: conversation.getChatProperty(METADATA_KEY__OBSERVED_PROMPT_CHARACTERS).toNonNegativeLong()
-        }
-
-        private fun resolveObservedPromptTokens(
-            conversation: AimoConversationClient,
-            sessionCache: AimoSessionCache,
-        ): Long {
-            return getTokenCalibration(sessionCache)?.observedPromptTokens
-                ?: conversation.getChatProperty(METADATA_KEY__OBSERVED_PROMPT_TOKENS).toNonNegativeLong()
-        }
-
-        private fun getTokenCalibration(sessionCache: AimoSessionCache): SessionTokenCalibration? {
-            return sessionCache.getRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION) as? SessionTokenCalibration
-        }
-
-        private fun Any?.toNonNegativeLong(): Long {
-            return when (this) {
-                is Number -> toLong().coerceAtLeast(0)
-                is String -> toLongOrNull()?.coerceAtLeast(0) ?: 0
-                else -> 0
-            }
-        }
-    }
 }
-
-
-
-
-
-
 

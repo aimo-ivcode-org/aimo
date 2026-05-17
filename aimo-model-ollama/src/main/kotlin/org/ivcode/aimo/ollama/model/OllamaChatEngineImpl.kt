@@ -4,6 +4,7 @@ import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoToolCall
+import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoPrompt
@@ -122,11 +123,24 @@ internal class OllamaChatEngineImpl(
             done       = done,
         )
 
+        val promptEvalCount = response.promptEvalCount
+        val evalCount = response.evalCount
+
+        val usage = if(promptEvalCount != null && evalCount != null) {
+            AimoUsage(
+                inputTokens = promptEvalCount,
+                outputTokens = evalCount,
+            )
+        } else {
+            null
+        }
+
         return AimoChatResponse(
             chatId      = UUID.randomUUID(),
             responseId  = UUID.randomUUID(),
             messages    = listOf(aimoMessage),
             createdAt   = response.createdAt,
+            usage       = usage,
         )
     }
 }

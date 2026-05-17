@@ -42,8 +42,6 @@ internal class AimoChatClientImpl (
     private val promptBudgeter: PromptBudgeter = when (model.context.budgeterType) {
         org.ivcode.aimo.core.model.AimoPromptBudgeterType.CONTEXT_WINDOW -> ContextWindowPromptBudgeter(
             maxInputTokens = model.context.size,
-            conversation = conversation,
-            sessionCache = sessionCache,
             excludeThinking = model.context.excludeThinking,
         )
 
@@ -329,11 +327,11 @@ internal class AimoChatClientImpl (
 
     private fun getCachedMessages(): List<AimoChatMessage>? {
         @Suppress("UNCHECKED_CAST")
-        return sessionCache.getRuntimeProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+        return sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
     }
 
     private fun putCachedMessages(messages: List<AimoChatMessage>) {
-        sessionCache.writeRuntimeProperty(CACHE_KEY__MESSAGES, messages.toList())
+        sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, messages.toList())
     }
 
     private fun appendCachedMessages(messages: List<AimoChatMessage>) {
@@ -342,11 +340,11 @@ internal class AimoChatClientImpl (
     }
 
     private fun getCachedSessionStats(): SessionCacheStats? {
-        return sessionCache.getRuntimeProperty(CACHE_KEY__CACHE_STATS) as? SessionCacheStats
+        return sessionCache.getSessionProperty(CACHE_KEY__CACHE_STATS) as? SessionCacheStats
     }
 
     private fun putCachedSessionStats(stats: SessionCacheStats) {
-        sessionCache.writeRuntimeProperty(CACHE_KEY__CACHE_STATS, stats)
+        sessionCache.writeSessionProperty(CACHE_KEY__CACHE_STATS, stats)
     }
 
     private companion object {

@@ -92,15 +92,15 @@ class AimoConversationClientImplTest {
         private val runtimeMetadata: MutableMap<String, Any>,
     ) : AimoSessionCache {
 
-        override fun getRuntimeProperty(key: String): Any? = runtimeMetadata[key]
+        override fun getSessionProperty(key: String): Any? = runtimeMetadata[key]
 
-        override fun getRuntimeProperties(): Map<String, Any> = runtimeMetadata.toMap()
+        override fun getSessionProperties(): Map<String, Any> = runtimeMetadata.toMap()
 
-        override fun writeRuntimeProperty(key: String, value: Any) {
+        override fun writeSessionProperty(key: String, value: Any) {
             runtimeMetadata[key] = value
         }
 
-        override fun deleteRuntimeProperty(key: String): Boolean {
+        override fun deleteSessionProperty(key: String): Boolean {
             return runtimeMetadata.remove(key) != null
         }
 

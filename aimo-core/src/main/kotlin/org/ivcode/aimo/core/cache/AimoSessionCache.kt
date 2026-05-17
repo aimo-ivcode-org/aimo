@@ -19,10 +19,10 @@ interface AimoSessionCache {
      * Runtime-only properties that live only for the cache lifetime.
      * Stored as a simple String -> Any mapping for flexibility.
      */
-    fun getRuntimeProperty(key: String): Any?
-    fun getRuntimeProperties(): Map<String, Any>
-    fun writeRuntimeProperty(key: String, value: Any)
-    fun deleteRuntimeProperty(key: String): Boolean
+    fun getSessionProperty(key: String): Any?
+    fun getSessionProperties(): Map<String, Any>
+    fun writeSessionProperty(key: String, value: Any)
+    fun deleteSessionProperty(key: String): Boolean
 
 
     fun evict()

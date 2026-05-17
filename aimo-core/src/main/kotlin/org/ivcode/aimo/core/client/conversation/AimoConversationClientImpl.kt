@@ -82,19 +82,19 @@ internal class AimoConversationClientImpl(
     }
 
     override fun getRuntimeMetadata(): Map<String, Any> {
-        return sessionCache.getRuntimeProperties()
+        return sessionCache.getSessionProperties()
     }
 
     override fun getRuntimeProperty(property: String): Any? {
-        return sessionCache.getRuntimeProperty(property)
+        return sessionCache.getSessionProperty(property)
     }
 
     override fun writeRuntimeProperty(property: String, value: Any) {
-        sessionCache.writeRuntimeProperty(property, value)
+        sessionCache.writeSessionProperty(property, value)
     }
 
     override fun deleteRuntimeProperty(property: String): Boolean {
-        return sessionCache.deleteRuntimeProperty(property)
+        return sessionCache.deleteSessionProperty(property)
     }
 
     private fun requireChatConversation() = dao.getChatConversation(chatId)
@@ -103,8 +103,8 @@ internal class AimoConversationClientImpl(
     private fun appendCachedMessages(messages: List<AimoChatMessage>) {
         if (messages.isEmpty()) return
         @Suppress("UNCHECKED_CAST")
-        val current = sessionCache.getRuntimeProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
-        sessionCache.writeRuntimeProperty(CACHE_KEY__MESSAGES, current.orEmpty() + messages)
+        val current = sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+        sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, current.orEmpty() + messages)
     }
 
     private companion object {

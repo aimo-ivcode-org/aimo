@@ -17,15 +17,15 @@ internal class EhcacheSessionCache(
 
     private val lock = Any()
 
-    override fun getRuntimeProperty(key: String): Any? {
+    override fun getSessionProperty(key: String): Any? {
         return globalCache.get(chatId)?.runtimeMetadata?.get(key)
     }
 
-    override fun getRuntimeProperties(): Map<String, Any> {
+    override fun getSessionProperties(): Map<String, Any> {
         return globalCache.get(chatId)?.runtimeMetadata?.toMap() ?: emptyMap()
     }
 
-    override fun writeRuntimeProperty(key: String, value: Any) {
+    override fun writeSessionProperty(key: String, value: Any) {
         synchronized(lock) {
             val current = globalCache.get(chatId) ?: EhcacheCachedSessionState()
             val updated = current.runtimeMetadata.toMutableMap().apply { this[key] = value }
@@ -33,7 +33,7 @@ internal class EhcacheSessionCache(
         }
     }
 
-    override fun deleteRuntimeProperty(key: String): Boolean {
+    override fun deleteSessionProperty(key: String): Boolean {
         synchronized(lock) {
             val current = globalCache.get(chatId) ?: return false
             if (!current.runtimeMetadata.containsKey(key)) return false

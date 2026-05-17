@@ -3,7 +3,6 @@ package org.ivcode.aimo.session.cache.ehcache
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.cache.SessionTokenCalibration
-import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -35,15 +34,15 @@ class EhcacheSessionCacheTest {
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache = provider.get(chatId)
-            cache.writeRuntimeProperty("a", 1)
-            cache.writeRuntimeProperty("b", 2)
+            cache.writeSessionProperty("a", 1)
+            cache.writeSessionProperty("b", 2)
 
-            val a = cache.getRuntimeProperty("a")
-            val b = cache.getRuntimeProperty("b")
+            val a = cache.getSessionProperty("a")
+            val b = cache.getSessionProperty("b")
             assertEquals(1, a)
             assertEquals(2, b)
 
-            val allProps = cache.getRuntimeProperties()
+            val allProps = cache.getSessionProperties()
             assertEquals(1, allProps["a"])
             assertEquals(2, allProps["b"])
 
@@ -51,7 +50,7 @@ class EhcacheSessionCacheTest {
                 observedPromptCharacters = 120,
                 observedPromptTokens = 30,
             )
-            cache.writeRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION, calibration)
+            cache.writeSessionProperty(CACHE_KEY__TOKEN_CALIBRATION, calibration)
             assertEquals(calibration, cache.getTokenCalibration())
         } finally {
             provider.close()
@@ -66,8 +65,8 @@ class EhcacheSessionCacheTest {
             val cache1 = provider.get(chatId)
             val cache2 = provider.get(chatId)
 
-            cache1.writeRuntimeProperty("key", "value")
-            assertEquals("value", cache2.getRuntimeProperty("key"))
+            cache1.writeSessionProperty("key", "value")
+            assertEquals("value", cache2.getSessionProperty("key"))
         } finally {
             provider.close()
         }
@@ -79,13 +78,13 @@ class EhcacheSessionCacheTest {
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache = provider.get(chatId)
-            cache.writeRuntimeProperty("x", "y")
+            cache.writeSessionProperty("x", "y")
             cache.putCachedMessages(listOf(message(1, "hello")))
 
             cache.evict()
 
             val newCache = provider.get(chatId)
-            assertEquals(emptyMap<String, Any>(), newCache.getRuntimeProperties())
+            assertEquals(emptyMap<String, Any>(), newCache.getSessionProperties())
             assertNull(newCache.getCachedMessages())
             assertNull(newCache.getTokenCalibration())
         } finally {
@@ -95,11 +94,11 @@ class EhcacheSessionCacheTest {
 
     private fun org.ivcode.aimo.core.cache.AimoSessionCache.getCachedMessages(): List<AimoChatMessage>? {
         @Suppress("UNCHECKED_CAST")
-        return getRuntimeProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+        return getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
     }
 
     private fun org.ivcode.aimo.core.cache.AimoSessionCache.putCachedMessages(messages: List<AimoChatMessage>) {
-        writeRuntimeProperty(CACHE_KEY__MESSAGES, messages.toList())
+        writeSessionProperty(CACHE_KEY__MESSAGES, messages.toList())
     }
 
     private fun org.ivcode.aimo.core.cache.AimoSessionCache.appendCachedMessages(messages: List<AimoChatMessage>) {
@@ -108,7 +107,7 @@ class EhcacheSessionCacheTest {
     }
 
     private fun org.ivcode.aimo.core.cache.AimoSessionCache.getTokenCalibration(): SessionTokenCalibration? {
-        return getRuntimeProperty(CACHE_KEY__TOKEN_CALIBRATION) as? SessionTokenCalibration
+        return getSessionProperty(CACHE_KEY__TOKEN_CALIBRATION) as? SessionTokenCalibration
     }
 
     private fun message(id: Int, content: String): AimoChatMessage {
