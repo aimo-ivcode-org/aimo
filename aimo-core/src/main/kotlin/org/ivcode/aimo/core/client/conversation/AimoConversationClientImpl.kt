@@ -35,7 +35,6 @@ internal class AimoConversationClientImpl(
             model = model,
             tools = tools,
             systemMessages = systemMessages,
-            sessionCacheProvider = sessionCacheProvider,
         )
     }
 
@@ -55,6 +54,11 @@ internal class AimoConversationClientImpl(
             )
         )
         appendCachedMessages(messages)
+    }
+
+    override fun getCachedMessages(): List<AimoChatMessage>? {
+        @Suppress("UNCHECKED_CAST")
+        return sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
     }
 
     override fun getChatMetadata(): Map<String, Any> {

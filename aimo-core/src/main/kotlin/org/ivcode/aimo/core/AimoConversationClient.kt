@@ -32,6 +32,16 @@ interface AimoConversationClient {
     fun addMessages(messages: List<AimoChatMessage>)
 
     /**
+     * Retrieve cached message history if available.
+     *
+     * Returns the most recently cached conversation history, or null if not cached.
+     * Intended for read/performance optimization; does not fetch from durable storage.
+     *
+     * @return cached messages, or null if not in cache
+     */
+    fun getCachedMessages(): List<AimoChatMessage>?
+
+    /**
      * Return persisted chat metadata from DAO storage.
      *
      * Durable chat metadata does not keep a local snapshot in the conversation client.

@@ -505,6 +505,13 @@ class AimoChatClientImplMessageIdTest {
                     createdAt = Instant.now(),
                 )
             )
+            // Cache the messages
+            val existing = (runtimeMetadata["chat.messages"] as? List<AimoChatMessage>).orEmpty()
+            runtimeMetadata["chat.messages"] = existing + messages
+        }
+        override fun getCachedMessages(): List<AimoChatMessage>? {
+            @Suppress("UNCHECKED_CAST")
+            return runtimeMetadata["chat.messages"] as? List<AimoChatMessage>
         }
         override fun getChatMetadata(): Map<String, Any> = metadata.toMap()
         override fun readChatMetadata(): Map<String, Any> = metadata.toMap()
@@ -516,7 +523,6 @@ class AimoChatClientImplMessageIdTest {
         override fun getRuntimeProperty(property: String): Any? = runtimeMetadata[property]
         override fun writeRuntimeProperty(property: String, value: Any) { runtimeMetadata[property] = value }
         override fun deleteRuntimeProperty(property: String): Boolean = runtimeMetadata.remove(property) != null
-
     }
 }
 

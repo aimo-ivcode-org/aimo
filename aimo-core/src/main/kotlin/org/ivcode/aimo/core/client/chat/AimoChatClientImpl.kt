@@ -6,9 +6,6 @@ import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoConversationClient
-import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.controller.SystemMessageContext
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -30,10 +27,8 @@ internal class AimoChatClientImpl (
     private val model: AimoChatModel,
     tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
-    sessionCacheProvider: AimoSessionCacheProvider = NoOpAimoSessionCacheProvider,
 ) : AimoChatClient {
 
-    private val sessionCache: AimoSessionCache = sessionCacheProvider.get(chatId)
     private val toolCallbacks: Map<String, AimoToolCallback> = tools.associateBy { it.toolDefinition.name }
     private val toolDefinitions: List<AimoToolDefinition> = toolCallbacks.values.map { it.toolDefinition }
     private val promptBudgeter: PromptBudgeter = when (model.context.budgeterType) {
@@ -64,7 +59,7 @@ internal class AimoChatClientImpl (
         call: (responseId: UUID, messageId: Int, prompt: AimoPrompt, callback: ((AimoChatResponse) -> Unit)?) -> AimoChatResponse,
     ): AimoChatResponse {
         val responseId = UUID.randomUUID()
-        var resolvedHistory: List<AimoChatMessage>? = getCachedMessages()
+        var resolvedHistory: List<AimoChatMessage>? = conversation.getCachedMessages()
         val historyProvider: (Long?) -> List<AimoChatMessage> = { chars ->
             resolvedHistory ?: (if (chars == null) {
                 dao.getChatRequests(chatId)
@@ -76,7 +71,7 @@ internal class AimoChatClientImpl (
             }).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
                 .also {
                     resolvedHistory = it
-                    putCachedMessages(it)
+                    conversation.addMessages(it)
                 }
         }
 
@@ -298,19 +293,9 @@ internal class AimoChatClientImpl (
     }
 
 
-    private fun getCachedMessages(): List<AimoChatMessage>? {
-        @Suppress("UNCHECKED_CAST")
-        return sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
-    }
-
-    private fun putCachedMessages(messages: List<AimoChatMessage>) {
-        sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, messages.toList())
-    }
 
 
-    private companion object {
-        const val CACHE_KEY__MESSAGES = "chat.messages"
-    }
+    private companion object
 }
 
 
