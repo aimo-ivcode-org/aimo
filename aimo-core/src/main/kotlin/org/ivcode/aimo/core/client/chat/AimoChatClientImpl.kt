@@ -71,7 +71,9 @@ internal class AimoChatClientImpl (
             }).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
                 .also {
                     resolvedHistory = it
-                    conversation.addMessages(it)
+                    if (it.isNotEmpty()) {
+                        conversation.addMessages(it)
+                    }
                 }
         }
 
@@ -292,10 +294,6 @@ internal class AimoChatClientImpl (
             toolCallId.isNullOrBlank()
     }
 
-
-
-
-    private companion object
 }
 
 
