@@ -78,7 +78,10 @@ internal class AimoConversationClientImpl(
     }
 
     override fun writeChatProperty(property: String, value: Any) {
-        dao.upsertConversationMetadata(chatId, mapOf(property to value))
+        val success = dao.upsertConversationMetadata(chatId, mapOf(property to value))
+        if (!success) {
+            throw IllegalStateException("Conversation not found for chatId: $chatId")
+        }
     }
 
     override fun deleteChatProperty(property: String): Boolean {
