@@ -2,12 +2,19 @@ package org.ivcode.aimo.session.cache.ehcache
 
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.cache.SessionTokenCalibration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+
+/**
+ * Test fixture for token calibration telemetry.
+ */
+data class SessionTokenCalibration(
+    val observedPromptCharacters: Long,
+    val observedPromptTokens: Long,
+)
 
 class EhcacheSessionCacheTest {
 
