@@ -52,7 +52,11 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
     }
 
     override fun deleteChatConversation(chatId: UUID): Boolean {
-        return conversations.remove(chatId) != null
+        val deleted = conversations.remove(chatId) != null
+        if (deleted) {
+            requests.remove(chatId)
+        }
+        return deleted
     }
 
     override fun deleteChatConversation(
@@ -66,7 +70,9 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
             if (conversationValue != md.value) return false
         }
         
-        return conversations.remove(chatId) != null
+        conversations.remove(chatId)
+        requests.remove(chatId)
+        return true
     }
 
     override fun addChatRequest(request: ChatRequestEntity) {
