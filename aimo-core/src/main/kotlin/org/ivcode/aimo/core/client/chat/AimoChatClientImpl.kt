@@ -420,7 +420,7 @@ internal class AimoChatClientImpl (
      */
     private fun createContextMap(requestId: UUID, requestContext: Map<String, Any>?): Map<String, Any> {
         val context = mutableMapOf (
-            CONTEXT_KEY__CHAT_ID to chatId.toString(),
+            CONTEXT_KEY__CHAT_ID to chatId,
             CONTEXT_KEY__REQUEST_ID to requestId,
             CONTEXT_KEY__CONVERSATION to conversation,
         )

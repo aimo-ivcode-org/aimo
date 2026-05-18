@@ -6,7 +6,6 @@ Ehcache-backed implementation of `AimoSessionCache`.
 
 - Session metadata (`Map<String, Any>`)
 - Cached chat messages (`List<AimoChatMessage>`)
-- Token calibration (`SessionTokenCalibration`)
 
 ## Configuration
 

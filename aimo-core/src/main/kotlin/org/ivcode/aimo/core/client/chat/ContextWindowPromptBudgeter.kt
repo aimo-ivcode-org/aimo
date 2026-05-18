@@ -146,14 +146,15 @@ internal class ContextWindowPromptBudgeter(
     }
 
     /**
-     * Computes the maximum number of characters that can be safely requested
-     * from the history lookup service.
+     * Converts the full input token budget to an equivalent character budget.
      *
-     * The calculation is a simple ceiling division of the remaining token budget
-     * by the average characters per token.  It is used to limit the size of the
-     * history returned by `historyProvider`.
+     * This method translates `maxInputTokens` into a character count using the
+     * character-to-token estimation heuristic (`charsPerToken`). The returned value
+     * is used to limit the size of history requested from `historyProvider`;
+     * subsequent filtering by `createPromptPlan` then selects only what fits within
+     * the remaining budget after accounting for fixed message components.
      *
-     * @return The maximum number of characters that can be requested.
+     * @return The character count equivalent of `maxInputTokens`.
      */
     private fun maxRequestCharactersForLookup(): Int {
         return ceil(maxInputTokens * charsPerToken).toInt().coerceAtLeast(0)
@@ -313,7 +314,6 @@ internal class ContextWindowPromptBudgeter(
      *     preserving the most recent exchanges.
      *  4. Normalize messages by optionally stripping `thinking`
      *     content and removing empty payloads.
-     *  5. Compute final prompt character counts for diagnostics.
      *
      * The resulting [PromptPlan] contains both the selected history subset
      * and the fully normalized message list that should be sent to the model.

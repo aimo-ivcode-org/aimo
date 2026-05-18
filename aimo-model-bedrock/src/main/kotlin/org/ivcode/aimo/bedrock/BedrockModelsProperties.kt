@@ -26,9 +26,9 @@ data class BedrockContextProperties(
      * request. Bedrock will cache the KV state up to that marker and reuse it on
      * subsequent calls, reducing both latency and per-token cost.
      *
-     * Only Claude models (Sonnet 3.5 v2+, 3.7+) currently support this feature on AWS
-     * Bedrock. Enabling it for unsupported models is harmless (the field is ignored),
-     * but verify model support in the AWS documentation before enabling in production.
+     * Enabling it for unsupported models is harmless (the field is ignored),
+     * but please verify model support in the AWS Bedrock documentation before
+     * enabling in production.
      */
     val promptCaching: Boolean = false,
 
