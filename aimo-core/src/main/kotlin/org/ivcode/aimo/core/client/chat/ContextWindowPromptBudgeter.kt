@@ -39,12 +39,10 @@ internal class ContextWindowPromptBudgeter(
      *
      * @property history          The subset of historical messages that will be sent.
      * @property promptMessages   The full list of messages that will be included in the model call.
-     * @property promptCharacters The estimated character count of the prompt (including tools).
      */
     private data class PromptPlan(
         val history: List<AimoChatMessage>,
         val promptMessages: List<AimoChatMessage>,
-        val promptCharacters: Int,
     )
 
     /**
@@ -199,16 +197,6 @@ internal class ContextWindowPromptBudgeter(
     }
 
     /**
-     * Counts the number of characters in a list of chat messages.
-     *
-     * @param messages List of messages.
-     * @return Total character count.
-     */
-    private fun countMessageCharacters(messages: List<AimoChatMessage>): Int {
-        return messages.sumOf { countCharacters(messagePayloadForBudgeting(it)) }
-    }
-
-    /**
      * Builds a deterministic string representation of an [AimoChatMessage] used for
      * prompt token budgeting.
      *
@@ -274,25 +262,6 @@ internal class ContextWindowPromptBudgeter(
             estimateTokens(def.name) +
                 estimateTokens(def.description ?: "") +
                 estimateTokens(def.inputSchema.toString())
-        }
-    }
-
-    /**
-     * Counts the approximate number of characters contributed by tool metadata.
-     *
-     * This mirrors the fields included in [estimateToolTokens] and is mainly
-     * used for diagnostics and prompt sizing telemetry.
-     *
-     * @param tools Tool callbacks included in the request.
-     * @return Total estimated character count for serialized tool metadata.
-     */
-    private fun countToolCharacters(tools: List<AimoToolCallback>): Int {
-        return tools.sumOf { toolCallback ->
-            val def = toolCallback.toolDefinition
-
-            countCharacters(def.name) +
-                countCharacters(def.description ?: "") +
-                countCharacters(def.inputSchema.toString())
         }
     }
 
@@ -384,13 +353,9 @@ internal class ContextWindowPromptBudgeter(
             }
             .filterNot { it.isEmptyPayload() }
 
-        val promptCharacters = countMessageCharacters(normalizedPromptMessages) +
-            countToolCharacters(tools)
-
         return PromptPlan(
             history = historyForPrompt,
             promptMessages = normalizedPromptMessages,
-            promptCharacters = promptCharacters,
         )
     }
 
