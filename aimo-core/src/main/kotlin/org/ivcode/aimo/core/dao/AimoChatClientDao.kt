@@ -111,7 +111,7 @@ interface AimoChatClientDao {
      *
       * @param chatId the unique identifier of the conversation whose metadata will be modified
      * @param metadata a non-null map of keys and values to insert or update for the conversation
-     * @return true when the metadata was applied to an existing session, false when the
+     * @return true when the metadata was applied to an existing conversation, false when the
      *         conversation identified by [chatId] does not exist and no update was performed
      */
     fun upsertConversationMetadata(chatId: UUID, metadata: Map<String, Any>): Boolean

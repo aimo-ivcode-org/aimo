@@ -26,9 +26,10 @@ data class BedrockContextProperties(
      * request. Bedrock will cache the KV state up to that marker and reuse it on
      * subsequent calls, reducing both latency and per-token cost.
      *
-     * Enabling it for unsupported models is harmless (the field is ignored),
-     * but please verify model support in the AWS Bedrock documentation before
-     * enabling in production.
+     * Do not enable this for models that do not support prompt caching. Requests that
+     * include cache-point markers may be rejected with a validation error rather than
+     * silently ignoring the feature, so verify model support in the AWS Bedrock
+     * documentation before enabling it in production.
      */
     val promptCaching: Boolean = false,
 

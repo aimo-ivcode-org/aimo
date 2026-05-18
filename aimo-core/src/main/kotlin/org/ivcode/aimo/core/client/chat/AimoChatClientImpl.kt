@@ -157,11 +157,9 @@ internal class AimoChatClientImpl (
                 )
             }).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
                 .also {
+                    // Memoize loaded history for this request without re-persisting
+                    // previously stored messages through the conversation API.
                     resolvedHistory = it
-                    // Update cache if this is the first time we're loading history
-                    if (it.isNotEmpty()) {
-                        conversation.addMessages(it)
-                    }
                 }
         }
 
