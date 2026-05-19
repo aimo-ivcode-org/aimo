@@ -367,17 +367,18 @@ internal class AimoChatClientImpl (
             )
         }
 
-        // If the model did not emit a terminal chunk, emit one explicitly
-        if (!terminalChunkEmitted) {
-            val terminalResponse = aggregatedFinalResponse.copy(
-                messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
-                createdAt = Instant.now(),
-            )
-            callback?.invoke(terminalResponse)
-            return terminalResponse
-        }
+         // If the model did not emit a terminal chunk, emit one explicitly
+         if (!terminalChunkEmitted) {
+             val terminalResponse = aggregatedFinalResponse.copy(
+                 messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
+                 createdAt = Instant.now(),
+                 usage = finalResponse.usage,
+             )
+             callback?.invoke(terminalResponse)
+             return terminalResponse
+         }
 
-        return aggregatedFinalResponse
+         return aggregatedFinalResponse
     }
 
     /**
