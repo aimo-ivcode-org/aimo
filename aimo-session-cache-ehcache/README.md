@@ -2,10 +2,12 @@
 
 Ehcache-backed implementation of `AimoSessionCache`.
 
-## What it stores per session (`chatId`)
+## What it stores per conversation cache entry (`chatId`)
 
-- Session metadata (`Map<String, Any>`)
+- Runtime-only conversation properties (`Map<String, Any>`)
 - Cached chat messages (`List<AimoChatMessage>`)
+
+Durable chat metadata remains in the DAO layer and is not stored in this cache.
 
 ## Configuration
 

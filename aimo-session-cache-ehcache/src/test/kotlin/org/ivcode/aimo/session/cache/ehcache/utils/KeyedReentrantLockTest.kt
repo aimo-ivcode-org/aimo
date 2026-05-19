@@ -51,8 +51,8 @@ class KeyedReentrantLockTest {
     }
 
     @Test
-    @DisplayName("multiple sequential acquires for the same key reuse the same lock instance")
-    fun sequentialAcquiresReuseEntry() {
+    @DisplayName("entry is removed on release and can be recreated for the same key")
+    fun entryRemovedAndCanBeRecreatedForSameKey() {
         val keyedLock = KeyedReentrantLock<String>()
 
         val lock1 = keyedLock.acquire("key-a")
@@ -185,41 +185,55 @@ class KeyedReentrantLockTest {
     }
 
     @Test
-    @DisplayName("entry is removed only after ALL concurrent holders release")
-    fun entryRemovedOnlyAfterAllHoldersRelease() {
+    @DisplayName("entry stays registered while another thread is waiting/holding and is removed after the final release")
+    fun entryRemovedOnlyAfterLastInterestedThreadReleases() {
         val keyedLock = KeyedReentrantLock<String>()
-        val threads = 20
-        val executor = Executors.newFixedThreadPool(threads)
+        val holderAcquired = CountDownLatch(1)
+        val releaseHolder = CountDownLatch(1)
+        val waiterAcquired = CountDownLatch(1)
+        val releaseWaiter = CountDownLatch(1)
 
-        // Phase 1: all threads acquire (sequentially wrt the key – each blocks until the previous releases)
-        val acquiredLatches = Array(threads) { CountDownLatch(1) }
-        val releaseLatches = Array(threads) { CountDownLatch(1) }
-
-        // We let them run freely – just verify cleanup at the end
-        val startLatch = CountDownLatch(1)
-        val doneLatch = CountDownLatch(threads)
-
-        repeat(threads) { i ->
-            executor.submit {
-                try {
-                    startLatch.await()
-                    val lock = keyedLock.acquire("key-a")
-                    try {
-                        // tiny critical section
-                    } finally {
-                        keyedLock.release("key-a", lock)
-                    }
-                } finally {
-                    doneLatch.countDown()
-                }
+        val holderThread = Thread {
+            val lock = keyedLock.acquire("key-a")
+            holderAcquired.countDown()
+            try {
+                releaseHolder.await()
+            } finally {
+                keyedLock.release("key-a", lock)
             }
         }
 
-        startLatch.countDown()
-        assertTrue(doneLatch.await(10, TimeUnit.SECONDS))
-        executor.shutdown()
+        val waiterThread = Thread {
+            val lock = keyedLock.acquire("key-a")
+            waiterAcquired.countDown()
+            try {
+                releaseWaiter.await()
+            } finally {
+                keyedLock.release("key-a", lock)
+            }
+        }
 
-        assertEquals(0, keyedLock.activeKeyCount(), "No entries should remain after all threads finish")
+        holderThread.start()
+        assertTrue(holderAcquired.await(5, TimeUnit.SECONDS), "Holder did not acquire key-a in time")
+        assertEquals(1, keyedLock.activeKeyCount(), "Entry should exist while the first holder is active")
+
+        waiterThread.start()
+        awaitCondition("Waiter never blocked while trying to acquire key-a") {
+            waiterThread.state == Thread.State.WAITING || waiterThread.state == Thread.State.BLOCKED
+        }
+        assertEquals(1, keyedLock.activeKeyCount(), "Entry must remain while another thread is waiting on the same key")
+
+        releaseHolder.countDown()
+        assertTrue(waiterAcquired.await(5, TimeUnit.SECONDS), "Waiter did not acquire key-a after holder release")
+        assertEquals(1, keyedLock.activeKeyCount(), "Entry must remain while the waiter still holds the key")
+
+        releaseWaiter.countDown()
+        holderThread.join(5_000)
+        waiterThread.join(5_000)
+
+        assertFalse(holderThread.isAlive, "Holder thread should have terminated")
+        assertFalse(waiterThread.isAlive, "Waiter thread should have terminated")
+        assertEquals(0, keyedLock.activeKeyCount(), "Entry should be removed only after the last interested thread releases")
     }
 
     // -------------------------------------------------------------------------
@@ -268,6 +282,17 @@ class KeyedReentrantLockTest {
         holderExecutor.shutdown()
         waiterExecutor.shutdown()
         assertEquals(0, keyedLock.activeKeyCount())
+    }
+
+    private fun awaitCondition(message: String, timeoutMillis: Long = 5_000, condition: () -> Boolean) {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
+        while (System.nanoTime() < deadline) {
+            if (condition()) {
+                return
+            }
+            Thread.sleep(10)
+        }
+        assertTrue(condition(), message)
     }
 }
 

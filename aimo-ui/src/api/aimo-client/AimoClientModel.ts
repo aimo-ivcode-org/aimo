@@ -8,6 +8,7 @@ export interface ChatResponse {
     responseId: string,
     messages: ChatMessage[],
     createdAt: Date,
+    usage?: ChatUsage,
 }
 
 export type MessageType = 'USER' | 'ASSISTANT' | 'SYSTEM' | 'TOOL';
@@ -30,6 +31,17 @@ export interface ChatHistoryRequest {
 
 export interface ChatConversationInfo {
     chatId: string,
+}
+
+export interface ChatUsage {
+    inputTokens: number,
+    outputTokens: number,
+    promptCache?: ChatPromptCacheUsage,
+}
+
+export interface ChatPromptCacheUsage {
+    cacheReadInputTokens: number,
+    cacheWriteInputTokens: number,
 }
 
 /**

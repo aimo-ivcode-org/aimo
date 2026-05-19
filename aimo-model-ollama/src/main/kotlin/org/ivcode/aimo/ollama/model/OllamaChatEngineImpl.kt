@@ -126,7 +126,7 @@ internal class OllamaChatEngineImpl(
         val promptEvalCount = response.promptEvalCount
         val evalCount = response.evalCount
 
-        val usage = if(promptEvalCount != null && evalCount != null) {
+        val usage = if(promptEvalCount != null || evalCount != null) {
             AimoUsage(
                 inputTokens = promptEvalCount,
                 outputTokens = evalCount,

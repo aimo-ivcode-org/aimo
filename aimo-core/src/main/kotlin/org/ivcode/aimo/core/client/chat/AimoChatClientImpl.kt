@@ -343,6 +343,7 @@ internal class AimoChatClientImpl (
                         content = contentBuilder.takeIf { it.isNotEmpty() }?.toString(),
                     )),
                     createdAt = Instant.now(),
+                    usage = streamResponse.usage,
                 )
             )
         }

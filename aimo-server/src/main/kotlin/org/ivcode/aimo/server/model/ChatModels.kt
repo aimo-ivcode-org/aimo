@@ -13,6 +13,7 @@ data class ChatResponse (
     val responseId: UUID,
     val messages: List<ChatMessage>,
     val createdAt: Instant,
+    val usage: ChatUsage? = null,
 )
 
 data class ChatMessage (
@@ -37,3 +38,15 @@ data class ChatHistoryRequest (
     val messages: List<ChatMessage>,
     val createdAt: Instant,
 )
+
+data class ChatUsage (
+    val inputTokens: Int?,
+    val outputTokens: Int?,
+    val promptCache: ChatPromptCacheUsage? = null,
+)
+
+data class ChatPromptCacheUsage (
+    val cacheReadInputTokens: Int = 0,
+    val cacheWriteInputTokens: Int = 0,
+)
+

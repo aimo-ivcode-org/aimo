@@ -38,8 +38,8 @@ data class AimoChatResponse (
  *                        a cache point was active during this call.
  */
 data class AimoUsage(
-    val inputTokens: Int = 0,
-    val outputTokens: Int = 0,
+    val inputTokens: Int? = 0,
+    val outputTokens: Int? = 0,
     val promptCache: AimoPromptCacheUsage? = null,
 )
 

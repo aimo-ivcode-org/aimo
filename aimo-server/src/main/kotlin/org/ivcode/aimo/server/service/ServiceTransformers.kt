@@ -6,11 +6,15 @@ import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoHistoryRequest
 import org.ivcode.aimo.core.AimoConversationInfo
+import org.ivcode.aimo.core.AimoUsage
+import org.ivcode.aimo.core.AimoPromptCacheUsage
 import org.ivcode.aimo.server.model.ChatHistoryRequest
 import org.ivcode.aimo.server.model.ChatMessage
 import org.ivcode.aimo.server.model.ChatRequest
 import org.ivcode.aimo.server.model.ChatResponse
 import org.ivcode.aimo.server.model.ChatConversationInfo
+import org.ivcode.aimo.server.model.ChatUsage
+import org.ivcode.aimo.server.model.ChatPromptCacheUsage
 
 internal fun ChatRequest.toAimoChatRequest(context: Map<String, Any> = emptyMap()) = AimoChatRequest (
     prompt = prompt,
@@ -21,7 +25,8 @@ internal fun AimoChatResponse.toChatResponse(): ChatResponse = ChatResponse (
     chatId = chatId,
     responseId = responseId,
     messages = messages.map { it.toChatMessage() },
-    createdAt = createdAt
+    createdAt = createdAt,
+    usage = usage?.toChatUsage()
 )
 
 internal fun AimoChatMessage.toChatMessage() = ChatMessage(
@@ -50,3 +55,15 @@ internal fun AimoHistoryRequest.toChatHistoryRequest() = ChatHistoryRequest(
 internal fun AimoConversationInfo.toChatConversationInfo() = ChatConversationInfo(
     chatId = chatId,
 )
+
+internal fun AimoUsage.toChatUsage() = ChatUsage(
+    inputTokens = inputTokens,
+    outputTokens = outputTokens,
+    promptCache = promptCache?.toChatPromptCacheUsage()
+)
+
+internal fun AimoPromptCacheUsage.toChatPromptCacheUsage() = ChatPromptCacheUsage(
+    cacheReadInputTokens = cacheReadInputTokens,
+    cacheWriteInputTokens = cacheWriteInputTokens
+)
+

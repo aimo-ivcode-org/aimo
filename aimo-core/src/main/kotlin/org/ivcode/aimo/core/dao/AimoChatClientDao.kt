@@ -37,7 +37,7 @@ interface AimoChatClientDao {
     /**
      * Retrieve a conversation by its [chatId], optionally scoped by the provided [metadata].
      *
-     * The implementation should only return a session when all metadata constraints match
+     * The implementation should only return a conversation when all metadata constraints match
      * the stored conversation metadata. Metadata acts as a scoping/filtering map: every
      * entry in the provided [metadata] must be present and equal in the stored conversation
      * metadata for a match to occur.
