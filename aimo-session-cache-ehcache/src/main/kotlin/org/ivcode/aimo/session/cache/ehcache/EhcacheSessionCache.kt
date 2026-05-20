@@ -68,7 +68,12 @@ internal class EhcacheSessionCache(
     }
 
     override fun evict() {
-        globalCache.remove(chatId)
+        val lock = keyedLock.acquire(chatId)
+        try {
+            globalCache.remove(chatId)
+        } finally {
+            keyedLock.release(chatId, lock)
+        }
     }
 
     companion object {
