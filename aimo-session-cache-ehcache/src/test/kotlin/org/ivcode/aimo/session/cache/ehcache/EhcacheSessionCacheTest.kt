@@ -8,13 +8,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/**
- * Test fixture for token calibration telemetry.
- */
-data class SessionTokenCalibration(
-    val observedPromptCharacters: Long,
-    val observedPromptTokens: Long,
-)
 
 class EhcacheSessionCacheTest {
 
@@ -53,13 +46,6 @@ class EhcacheSessionCacheTest {
             val allProps = cache.getSessionProperties()
             assertEquals(1, allProps["a"])
             assertEquals(2, allProps["b"])
-
-            val calibration = SessionTokenCalibration(
-                observedPromptCharacters = 120,
-                observedPromptTokens = 30,
-            )
-            cache.writeSessionProperty(CACHE_KEY__TOKEN_CALIBRATION, calibration)
-            assertEquals(calibration, cache.getTokenCalibration())
         } finally {
             provider.close()
         }
@@ -94,7 +80,6 @@ class EhcacheSessionCacheTest {
             val newCache = provider.get(chatId)
             assertEquals(emptyMap<String, Any>(), newCache.getSessionProperties())
             assertNull(newCache.getCachedMessages())
-            assertNull(newCache.getTokenCalibration())
         } finally {
             provider.close()
         }
@@ -178,11 +163,6 @@ class EhcacheSessionCacheTest {
         writeSessionProperty(CACHE_KEY__MESSAGES, messages.toList())
     }
 
-
-    private fun org.ivcode.aimo.core.cache.AimoSessionCache.getTokenCalibration(): SessionTokenCalibration? {
-        return getSessionProperty(CACHE_KEY__TOKEN_CALIBRATION) as? SessionTokenCalibration
-    }
-
     private fun message(id: Int, content: String): AimoChatMessage {
         return AimoChatMessage(
             messageId = id,
@@ -196,7 +176,6 @@ class EhcacheSessionCacheTest {
 
     private companion object {
         const val CACHE_KEY__MESSAGES = "chat.messages"
-        const val CACHE_KEY__TOKEN_CALIBRATION = "chat.tokenCalibration"
     }
 }
 
