@@ -10,10 +10,46 @@ import tools.jackson.databind.JsonNode
  *
  * This forms the provider-agnostic execution seam between Aimo core and concrete
  * model integrations. Callers should depend only on these Aimo-owned contracts.
+ *
+ * ## Token Usage in Responses
+ * Both `call` methods return an [AimoChatResponse] where [AimoChatResponse.usage]
+ * represents the total token usage across the entire exchange:
+ * - The `usage` field contains the sum of all tokens consumed across every model invocation
+ * - This includes all tool call invocations in multi-turn scenarios
+ * - For single-turn calls, usage reflects just that single invocation
+ * - The [AimoChatResponse.messages] field contains all messages generated during the complete exchange
  */
 interface AimoChatEngine {
     val options: AimoChatOptions
+
+    /**
+     * Non-streaming chat execution.
+     *
+     * Blocks until the complete exchange is finished and returns a single response.
+     * Any multi-turn exchanges (e.g., tool calls) occur internally and are not
+     * visible to the caller until the final response is returned.
+     *
+     * @param prompt The chat prompt with messages, tools, and options
+     * @return Response with all messages generated and total token usage across the entire exchange
+     */
     fun call(prompt: AimoPrompt): AimoChatResponse
+
+    /**
+     * Streaming chat execution with incremental callback updates.
+     *
+     * Invokes the callback incrementally as the response is generated. Callbacks receive
+     * streaming updates (not accumulated state); they are useful for displaying progress
+     * to the caller.
+     *
+     * The final returned [AimoChatResponse] is a complete accumulation of the entire exchange:
+     * - [AimoChatResponse.messages] contains all generated messages
+     * - [AimoChatResponse.usage] contains the total tokens consumed (sum of all tokens
+     *   across every model invocation, including tool calls in multi-turn scenarios)
+     *
+     * @param prompt The chat prompt with messages, tools, and options
+     * @param callback Invoked for each incremental streaming update; use for progress/display only
+     * @return Final accumulated response with all messages and total token usage
+     */
     fun call(prompt: AimoPrompt, callback: (AimoChatResponse) -> Unit): AimoChatResponse
 }
 

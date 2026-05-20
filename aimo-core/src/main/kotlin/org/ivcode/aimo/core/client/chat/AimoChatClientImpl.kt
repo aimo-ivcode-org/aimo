@@ -6,6 +6,7 @@ import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoConversationClient
+import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.controller.SystemMessageContext
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -125,13 +126,14 @@ internal class AimoChatClientImpl (
      *    a. Use the prompt budgeter to select history that fits the context window
      *    b. Call the model with the budgeted prompt
      *    c. If the assistant has tool calls, invoke each tool and add results
+     *    d. Accumulate token usage from each model call (for multi-turn tool scenarios)
      * 5. Persist all new messages (prompt + tasks) via the conversation
-     * 6. Return non-empty task messages to the caller
+     * 6. Return non-empty task messages to the caller with accumulated usage
      *
      * @param request The chat request (prompt + optional context)
      * @param callback Optional callback for streaming updates (null for non-streaming)
      * @param call Function reference to either [call] (non-streaming) or [stream] (streaming)
-     * @return The final response with assistant messages
+     * @return The final response with assistant messages and accumulated token usage
      */
     private fun doChat (
         request: AimoChatRequest,
@@ -173,6 +175,7 @@ internal class AimoChatClientImpl (
         // Accumulate all task messages (assistant responses, tool calls, tool results)
         val taskMessages = mutableListOf<AimoChatMessage>()
         var assistantMessage: AimoChatMessage? = null
+        var accumulatedUsage: AimoUsage? = null
 
         // Main chat loop: continue until the assistant finishes (no tool calls)
         while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
@@ -197,6 +200,18 @@ internal class AimoChatClientImpl (
                     call(responseId, messageId, prompt, callback)
                 }
             )
+
+            // Accumulate usage from this model call
+            if (engineResponse.usage != null) {
+                accumulatedUsage = if (accumulatedUsage == null) {
+                    engineResponse.usage
+                } else {
+                    accumulatedUsage.copy(
+                        inputTokens = (accumulatedUsage.inputTokens ?: 0) + (engineResponse.usage.inputTokens ?: 0),
+                        outputTokens = (accumulatedUsage.outputTokens ?: 0) + (engineResponse.usage.outputTokens ?: 0),
+                    )
+                }
+            }
 
             // Extract the assistant's message from the engine response
             assistantMessage = engineResponse.extractAssistantMessage(messageId)
@@ -256,6 +271,7 @@ internal class AimoChatClientImpl (
             responseId = responseId,
             messages = persistedTaskMessages,
             createdAt = Instant.now(),
+            usage = accumulatedUsage,
         )
     }
 
@@ -304,12 +320,13 @@ internal class AimoChatClientImpl (
      * ### Behavior
      * - If no terminal chunk was emitted by the model, an explicit done event is emitted
      * - Thinking and content are accumulated separately and merged into the final message
+     * - Token usage is accumulated across all stream chunks (for multi-turn scenarios)
      *
      * @param responseId The unique ID for this response
      * @param messageId The message ID to assign to the response
      * @param prompt The prompt to send to the model
      * @param callback Invoked for each chunk as it arrives from the stream
-     * @return Aggregated final response with all thinking/content merged
+     * @return Aggregated final response with all thinking/content merged and accumulated usage
      */
     private fun stream(
         responseId: UUID,
@@ -321,6 +338,8 @@ internal class AimoChatClientImpl (
         val thinkingBuilder = StringBuilder()
         val contentBuilder = StringBuilder()
         var terminalChunkEmitted = false
+        // Use a mutable holder to work around Kotlin smart cast limitations in closures
+        val accumulatedStreamUsageHolder = mutableMapOf<String, AimoUsage?>("value" to null)
 
         // Callback invoked for each chunk from the stream
         val streamCallback: (AimoChatResponse) -> Unit = { streamResponse ->
@@ -333,6 +352,18 @@ internal class AimoChatClientImpl (
             if (streamMessage.done == true) {
                 terminalChunkEmitted = true
             }
+            // Accumulate usage from each chunk
+            if (streamResponse.usage != null) {
+                val current = accumulatedStreamUsageHolder["value"]
+                accumulatedStreamUsageHolder["value"] = if (current == null) {
+                    streamResponse.usage
+                } else {
+                    current.copy(
+                        inputTokens = (current.inputTokens ?: 0) + (streamResponse.usage.inputTokens ?: 0),
+                        outputTokens = (current.outputTokens ?: 0) + (streamResponse.usage.outputTokens ?: 0),
+                    )
+                }
+            }
             // Emit current state to the caller
             callback?.invoke(
                 AimoChatResponse(
@@ -344,27 +375,30 @@ internal class AimoChatClientImpl (
                         content = contentBuilder.takeIf { it.isNotEmpty() }?.toString(),
                     )),
                     createdAt = Instant.now(),
-                    usage = streamResponse.usage,
+                    usage = accumulatedStreamUsageHolder["value"],
                 )
             )
         }
 
         // Call the model with the stream callback
-        val finalResponse = model.chatEngine.call(prompt, streamCallback).normalizeResponse(responseId, messageId)
+        val rawResponse = model.chatEngine.call(prompt, streamCallback)
+        val accumulatedStreamUsage = accumulatedStreamUsageHolder["value"]
+        val normalizedResponse = rawResponse.normalizeResponse(responseId, messageId)
 
         // Merge accumulated thinking/content into the final response
         val accThinking = thinkingBuilder.takeIf { it.isNotEmpty() }?.toString()
         val accContent = contentBuilder.takeIf { it.isNotEmpty() }?.toString()
         val aggregatedFinalResponse = if (accThinking == null && accContent == null) {
-            finalResponse
+            normalizedResponse.copy(usage = accumulatedStreamUsage)
         } else {
-            finalResponse.copy(
-                messages = finalResponse.messages.map { msg ->
+            normalizedResponse.copy(
+                messages = normalizedResponse.messages.map { msg ->
                     msg.copy(
                         thinking = accThinking ?: msg.thinking,
                         content = accContent ?: msg.content,
                     )
-                }
+                },
+                usage = accumulatedStreamUsage,
             )
         }
 
@@ -373,7 +407,6 @@ internal class AimoChatClientImpl (
              val terminalResponse = aggregatedFinalResponse.copy(
                  messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
                  createdAt = Instant.now(),
-                 usage = finalResponse.usage,
              )
              callback?.invoke(terminalResponse)
              return terminalResponse
@@ -414,20 +447,24 @@ internal class AimoChatClientImpl (
      * Builds a unified context map for both system and tool callbacks.
      *
      * Combines core AIMO context (chatId, requestId, conversation) with user-provided request context.
+     * Reserved internal keys are always set to their correct values, preventing caller-provided context
+     * from tampering with critical system state.
      *
      * @param requestId The unique ID for this request
-     * @param requestContext Optional caller-provided context (merged into result)
+     * @param requestContext Optional caller-provided context (merged into result, but cannot override reserved keys)
      * @return Map with all context variables
      */
     private fun createContextMap(requestId: UUID, requestContext: Map<String, Any>?): Map<String, Any> {
-        val context = mutableMapOf (
-            CONTEXT_KEY__CHAT_ID to chatId,
-            CONTEXT_KEY__REQUEST_ID to requestId,
-            CONTEXT_KEY__CONVERSATION to conversation,
-        )
+        val context = mutableMapOf<String, Any>()
 
-        // Merge caller-provided context if present
+        // Merge caller-provided context first
         requestContext?.let { context.putAll(it) }
+
+        // Override with reserved internal keys to prevent caller from tampering
+        context[CONTEXT_KEY__CHAT_ID] = chatId
+        context[CONTEXT_KEY__REQUEST_ID] = requestId
+        context[CONTEXT_KEY__CONVERSATION] = conversation
+
         return context
     }
 
