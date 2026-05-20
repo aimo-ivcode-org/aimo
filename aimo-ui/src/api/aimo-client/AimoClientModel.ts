@@ -34,8 +34,8 @@ export interface ChatConversationInfo {
 }
 
 export interface ChatUsage {
-    inputTokens: number,
-    outputTokens: number,
+    inputTokens?: number,
+    outputTokens?: number,
     promptCache?: ChatPromptCacheUsage,
 }
 
