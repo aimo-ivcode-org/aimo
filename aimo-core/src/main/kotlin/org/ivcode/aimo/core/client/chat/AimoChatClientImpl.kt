@@ -144,14 +144,14 @@ internal class AimoChatClientImpl (
         var resolvedHistory: List<AimoChatMessage>? = conversation.getCachedMessages()
 
         // History provider: returns cached history if available, otherwise lazy-loads from DAO
-        // Applies character limits to both cached and DAO-loaded history to maintain bounded-history semantics.
-        // The prompt budgeter uses this to fetch history on-demand as needed for context fitting.
+        // The DAO respects character limits strictly. The prompt budgeter uses this to fetch
+        // history on-demand as needed for context fitting.
         val historyProvider: (Long?) -> List<AimoChatMessage> = { chars ->
-            val history = resolvedHistory ?: (if (chars == null) {
+            resolvedHistory ?: (if (chars == null) {
                 // Fetch all history
                 dao.getChatRequests(chatId)
             } else {
-                // Fetch history up to a character limit
+                // Fetch history up to a character limit; DAO respects budget strictly
                 dao.getChatRequests(
                     chatId = chatId,
                     maxRequestCharacters = chars.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
@@ -162,22 +162,6 @@ internal class AimoChatClientImpl (
                     // previously stored messages through the conversation API.
                     resolvedHistory = it
                 }
-
-            // Apply character limit to both cached and DAO-loaded history
-            if (chars == null) {
-                history
-            } else {
-                // Accumulate messages from the end (most recent) up to the character limit
-                val charLimit = chars.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-                var totalChars = 0
-                history.asReversed()
-                    .takeWhile { msg ->
-                        val msgSize = (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
-                        totalChars += msgSize
-                        totalChars <= charLimit
-                    }
-                    .asReversed()
-            }
         }
 
         // Prepare system messages from registered callbacks

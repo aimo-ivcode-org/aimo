@@ -99,14 +99,12 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         val maxCharacters = maxRequestCharacters.toLong()
         val selected = mutableListOf<ChatRequestEntity>()
 
-        // Pick newest requests first until the cumulative character budget would be exceeded.
+        // Pick newest requests first until adding the next would exceed the budget.
+        // Respect the budget strictly: if a request doesn't fit, stop and return what we have.
         for (request in chatRequests.asReversed()) {
             val requestCharacters = request.requestCharacters.toLong()
             if (totalCharacters + requestCharacters > maxCharacters) {
-                if (selected.isEmpty()) {
-                    // Always include the newest request so tail lookups retain the latest message id.
-                    selected.add(request)
-                }
+                // Budget exceeded; exclude this request and all older ones
                 break
             }
 

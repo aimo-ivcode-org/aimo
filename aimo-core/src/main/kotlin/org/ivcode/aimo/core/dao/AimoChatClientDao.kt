@@ -69,6 +69,41 @@ interface AimoChatClientDao {
 
     fun addChatRequest(request: ChatRequestEntity)
     fun getChatRequests(chatId: UUID): List<ChatRequestEntity>
+
+    /**
+     * Retrieve recent chat requests for a conversation, bounded by character count.
+     *
+     * This method returns the most recent requests that fit within the specified character
+     * budget, respecting the budget strictly. The implementation selects requests in
+     * reverse chronological order (newest first) and accumulates them until adding the
+     * next complete request would exceed [maxRequestCharacters].
+     *
+     * ### Budget Semantics
+     * - The character budget is a hard constraint: returned requests will never exceed it
+     * - If the newest request alone exceeds the budget, an empty list is returned
+     * - Partial messages are not returned; each request must fit completely or not at all
+     * - A zero or negative budget returns an empty list
+     *
+     * ### Character Calculation
+     * - Character count is based on [ChatRequestEntity.requestCharacters], which typically
+     *   sums the lengths of request content
+     *
+     * ### Example
+     * With requests of sizes [10, 10, 10] and budget 25:
+     * - Newest request (10): 0 + 10 <= 25, include. Total = 10
+     * - Next request (10): 10 + 10 <= 25, include. Total = 20
+     * - Next request (10): 20 + 10 > 25, stop
+     * - Return: [request at offset 1, request at offset 2] (in chronological order)
+     *
+     * With requests of sizes [100, 10, 10] and budget 25:
+     * - Newest request (100): 0 + 100 > 25, doesn't fit
+     * - Return: [] (empty list)
+     *
+     * @param chatId the conversation to fetch requests from
+     * @param maxRequestCharacters maximum cumulative character count; must be positive.
+     *                               Zero or negative returns an empty list
+     * @return requests in chronological order that fit within the budget, or empty if none fit
+     */
     fun getChatRequests(chatId: UUID, maxRequestCharacters: Int): List<ChatRequestEntity>
     fun getMessages(chatId: UUID): List<ChatMessageEntity>
 
