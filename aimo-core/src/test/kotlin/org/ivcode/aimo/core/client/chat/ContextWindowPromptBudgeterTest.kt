@@ -2,6 +2,7 @@ package org.ivcode.aimo.core.client.chat
 
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
+import org.ivcode.aimo.core.AimoChatResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -91,16 +92,23 @@ class ContextWindowPromptBudgeterTest {
         )
         val prompt = message(2, "prompt", thinking = "prompt-thought")
 
-        val result = budgeter.promptMessagesForCall(
+        budgeter.withPromptForCall(
             systemMessages = emptyList(),
             prompt = prompt,
             taskMessages = emptyList(),
             tools = emptyList(),
             historyProvider = { history },
+            execute = { result ->
+                assertEquals("old-thought", result[0].thinking)
+                assertEquals("prompt-thought", result[1].thinking)
+                AimoChatResponse(
+                    chatId = java.util.UUID.randomUUID(),
+                    responseId = java.util.UUID.randomUUID(),
+                    messages = emptyList(),
+                    createdAt = java.time.Instant.now(),
+                )
+            }
         )
-
-        assertEquals("old-thought", result[0].thinking)
-        assertEquals("prompt-thought", result[1].thinking)
     }
 
     @Test
@@ -111,16 +119,23 @@ class ContextWindowPromptBudgeterTest {
         )
         val prompt = message(2, "prompt", thinking = "prompt-thought")
 
-        val result = budgeter.promptMessagesForCall(
+        budgeter.withPromptForCall(
             systemMessages = emptyList(),
             prompt = prompt,
             taskMessages = emptyList(),
             tools = emptyList(),
             historyProvider = { history },
+            execute = { result ->
+                assertEquals(null, result[0].thinking)
+                assertEquals(null, result[1].thinking)
+                AimoChatResponse(
+                    chatId = java.util.UUID.randomUUID(),
+                    responseId = java.util.UUID.randomUUID(),
+                    messages = emptyList(),
+                    createdAt = java.time.Instant.now(),
+                )
+            }
         )
-
-        assertEquals(null, result[0].thinking)
-        assertEquals(null, result[1].thinking)
     }
 
 

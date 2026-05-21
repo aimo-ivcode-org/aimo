@@ -1,6 +1,7 @@
 package org.ivcode.aimo.core.client.chat
 
 import org.ivcode.aimo.core.AimoChatMessage
+import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoToolCallback
 
 /**
@@ -12,17 +13,18 @@ import org.ivcode.aimo.core.model.AimoToolCallback
 internal class NoOpPromptBudgeter(
     private val excludeThinking: Boolean = false,
 ) : PromptBudgeter {
-    override fun promptMessagesForCall(
+    override fun withPromptForCall(
         systemMessages: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
         tools: List<AimoToolCallback>,
         historyProvider: (Long?) -> List<AimoChatMessage>,
-    ): List<AimoChatMessage> {
+        execute: (promptMessages: List<AimoChatMessage>) -> AimoChatResponse,
+    ): AimoChatResponse {
         val history = historyProvider(null)
         val promptMessages = systemMessages + history + prompt + taskMessages
 
-        return promptMessages
+        val filteredMessages = promptMessages
             .let { messages ->
                 if (!excludeThinking) messages
                 else messages.map { message ->
@@ -30,6 +32,8 @@ internal class NoOpPromptBudgeter(
                 }
             }
             .filterNot { it.isEmptyPayload() }
+
+        return execute(filteredMessages)
     }
 
     private fun AimoChatMessage.isEmptyPayload(): Boolean {
