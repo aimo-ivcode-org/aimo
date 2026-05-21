@@ -20,7 +20,7 @@ class EhcacheSessionCacheTest {
             cache.putCachedMessages(listOf(message(1, "hello")))
             cache.appendToSessionProperty(CACHE_KEY__MESSAGES, listOf(message(2, "world") as Any))
 
-            val messages = cache.getCachedMessages()
+            val messages = cache.getMessages()
             assertNotNull(messages)
             assertEquals(listOf(1, 2), messages.map { it.messageId })
             assertEquals(listOf("hello", "world"), messages.map { it.content })
@@ -79,7 +79,7 @@ class EhcacheSessionCacheTest {
 
             val newCache = provider.get(chatId)
             assertEquals(emptyMap<String, Any>(), newCache.getSessionProperties())
-            assertNull(newCache.getCachedMessages())
+            assertNull(newCache.getMessages())
         } finally {
             provider.close()
         }
@@ -102,7 +102,7 @@ class EhcacheSessionCacheTest {
             cache.appendToSessionProperty(CACHE_KEY__MESSAGES, listOf(message(3, "third") as Any))
 
             // Verify all messages are present in order
-            val messages = cache.getCachedMessages()
+            val messages = cache.getMessages()
             assertNotNull(messages)
             assertEquals(3, messages.size)
             assertEquals(listOf(1, 2, 3), messages.map { it.messageId })
@@ -141,7 +141,7 @@ class EhcacheSessionCacheTest {
             assertTrue(latch.await(5, java.util.concurrent.TimeUnit.SECONDS), "Concurrent appends timed out")
 
             // Verify all 10 messages are present with no lost updates
-            val messages = cache.getCachedMessages()
+            val messages = cache.getMessages()
             assertNotNull(messages)
             assertEquals(10, messages.size, "Expected all 10 appended messages, but got ${messages.size}")
             assertEquals(
@@ -154,7 +154,7 @@ class EhcacheSessionCacheTest {
         }
     }
 
-    private fun org.ivcode.aimo.core.cache.AimoSessionCache.getCachedMessages(): List<AimoChatMessage>? {
+    private fun org.ivcode.aimo.core.cache.AimoSessionCache.getMessages(): List<AimoChatMessage>? {
         @Suppress("UNCHECKED_CAST")
         return getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
     }

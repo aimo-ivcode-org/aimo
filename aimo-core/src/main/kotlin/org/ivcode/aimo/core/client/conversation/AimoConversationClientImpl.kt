@@ -13,6 +13,7 @@ import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.toChatMessageEntity
+import org.ivcode.aimo.core.toAimoChatMessage
 import java.time.Instant
 import java.util.UUID
 
@@ -31,19 +32,17 @@ internal class AimoConversationClientImpl(
         return AimoChatClientImpl (
             chatId = chatId,
             conversation = this,
-            dao = dao,
             model = model,
             tools = tools,
             systemMessages = systemMessages,
         )
     }
 
-    override fun addMessages(messages: List<AimoChatMessage>) {
+    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>) {
         if(messages.isEmpty()) {
             throw IllegalArgumentException("AimoConversationClientImpl addMessages should have at least one message")
         }
 
-        val requestId = UUID.randomUUID()
         dao.addChatRequest(
             ChatRequestEntity(
                 chatId = chatId,
@@ -56,9 +55,20 @@ internal class AimoConversationClientImpl(
         appendCachedMessages(messages)
     }
 
-    override fun getCachedMessages(): List<AimoChatMessage>? {
+    override fun getMessages(): List<AimoChatMessage>? {
         @Suppress("UNCHECKED_CAST")
-        return sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+        var cached = sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+
+        // Seed the cache on first call: load all durable history into the session cache
+        if (cached == null) {
+            cached = dao.getChatRequests(chatId)
+                .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+            if (cached.isNotEmpty()) {
+                sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, cached as Any)
+            }
+        }
+
+        return cached.takeIf { it.isNotEmpty() }
     }
 
     override fun getChatMetadata(): Map<String, Any> {

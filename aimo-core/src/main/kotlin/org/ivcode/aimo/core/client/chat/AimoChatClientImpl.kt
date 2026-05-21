@@ -9,12 +9,10 @@ import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.controller.SystemMessageContext
-import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.model.AimoToolDefinition
-import org.ivcode.aimo.core.toAimoChatMessage
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CHAT_ID
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CONVERSATION
 import org.ivcode.aimo.core.util.CONTEXT_KEY__REQUEST_ID
@@ -28,15 +26,15 @@ import java.util.UUID
  * - **Chat execution**: Processing user prompts and generating responses via the chat model
  * - **Tool handling**: Invoking registered tools when the assistant requests them
  * - **System messages**: Retrieving and preparing system-level prompts via callbacks
- * - **Conversation history**: Reading cached messages and lazy-loading from the DAO
+ * - **Conversation history**: Reading conversation history from cache/session storage
  * - **Prompt budgeting**: Managing context window constraints via the prompt budgeter
  * - **Message persistence**: Delegating all persistence to the conversation client
  *
  * ### Architecture
- * - Delegates cache management to [AimoConversationClient] (single owner)
- * - Reads messages via [conversation.getCachedMessages] and [AimoChatClientDao]
+ * - Delegates cache and history management to [AimoConversationClient] (single owner)
+ * - Reads messages via [conversation.getMessages]
  * - Persists new messages via [conversation.addMessages]
- * - Does not directly manage the session cache
+ * - Does not directly manage the session cache or DAO
  *
  * ### Tool Handling
  * When the assistant returns tool calls, this class:
@@ -56,15 +54,13 @@ import java.util.UUID
  * 8. Non-empty messages are returned to the caller
  *
  * @property chatId The conversation ID that this chat client serves
- * @property conversation The conversation client (manages cache and persistence)
- * @property dao Data access layer for durable storage
+ * @property conversation The conversation client (manages cache, persistence, and message fetching)
  * @property model The chat model that generates responses
  * @property systemMessages Callbacks that generate system-level prompts
  */
 internal class AimoChatClientImpl (
     override val chatId: UUID,
     private val conversation: AimoConversationClient,
-    private val dao: AimoChatClientDao,
     private val model: AimoChatModel,
     tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
@@ -119,7 +115,7 @@ internal class AimoChatClientImpl (
      * Core chat orchestration logic shared by both streaming and non-streaming endpoints.
      *
      * ### Algorithm
-     * 1. Initialize a response ID and lazy-loading history provider
+     * 1. Initialize a response ID and load conversation history from cache (seeded on first call)
      * 2. Prepare system messages via registered callbacks
      * 3. Create initial user message from the request prompt
      * 4. Loop while the assistant has not finished or has tool calls:
@@ -142,28 +138,14 @@ internal class AimoChatClientImpl (
     ): AimoChatResponse {
         val responseId = UUID.randomUUID()
 
-        // Try to read cached messages; lazy-load from DAO on cache miss
-        var resolvedHistory: List<AimoChatMessage>? = conversation.getCachedMessages()
+        // Seed cache on first call; subsequent calls return cached history
+        val resolvedHistory = conversation.getMessages().orEmpty()
 
-        // History provider: returns cached history if available, otherwise lazy-loads from DAO
-        // The DAO respects character limits strictly. The prompt budgeter uses this to fetch
-        // history on-demand as needed for context fitting.
-        val historyProvider: (Long?) -> List<AimoChatMessage> = { chars ->
-            resolvedHistory ?: (if (chars == null) {
-                // Fetch all history
-                dao.getChatRequests(chatId)
-            } else {
-                // Fetch history up to a character limit; DAO respects budget strictly
-                dao.getChatRequests(
-                    chatId = chatId,
-                    maxRequestCharacters = chars.coerceAtLeast(0L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                )
-            }).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
-                .also {
-                    // Memoize loaded history for this request without re-persisting
-                    // previously stored messages through the conversation API.
-                    resolvedHistory = it
-                }
+        // History provider: returns the conversation history (already seeded and complete).
+        // The prompt budgeter uses this to select history that fits the context window based
+        // on character limits; truncation happens at the budgeter level, not here.
+        val historyProvider: (Long?) -> List<AimoChatMessage> = {
+            resolvedHistory
         }
 
         // Prepare system messages from registered callbacks
@@ -209,6 +191,8 @@ internal class AimoChatClientImpl (
                     accumulatedUsage.copy(
                         inputTokens = (accumulatedUsage.inputTokens ?: 0) + (engineResponse.usage.inputTokens ?: 0),
                         outputTokens = (accumulatedUsage.outputTokens ?: 0) + (engineResponse.usage.outputTokens ?: 0),
+                        // promptCache is not accumulated; use the latest value which represents current cache state
+                        promptCache = engineResponse.usage.promptCache ?: accumulatedUsage.promptCache,
                     )
                 }
             }
@@ -262,9 +246,10 @@ internal class AimoChatClientImpl (
         }
 
         // Persist the new messages (user prompt + all task responses) to durable storage and cache
+        // Use responseId as requestId to maintain correlation between live response and history
         val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
         val allMessages = listOf(promptMessage) + persistedTaskMessages
-        conversation.addMessages(allMessages)
+        conversation.addMessages(responseId, allMessages)
 
         return AimoChatResponse(
             chatId = chatId,
@@ -361,6 +346,8 @@ internal class AimoChatClientImpl (
                     current.copy(
                         inputTokens = (current.inputTokens ?: 0) + (streamResponse.usage.inputTokens ?: 0),
                         outputTokens = (current.outputTokens ?: 0) + (streamResponse.usage.outputTokens ?: 0),
+                        // promptCache is not accumulated; use the latest value which represents current cache state
+                        promptCache = streamResponse.usage.promptCache ?: current.promptCache,
                     )
                 }
             }
