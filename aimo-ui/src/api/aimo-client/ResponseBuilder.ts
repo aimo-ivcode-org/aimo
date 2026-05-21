@@ -1,4 +1,4 @@
-import { ChatMessage, ChatResponse } from "./AimoClientModel";
+import { ChatMessage, ChatResponse, ChatUsage } from "./AimoClientModel";
 import { normalizeChatResponse } from "./AimoClientNormalizers";
 
 type ResponseAccumulator = {
@@ -7,6 +7,7 @@ type ResponseAccumulator = {
     createdAt: Date,
     messageOrder: string[],
     messagesByKey: Map<string, ChatMessage>,
+    usage?: ChatUsage,
 }
 
 /**
@@ -141,11 +142,16 @@ export class ResponseBuilder {
                 createdAt: incoming.createdAt,
                 messageOrder: [],
                 messagesByKey: new Map<string, ChatMessage>(),
+                usage: incoming.usage,
             }
             this.accumulatorsByResponseId.set(incoming.responseId, acc)
         } else {
             acc.chatId = incoming.chatId || acc.chatId
             acc.createdAt = incoming.createdAt ?? acc.createdAt
+            // Propagate the latest usage value if provided
+            if (incoming.usage) {
+                acc.usage = incoming.usage
+            }
         }
 
         for (const msg of incoming.messages ?? []) {
@@ -194,6 +200,7 @@ export class ResponseBuilder {
                 .map((key) => acc.messagesByKey.get(key))
                 .filter((m): m is ChatMessage => m != null)
                 .map((m) => ({ ...m })),
+            usage: acc.usage,
         }
     }
 
@@ -212,6 +219,7 @@ export class ResponseBuilder {
             responseId: acc.responseId,
             createdAt: acc.createdAt,
             messages: [{ ...message }],
+            usage: acc.usage,
         }
     }
 }
