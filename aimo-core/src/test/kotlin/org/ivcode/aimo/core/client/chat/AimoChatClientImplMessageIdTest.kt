@@ -7,6 +7,7 @@ import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.AimoToolCall
+import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.controller.Tool
 import org.ivcode.aimo.core.controller.toAimoToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
@@ -329,6 +330,39 @@ class AimoChatClientImplMessageIdTest {
         assertEquals("hello world", returnedAssistant.content)
     }
 
+    @Test
+    fun `chatStream falls back to engine final response usage when streamed chunks have no usage`() {
+        val dao = AimoChatClientDaoMemory()
+        val chatId = dao.createChatConversation().chatId
+
+        // Engine emits chunks without usage, but final response includes usage
+        val engineFinalUsage = AimoUsage(inputTokens = 100, outputTokens = 50)
+        val client = AimoChatClientImpl(
+            chatId = chatId,
+            conversation = TestSessionClient(chatId, dao),
+            model = testModel(
+                engine = StreamingResponseEngineWithFinalUsage(
+                    chunks = listOf(
+                        responseWithThinking("", "hello", usage = null),
+                        responseWithThinking("", " world", usage = null),
+                    ),
+                    finalUsage = engineFinalUsage,
+                ),
+                contextSize = 4000,
+            ),
+            tools = emptyList(),
+            systemMessages = emptyList(),
+        )
+
+        val callbackResponses = mutableListOf<AimoChatResponse>()
+        val returnedResponse = client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { response ->
+            callbackResponses.add(response)
+        }
+
+        // Verify final returned response includes the engine's usage (fallback from engine final response)
+        assertEquals(engineFinalUsage, returnedResponse.usage)
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -397,7 +431,7 @@ class AimoChatClientImplMessageIdTest {
         createdAt = Instant.now(),
     )
 
-    private fun responseWithThinking(thinking: String, content: String): AimoChatResponse = AimoChatResponse(
+    private fun responseWithThinking(thinking: String, content: String, usage: AimoUsage? = null): AimoChatResponse = AimoChatResponse(
         chatId = UUID.randomUUID(),
         responseId = UUID.randomUUID(),
         messages = listOf(AimoChatMessage(
@@ -409,6 +443,7 @@ class AimoChatClientImplMessageIdTest {
             done = true,
         )),
         createdAt = Instant.now(),
+        usage = usage,
     )
 
     private fun responseWithThinkingDone(thinking: String, content: String, done: Boolean): AimoChatResponse = AimoChatResponse(
@@ -466,6 +501,21 @@ class AimoChatClientImplMessageIdTest {
             capturedPrompts?.add(prompt.messages.toList())
             chunks.forEach { callback(it) }
             return chunks.last()
+        }
+    }
+
+    private class StreamingResponseEngineWithFinalUsage(
+        private val chunks: List<AimoChatResponse>,
+        private val finalUsage: AimoUsage,
+    ) : AimoChatEngine {
+        override val options = AimoChatOptions()
+        override fun call(prompt: AimoPrompt): AimoChatResponse {
+            return chunks.last().copy(usage = finalUsage)
+        }
+        override fun call(prompt: AimoPrompt, callback: (AimoChatResponse) -> Unit): AimoChatResponse {
+            chunks.forEach { callback(it) }
+            val finalResponse = chunks.last().copy(usage = finalUsage)
+            return finalResponse
         }
     }
 

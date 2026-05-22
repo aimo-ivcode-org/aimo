@@ -373,10 +373,14 @@ internal class AimoChatClientImpl (
         val normalizedResponse = rawResponse.normalizeResponse(responseId, messageId)
 
         // Merge accumulated thinking/content into the final response
+        // Usage: prefer accumulated stream usage (from chunks); fall back to engine's final response usage
+        // if chunks did not include usage information. If both are present, use accumulated (which may
+        // include multi-turn aggregation); if both are absent, result is null.
+        val finalUsage = accumulatedStreamUsage ?: normalizedResponse.usage
         val accThinking = thinkingBuilder.takeIf { it.isNotEmpty() }?.toString()
         val accContent = contentBuilder.takeIf { it.isNotEmpty() }?.toString()
         val aggregatedFinalResponse = if (accThinking == null && accContent == null) {
-            normalizedResponse.copy(usage = accumulatedStreamUsage)
+            normalizedResponse.copy(usage = finalUsage)
         } else {
             normalizedResponse.copy(
                 messages = normalizedResponse.messages.map { msg ->
@@ -385,7 +389,7 @@ internal class AimoChatClientImpl (
                         content = accContent ?: msg.content,
                     )
                 },
-                usage = accumulatedStreamUsage,
+                usage = finalUsage,
             )
         }
 
