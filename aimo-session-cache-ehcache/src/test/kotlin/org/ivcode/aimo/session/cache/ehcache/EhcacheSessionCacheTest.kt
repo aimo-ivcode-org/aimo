@@ -13,7 +13,7 @@ class EhcacheSessionCacheTest {
 
     @Test
     fun `stores and appends messages`() {
-        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, tti = java.time.Duration.ofMinutes(5))
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache = provider.get(chatId)
@@ -31,7 +31,7 @@ class EhcacheSessionCacheTest {
 
     @Test
     fun `writes and reads runtime properties`() {
-        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, tti = java.time.Duration.ofMinutes(5))
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache = provider.get(chatId)
@@ -53,7 +53,7 @@ class EhcacheSessionCacheTest {
 
     @Test
     fun `shares cache state for same chatId`() {
-        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, tti = java.time.Duration.ofMinutes(5))
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache1 = provider.get(chatId)
@@ -68,7 +68,7 @@ class EhcacheSessionCacheTest {
 
     @Test
     fun `cache evict clears shared state for chatId`() {
-        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, tti = java.time.Duration.ofMinutes(5))
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache = provider.get(chatId)
@@ -87,7 +87,7 @@ class EhcacheSessionCacheTest {
 
     @Test
     fun `appendToSessionProperty atomically appends to list without lost updates`() {
-        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, tti = java.time.Duration.ofMinutes(5))
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache = provider.get(chatId)
@@ -114,7 +114,7 @@ class EhcacheSessionCacheTest {
 
     @Test
     fun `appendToSessionProperty is thread-safe across concurrent requests`() {
-        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, ttl = java.time.Duration.ofMinutes(5))
+        val provider = EhcacheRuntimeStateProvider(maxEntries = 100, tti = java.time.Duration.ofMinutes(5))
         try {
             val chatId = java.util.UUID.randomUUID()
             val cache = provider.get(chatId)

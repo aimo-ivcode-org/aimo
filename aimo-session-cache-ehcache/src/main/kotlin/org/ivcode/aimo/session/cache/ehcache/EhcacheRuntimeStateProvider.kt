@@ -17,10 +17,14 @@ import java.util.UUID
  * Maintains a shared ehcache datasource and returns lightweight conversation-scoped
  * wrappers over that datasource. Multiple wrappers for the same [chatId] observe the
  * same underlying cached state.
+ *
+ * @param maxEntries Maximum number of conversation entries to hold in cache
+ * @param tti Time-to-idle duration; entries expire after this duration of inactivity
+ *            (no reads/writes). Accessing cache resets the idle timer. Minimum enforced is 1 minute.
  */
 internal class EhcacheRuntimeStateProvider(
     maxEntries: Long,
-    ttl: Duration,
+    tti: Duration,
 ) : AimoSessionCacheProvider {
 
     private val cacheManager: CacheManager = CacheManagerBuilder.newCacheManagerBuilder()
@@ -30,7 +34,7 @@ internal class EhcacheRuntimeStateProvider(
                 UUID::class.java,
                 EhcacheCachedSessionState::class.java,
                 ResourcePoolsBuilder.heap(maxEntries.coerceAtLeast(1)),
-            ).withExpiry(ExpiryPolicyBuilder.timeToIdleExpiration(ttl.coerceAtLeast(Duration.ofMinutes(1))))
+            ).withExpiry(ExpiryPolicyBuilder.timeToIdleExpiration(tti.coerceAtLeast(Duration.ofMinutes(1))))
         )
         .build(true)
 

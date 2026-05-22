@@ -15,7 +15,7 @@ class SessionCacheEhcacheConfig {
     fun createSessionCacheProvider(properties: EhcacheSessionCacheProperties): AimoSessionCacheProvider {
         return EhcacheRuntimeStateProvider(
             maxEntries = properties.maxEntries,
-            ttl = properties.ttl,
+            tti = properties.tti,
         )
     }
 }
