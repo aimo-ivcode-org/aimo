@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration
 @EnableConfigurationProperties(EhcacheSessionCacheProperties::class)
 class SessionCacheEhcacheConfig {
 
-    @Bean(destroyMethod = "close")
+    @Bean
     @ConditionalOnMissingBean(AimoSessionCacheProvider::class)
     fun createSessionCacheProvider(properties: EhcacheSessionCacheProperties): AimoSessionCacheProvider {
         return EhcacheRuntimeStateProvider(
