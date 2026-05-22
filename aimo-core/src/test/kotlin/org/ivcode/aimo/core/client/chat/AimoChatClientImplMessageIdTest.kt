@@ -335,7 +335,9 @@ class AimoChatClientImplMessageIdTest {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatConversation().chatId
 
-        // Engine emits chunks without usage, but final response includes usage
+        // Scenario: Engine (e.g., Ollama) reports usage ONLY in the final response,
+        // not in intermediate streamed chunks. This simulates providers that accumulate
+        // usage info until the complete response is ready.
         val engineFinalUsage = AimoUsage(inputTokens = 100, outputTokens = 50)
         val client = AimoChatClientImpl(
             chatId = chatId,
@@ -343,9 +345,11 @@ class AimoChatClientImplMessageIdTest {
             model = testModel(
                 engine = StreamingResponseEngineWithFinalUsage(
                     chunks = listOf(
+                        // Streamed chunks: no usage information
                         responseWithThinking("", "hello", usage = null),
                         responseWithThinking("", " world", usage = null),
                     ),
+                    // Final response: includes accumulated usage (but only from this single turn)
                     finalUsage = engineFinalUsage,
                 ),
                 contextSize = 4000,
@@ -354,12 +358,13 @@ class AimoChatClientImplMessageIdTest {
             systemMessages = emptyList(),
         )
 
-        val callbackResponses = mutableListOf<AimoChatResponse>()
-        val returnedResponse = client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { response ->
-            callbackResponses.add(response)
-        }
+        val returnedResponse = client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { _ -> }
 
-        // Verify final returned response includes the engine's usage (fallback from engine final response)
+        // Verify: stream() falls back to engine's final response usage when chunks had none.
+        // This ensures token usage is never lost, even when the engine only reports it at the end.
+        // Note: Multi-turn aggregation across tool calls happens at doChat() level, so the
+        // final returned response here has only this single turn's usage. If there were tool calls,
+        // doChat() would accumulate usage from all turns.
         assertEquals(engineFinalUsage, returnedResponse.usage)
     }
 
