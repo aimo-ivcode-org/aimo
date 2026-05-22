@@ -115,14 +115,15 @@ internal class AimoChatClientImpl (
      * Core chat orchestration logic shared by both streaming and non-streaming endpoints.
      *
      * ### Algorithm
-     * 1. Initialize a response ID and load conversation history from cache (seeded on first call)
+     * 1. Initialize a response ID and load conversation history from cache (seeded on first call to budgeter's maxContextSize)
      * 2. Prepare system messages via registered callbacks
      * 3. Create initial user message from the request prompt
      * 4. Loop while the assistant has not finished or has tool calls:
-     *    a. Use the prompt budgeter to select history that fits the context window
-     *    b. Call the model with the budgeted prompt
-     *    c. If the assistant has tool calls, invoke each tool and add results
-     *    d. Accumulate token usage from each model call (for multi-turn tool scenarios)
+     *    a. Fetch cached history (or lazy-seed from DAO if empty)
+     *    b. Pass history to the prompt budgeter to select messages that fit the context window
+     *    c. Call the model with the budgeted prompt
+     *    d. If the assistant has tool calls, invoke each tool and add results
+     *    e. Accumulate token usage from each model call (for multi-turn tool scenarios)
      * 5. Persist all new messages (prompt + tasks) via the conversation
      * 6. Return non-empty task messages to the caller with accumulated usage
      *
@@ -131,46 +132,42 @@ internal class AimoChatClientImpl (
      * @param call Function reference to either [call] (non-streaming) or [stream] (streaming)
      * @return The final response with assistant messages and accumulated token usage
      */
-    private fun doChat (
-        request: AimoChatRequest,
-        callback: ((AimoChatResponse) -> Unit)? = null,
-        call: (responseId: UUID, messageId: Int, prompt: AimoPrompt, callback: ((AimoChatResponse) -> Unit)?) -> AimoChatResponse,
-    ): AimoChatResponse {
-        val responseId = UUID.randomUUID()
+     private fun doChat (
+         request: AimoChatRequest,
+         callback: ((AimoChatResponse) -> Unit)? = null,
+         call: (responseId: UUID, messageId: Int, prompt: AimoPrompt, callback: ((AimoChatResponse) -> Unit)?) -> AimoChatResponse,
+     ): AimoChatResponse {
+         val responseId = UUID.randomUUID()
 
-        // Seed cache on first call; subsequent calls return cached history
-        val resolvedHistory = conversation.getMessages().orEmpty()
+         // Prepare system messages from registered callbacks
+         val systemMessages = getSystemMessages(createSystemMessageContext(responseId, request))
 
-        // History provider: returns the conversation history (already seeded and complete).
-        // The prompt budgeter uses this to select history that fits the context window based
-        // on character limits; truncation happens at the budgeter level, not here.
-        val historyProvider: (Long?) -> List<AimoChatMessage> = {
-            resolvedHistory
-        }
+         // Create the initial user message from the request prompt
+         val promptMessage = createUserMessage(messageId = 1, content = request.prompt)
 
-        // Prepare system messages from registered callbacks
-        val systemMessages = getSystemMessages(createSystemMessageContext(responseId, request))
+         // Accumulate all task messages (assistant responses, tool calls, tool results)
+         val taskMessages = mutableListOf<AimoChatMessage>()
+         var assistantMessage: AimoChatMessage? = null
+         var accumulatedUsage: AimoUsage? = null
 
-        // Create the initial user message from the request prompt
-        val promptMessage = createUserMessage(messageId = 1, content = request.prompt)
+         // Main chat loop: continue until the assistant finishes (no tool calls)
+         while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
+             val messageId = 2 + taskMessages.size
 
-        // Accumulate all task messages (assistant responses, tool calls, tool results)
-        val taskMessages = mutableListOf<AimoChatMessage>()
-        var assistantMessage: AimoChatMessage? = null
-        var accumulatedUsage: AimoUsage? = null
+             // Fetch history with lazy seeding: get cached messages, or seed if not yet populated
+             var cachedHistory = conversation.getMessages()
+             if (cachedHistory == null) {
+                 cachedHistory = conversation.seedMessages(maxCacheBytes = promptBudgeter.maxContextSize)
+             }
 
-        // Main chat loop: continue until the assistant finishes (no tool calls)
-        while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
-            val messageId = 2 + taskMessages.size
-
-            // Use the prompt budgeter to select and fit history into the context window
-            val engineResponse = promptBudgeter.withPromptForCall(
-                systemMessages = systemMessages,
-                prompt = promptMessage,
-                taskMessages = taskMessages,
-                tools = toolCallbacks.values.toList(),
-                historyProvider = historyProvider,
-                execute = { promptMessages ->
+             // Use the prompt budgeter to fit history into the context window
+             val engineResponse = promptBudgeter.withPromptForCall(
+                 systemMessages = systemMessages,
+                 prompt = promptMessage,
+                 taskMessages = taskMessages,
+                 tools = toolCallbacks.values.toList(),
+                 history = cachedHistory.orEmpty(),
+                 execute = { promptMessages ->
                     // Build the final prompt with budgeted history
                     val prompt = AimoPrompt(
                         tools = toolDefinitions,
@@ -249,7 +246,7 @@ internal class AimoChatClientImpl (
         // Use responseId as requestId to maintain correlation between live response and history
         val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
         val allMessages = listOf(promptMessage) + persistedTaskMessages
-        conversation.addMessages(responseId, allMessages)
+        conversation.addMessages(responseId, allMessages, maxCacheBytes = null)
 
         return AimoChatResponse(
             chatId = chatId,

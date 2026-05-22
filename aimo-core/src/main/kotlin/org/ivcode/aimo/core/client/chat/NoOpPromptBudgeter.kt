@@ -13,15 +13,16 @@ import org.ivcode.aimo.core.model.AimoToolCallback
 internal class NoOpPromptBudgeter(
     private val excludeThinking: Boolean = false,
 ) : PromptBudgeter {
+    override val maxContextSize: Long = Long.MAX_VALUE
+
     override fun withPromptForCall(
         systemMessages: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
         tools: List<AimoToolCallback>,
-        historyProvider: (Long?) -> List<AimoChatMessage>,
+        history: List<AimoChatMessage>,
         execute: (promptMessages: List<AimoChatMessage>) -> AimoChatResponse,
     ): AimoChatResponse {
-        val history = historyProvider(null)
         val promptMessages = systemMessages + history + prompt + taskMessages
 
         val filteredMessages = promptMessages

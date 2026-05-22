@@ -38,7 +38,33 @@ internal class AimoConversationClientImpl(
         )
     }
 
-    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>) {
+    override fun getMessages(): List<AimoChatMessage>? {
+        @Suppress("UNCHECKED_CAST")
+        val cached = sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+        return cached.takeIf { it?.isNotEmpty() == true }
+    }
+
+    override fun seedMessages(maxCacheBytes: Long?): List<AimoChatMessage> {
+        // Load from DAO with optional byte limit (may override existing cache)
+        val loaded = if (maxCacheBytes == null) {
+            dao.getChatRequests(chatId)
+                .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+        } else {
+            dao.getChatRequests(
+                chatId = chatId,
+                maxRequestCharacters = maxCacheBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            ).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+        }
+
+        // Populate/replace the cache
+        if (loaded.isNotEmpty()) {
+            sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, loaded as Any)
+        }
+
+        return loaded
+    }
+
+    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheBytes: Long?) {
         if(messages.isEmpty()) {
             throw IllegalArgumentException("AimoConversationClientImpl addMessages should have at least one message")
         }
@@ -52,23 +78,27 @@ internal class AimoConversationClientImpl(
                 createdAt = Instant.now(),
             )
         )
-        appendCachedMessages(messages)
-    }
 
-    override fun getMessages(): List<AimoChatMessage>? {
+        // Append to cache and optionally cycle old messages if over limit
         @Suppress("UNCHECKED_CAST")
-        var cached = sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
+        val cached = (sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>)?.toMutableList() ?: mutableListOf()
+        cached.addAll(messages)
 
-        // Seed the cache on first call: load all durable history into the session cache
-        if (cached == null) {
-            cached = dao.getChatRequests(chatId)
-                .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
-            if (cached.isNotEmpty()) {
-                sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, cached as Any)
-            }
+        // Cap cache if maxCacheBytes is specified
+        val updated = if (maxCacheBytes != null) {
+            var charCount = 0L
+            cached.asReversed()
+                .takeWhile { msg ->
+                    val msgSize = (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
+                    charCount += msgSize
+                    charCount <= maxCacheBytes
+                }
+                .reversed()
+        } else {
+            cached
         }
 
-        return cached.takeIf { it.isNotEmpty() }
+        sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, updated as Any)
     }
 
     override fun getChatMetadata(): Map<String, Any> {
@@ -116,10 +146,6 @@ internal class AimoConversationClientImpl(
 
     private fun requireChatConversation() = dao.getChatConversation(chatId)
         ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
-
-    private fun appendCachedMessages(messages: List<AimoChatMessage>) {
-        sessionCache.appendToSessionProperty(CACHE_KEY__MESSAGES, messages.map { it as Any })
-    }
 
     private companion object {
         const val CACHE_KEY__MESSAGES = "chat.messages"

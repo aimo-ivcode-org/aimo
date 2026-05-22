@@ -19,34 +19,46 @@ interface AimoConversationClient {
      * Create a chat client bound to this conversation.
      * @return a new or pooled [AimoChatClient] for performing chat interactions.
      */
-    fun createChatClient(): AimoChatClient
-
-    /**
-     * Append chat messages to this conversation's history.
-     *
-     * Implementations should persist the messages to the conversation backing store and update
-     * any cache layer used for faster history access.
-     *
-     * The provided requestId is used as the durable request identifier for persistence. This allows
-     * callers (especially [AimoChatClient]) to maintain correlation between the response ID
-     * returned to the caller and the request ID stored in history, so the UI can reliably map
-     * history requests back to live responses.
-     *
-     * @param requestId The unique request identifier to use for history persistence (typically the responseId from the chat response)
-     * @param messages messages to append, in the order they should appear in the conversation
-     */
-    fun addMessages(requestId: UUID, messages: List<AimoChatMessage>)
+     fun createChatClient(): AimoChatClient
 
      /**
-      * Retrieve message history for this conversation.
+      * Return cached conversation history (no DAO access).
       *
-      * On first call, seeds the session cache from durable storage and returns all history.
-      * On subsequent calls, returns the session cache (fast path).
-      * Returns null only if the conversation has no messages in either cache or storage.
+      * Returns null only if the cache is empty (seed has not been called yet).
+      * To populate the cache initially, call [seedMessages].
       *
-      * @return conversation messages, or null if empty
+      * @return cached conversation messages, or null if cache is empty
       */
-    fun getMessages(): List<AimoChatMessage>?
+     fun getMessages(): List<AimoChatMessage>?
+
+      /**
+       * Populate the session cache by loading history from durable storage.
+       *
+       * Loads most recent history up to the specified byte limit, or all history if limit is null.
+       * Can be called multiple times with different byte limits to adjust the cached dataset.
+       *
+       * @param maxCacheBytes optional maximum bytes to load from durable storage; null means no limit
+       * @return loaded messages, or empty list if no history exists
+       */
+      fun seedMessages(maxCacheBytes: Long? = null): List<AimoChatMessage>
+
+      /**
+       * Append chat messages to this conversation's history.
+       *
+       * Implementations should persist the messages to the conversation backing store and update
+       * any cache layer used for faster history access. If maxCacheBytes is specified, old messages
+       * are removed from the cache to stay within the limit (messages still persist to DAO).
+       *
+       * The provided requestId is used as the durable request identifier for persistence. This allows
+       * callers (especially [AimoChatClient]) to maintain correlation between the response ID
+       * returned to the caller and the request ID stored in history, so the UI can reliably map
+       * history requests back to live responses.
+       *
+       * @param requestId The unique request identifier to use for history persistence (typically the responseId from the chat response)
+       * @param messages messages to append, in the order they should appear in the conversation
+       * @param maxCacheBytes optional maximum bytes to keep in cache; old messages dropped if exceeded (but still persisted to DAO)
+       */
+      fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheBytes: Long? = null)
 
     /**
      * Return persisted chat metadata from DAO storage.

@@ -18,6 +18,7 @@ import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.toChatMessageEntity
+import org.ivcode.aimo.core.toAimoChatMessage
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -537,7 +538,19 @@ class AimoChatClientImplMessageIdTest {
         private val runtimeMetadata = mutableMapOf<String, Any>()
 
         override fun createChatClient(): AimoChatClient = throw UnsupportedOperationException()
-        override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>) {
+        override fun getMessages(): List<AimoChatMessage>? {
+            @Suppress("UNCHECKED_CAST")
+            return runtimeMetadata["chat.messages"] as? List<AimoChatMessage>
+        }
+        override fun seedMessages(maxCacheBytes: Long?): List<AimoChatMessage> {
+            val loaded = (dao?.getChatRequests(chatId) ?: emptyList())
+                .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+            if (loaded.isNotEmpty()) {
+                runtimeMetadata["chat.messages"] = loaded
+            }
+            return loaded
+        }
+        override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheBytes: Long?) {
             if (messages.isEmpty()) return
             dao?.addChatRequest(
                 ChatRequestEntity(
@@ -548,13 +561,9 @@ class AimoChatClientImplMessageIdTest {
                     createdAt = Instant.now(),
                 )
             )
-            // Cache the messages
+            // Append to cache
             val existing = (runtimeMetadata["chat.messages"] as? List<AimoChatMessage>).orEmpty()
             runtimeMetadata["chat.messages"] = existing + messages
-        }
-        override fun getMessages(): List<AimoChatMessage>? {
-            @Suppress("UNCHECKED_CAST")
-            return runtimeMetadata["chat.messages"] as? List<AimoChatMessage>
         }
         override fun getChatMetadata(): Map<String, Any> = metadata.toMap()
         override fun readChatMetadata(): Map<String, Any> = metadata.toMap()

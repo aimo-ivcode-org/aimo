@@ -97,7 +97,7 @@ class ContextWindowPromptBudgeterTest {
             prompt = prompt,
             taskMessages = emptyList(),
             tools = emptyList(),
-            historyProvider = { history },
+            history = history,
             execute = { result ->
                 assertEquals("old-thought", result[0].thinking)
                 assertEquals("prompt-thought", result[1].thinking)
@@ -124,7 +124,7 @@ class ContextWindowPromptBudgeterTest {
             prompt = prompt,
             taskMessages = emptyList(),
             tools = emptyList(),
-            historyProvider = { history },
+            history = history,
             execute = { result ->
                 assertEquals(null, result[0].thinking)
                 assertEquals(null, result[1].thinking)

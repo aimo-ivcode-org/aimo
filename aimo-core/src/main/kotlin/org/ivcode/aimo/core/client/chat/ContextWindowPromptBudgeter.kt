@@ -29,6 +29,8 @@ internal class ContextWindowPromptBudgeter(
     private val excludeThinking: Boolean = false,
 ) : PromptBudgeter {
 
+    override val maxContextSize: Long = ceil(maxInputTokens * charsPerToken).toLong()
+
     private companion object {
         const val DEFAULT_CHARACTERS_PER_TOKEN = 4.0
         private val logger = LoggerFactory.getLogger(ContextWindowPromptBudgeter::class.java)
@@ -78,17 +80,15 @@ internal class ContextWindowPromptBudgeter(
     /**
      * Builds the list of messages that will be sent to the model.
      *
-     * The method obtains a history slice that respects the token budget and then
-     * concatenates system messages, the chosen history, the current prompt, and
-     * any task messages.  It also removes empty payloads and optionally strips
-     * the `thinking` field when `excludeThinking` is `true`.
+     * The method takes the provided history (pre-fetched up to maxContextSize) and
+     * truncates it to fit within the remaining token budget after accounting for
+     * system messages, the current prompt, task messages, and tools.
      *
      * @param systemMessages System messages included on this model call.
      * @param prompt          Current user prompt message.
      * @param taskMessages    Messages generated during the current request loop (assistant/tool).
      * @param tools           Tool callbacks available to this model call.
-     * @param historyProvider Function that supplies historical messages based on a
-     *                        character limit (used for incremental look‑ups).
+     * @param history         Conversation history (pre-fetched up to maxContextSize by caller).
      * @param execute         A lambda function that performs the actual model call with the constructed prompt messages.
      * @return The response from the model call as an `AimoChatResponse` object.
      */
@@ -97,10 +97,9 @@ internal class ContextWindowPromptBudgeter(
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
         tools: List<AimoToolCallback>,
-        historyProvider: (Long?) -> List<AimoChatMessage>,
+        history: List<AimoChatMessage>,
         execute: (promptMessages: List<AimoChatMessage>) -> AimoChatResponse,
     ): AimoChatResponse {
-        val history = historyProvider(maxRequestCharactersForLookup().toLong())
         val plan = createPromptPlan(
             systemMessages = systemMessages,
             history = history,
@@ -113,21 +112,6 @@ internal class ContextWindowPromptBudgeter(
     }
 
 
-
-    /**
-     * Converts the full input token budget to an equivalent character budget.
-     *
-     * This method translates `maxInputTokens` into a character count using the
-     * character-to-token estimation heuristic (`charsPerToken`). The returned value
-     * is used to limit the size of history requested from `historyProvider`;
-     * subsequent filtering by `createPromptPlan` then selects only what fits within
-     * the remaining budget after accounting for fixed message components.
-     *
-     * @return The character count equivalent of `maxInputTokens`.
-     */
-    private fun maxRequestCharactersForLookup(): Int {
-        return ceil(maxInputTokens * charsPerToken).toInt().coerceAtLeast(0)
-    }
 
     /**
      * Keeps the most recent history messages that fit within [tokenBudget].
