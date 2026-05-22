@@ -246,7 +246,7 @@ internal class AimoChatClientImpl (
         // Use responseId as requestId to maintain correlation between live response and history
         val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
         val allMessages = listOf(promptMessage) + persistedTaskMessages
-        conversation.addMessages(responseId, allMessages, maxCacheBytes = null)
+        conversation.addMessages(responseId, allMessages, maxCacheBytes = promptBudgeter.maxContextSize)
 
         return AimoChatResponse(
             chatId = chatId,
