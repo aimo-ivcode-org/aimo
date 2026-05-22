@@ -157,7 +157,7 @@ internal class AimoChatClientImpl (
              // Fetch history with lazy seeding: get cached messages, or seed if not yet populated
              var cachedHistory = conversation.getMessages()
              if (cachedHistory == null) {
-                 cachedHistory = conversation.seedMessages(maxCacheBytes = promptBudgeter.maxContextSize)
+                 cachedHistory = conversation.seedMessages(maxCacheCharacters = promptBudgeter.maxContextSize)
              }
 
              // Use the prompt budgeter to fit history into the context window
@@ -246,7 +246,7 @@ internal class AimoChatClientImpl (
         // Use responseId as requestId to maintain correlation between live response and history
         val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
         val allMessages = listOf(promptMessage) + persistedTaskMessages
-        conversation.addMessages(responseId, allMessages, maxCacheBytes = promptBudgeter.maxContextSize)
+        conversation.addMessages(responseId, allMessages, maxCacheCharacters = promptBudgeter.maxContextSize)
 
         return AimoChatResponse(
             chatId = chatId,

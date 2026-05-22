@@ -34,19 +34,19 @@ interface AimoConversationClient {
       /**
        * Populate the session cache by loading history from durable storage.
        *
-       * Loads most recent history up to the specified byte limit, or all history if limit is null.
-       * Can be called multiple times with different byte limits to adjust the cached dataset.
+       * Loads most recent history up to the specified character limit, or all history if limit is null.
+       * Can be called multiple times with different character limits to adjust the cached dataset.
        *
-       * @param maxCacheBytes optional maximum bytes to load from durable storage; null means no limit
+       * @param maxCacheCharacters optional maximum characters to load from durable storage; null means no limit
        * @return loaded messages, or empty list if no history exists
        */
-      fun seedMessages(maxCacheBytes: Long? = null): List<AimoChatMessage>
+      fun seedMessages(maxCacheCharacters: Long? = null): List<AimoChatMessage>
 
       /**
        * Append chat messages to this conversation's history.
        *
        * Implementations should persist the messages to the conversation backing store and update
-       * any cache layer used for faster history access. If maxCacheBytes is specified, old messages
+       * any cache layer used for faster history access. If maxCacheCharacters is specified, old messages
        * are removed from the cache to stay within the limit (messages still persist to DAO).
        *
        * The provided requestId is used as the durable request identifier for persistence. This allows
@@ -56,9 +56,9 @@ interface AimoConversationClient {
        *
        * @param requestId The unique request identifier to use for history persistence (typically the responseId from the chat response)
        * @param messages messages to append, in the order they should appear in the conversation
-       * @param maxCacheBytes optional maximum bytes to keep in cache; old messages dropped if exceeded (but still persisted to DAO)
+       * @param maxCacheCharacters optional maximum characters to keep in cache; old messages dropped if exceeded (but still persisted to DAO)
        */
-      fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheBytes: Long? = null)
+      fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long? = null)
 
     /**
      * Return persisted chat metadata from DAO storage.

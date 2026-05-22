@@ -44,15 +44,15 @@ internal class AimoConversationClientImpl(
         return cached.takeIf { it?.isNotEmpty() == true }
     }
 
-    override fun seedMessages(maxCacheBytes: Long?): List<AimoChatMessage> {
-        // Load from DAO with optional byte limit (may override existing cache)
-        val loaded = if (maxCacheBytes == null) {
+    override fun seedMessages(maxCacheCharacters: Long?): List<AimoChatMessage> {
+        // Load from DAO with optional character limit (may override existing cache)
+        val loaded = if (maxCacheCharacters == null) {
             dao.getChatRequests(chatId)
                 .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
         } else {
             dao.getChatRequests(
                 chatId = chatId,
-                maxRequestCharacters = maxCacheBytes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                maxRequestCharacters = maxCacheCharacters.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
             ).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
         }
 
@@ -64,7 +64,7 @@ internal class AimoConversationClientImpl(
         return loaded
     }
 
-    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheBytes: Long?) {
+    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
         if(messages.isEmpty()) {
             throw IllegalArgumentException("AimoConversationClientImpl addMessages should have at least one message")
         }
@@ -84,14 +84,14 @@ internal class AimoConversationClientImpl(
         val cached = (sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>)?.toMutableList() ?: mutableListOf()
         cached.addAll(messages)
 
-        // Cap cache if maxCacheBytes is specified
-        val updated = if (maxCacheBytes != null) {
+        // Cap cache if maxCacheCharacters is specified
+        val updated = if (maxCacheCharacters != null) {
             var charCount = 0L
             cached.asReversed()
                 .takeWhile { msg ->
                     val msgSize = (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
                     charCount += msgSize
-                    charCount <= maxCacheBytes
+                    charCount <= maxCacheCharacters
                 }
                 .reversed()
         } else {

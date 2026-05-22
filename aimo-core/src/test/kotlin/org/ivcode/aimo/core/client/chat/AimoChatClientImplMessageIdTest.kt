@@ -542,7 +542,7 @@ class AimoChatClientImplMessageIdTest {
             @Suppress("UNCHECKED_CAST")
             return runtimeMetadata["chat.messages"] as? List<AimoChatMessage>
         }
-        override fun seedMessages(maxCacheBytes: Long?): List<AimoChatMessage> {
+        override fun seedMessages(maxCacheCharacters: Long?): List<AimoChatMessage> {
             val loaded = (dao?.getChatRequests(chatId) ?: emptyList())
                 .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
             if (loaded.isNotEmpty()) {
@@ -550,7 +550,7 @@ class AimoChatClientImplMessageIdTest {
             }
             return loaded
         }
-        override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheBytes: Long?) {
+        override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
             if (messages.isEmpty()) return
             dao?.addChatRequest(
                 ChatRequestEntity(
