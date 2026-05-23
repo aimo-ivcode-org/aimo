@@ -398,14 +398,29 @@ internal class AimoChatClientImpl (
             )
         }
 
-         // If the model did not emit a terminal chunk, emit one explicitly
+         // Ensure the client always receives a terminal signal (done=true).
+         // Some LLM providers may not emit a terminal chunk in the stream, leaving the client
+         // hanging. When this happens, emit an explicit terminal signal with complete usage metrics.
+         // If the provider already sent a terminal chunk, do not emit anything else.
          if (!terminalChunkEmitted) {
-             val terminalResponse = aggregatedFinalResponse.copy(
-                 messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
-                 createdAt = Instant.now(),
+             val terminalMessage = AimoChatMessage(
+                 messageId = messageId,
+                 type = AimoChatMessageType.ASSISTANT,
+                 content = null,
+                 thinking = null,
+                 toolName = null,
+                 done = true,
              )
-             callback?.invoke(terminalResponse)
-             return terminalResponse
+             callback?.invoke(
+                 AimoChatResponse(
+                     chatId = chatId,
+                     responseId = responseId,
+                     messages = listOf(terminalMessage),
+                     createdAt = Instant.now(),
+                     usage = finalUsage,
+                 )
+             )
+             return aggregatedFinalResponse
          }
 
          return aggregatedFinalResponse
