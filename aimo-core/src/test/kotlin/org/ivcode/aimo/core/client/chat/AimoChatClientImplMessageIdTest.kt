@@ -538,17 +538,13 @@ class AimoChatClientImplMessageIdTest {
         private val runtimeMetadata = mutableMapOf<String, Any>()
 
         override fun createChatClient(): AimoChatClient = throw UnsupportedOperationException()
-        override fun getMessages(): List<AimoChatMessage>? {
-            @Suppress("UNCHECKED_CAST")
-            return runtimeMetadata["chat.messages"] as? List<AimoChatMessage>
-        }
-        override fun seedMessages(maxCacheCharacters: Long?): List<AimoChatMessage> {
+        override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
             val loaded = (dao?.getChatRequests(chatId) ?: emptyList())
                 .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
             if (loaded.isNotEmpty()) {
                 runtimeMetadata["chat.messages"] = loaded
             }
-            return loaded
+            return loaded.takeIf { it.isNotEmpty() }
         }
         override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
             if (messages.isEmpty()) return
@@ -577,4 +573,3 @@ class AimoChatClientImplMessageIdTest {
         override fun deleteRuntimeProperty(property: String): Boolean = runtimeMetadata.remove(property) != null
     }
 }
-

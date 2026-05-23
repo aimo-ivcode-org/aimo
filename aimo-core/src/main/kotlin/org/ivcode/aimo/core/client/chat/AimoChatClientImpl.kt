@@ -150,15 +150,13 @@ internal class AimoChatClientImpl (
          var assistantMessage: AimoChatMessage? = null
          var accumulatedUsage: AimoUsage? = null
 
+         // Fetch conversation history once
+         val history = conversation.getMessages(maxCacheCharacters = promptBudgeter.maxContextSize)
+
          // Main chat loop: continue until the assistant finishes (no tool calls)
          while (assistantMessage == null || !assistantMessage.toolCalls.isNullOrEmpty()) {
              val messageId = 2 + taskMessages.size
 
-             // Fetch history with lazy seeding: get cached messages, or seed if not yet populated
-             var cachedHistory = conversation.getMessages()
-             if (cachedHistory == null) {
-                 cachedHistory = conversation.seedMessages(maxCacheCharacters = promptBudgeter.maxContextSize)
-             }
 
              // Use the prompt budgeter to fit history into the context window
              val engineResponse = promptBudgeter.withPromptForCall(
@@ -166,7 +164,7 @@ internal class AimoChatClientImpl (
                  prompt = promptMessage,
                  taskMessages = taskMessages,
                  tools = toolCallbacks.values.toList(),
-                 history = cachedHistory.orEmpty(),
+                 history = history.orEmpty(),
                  execute = { promptMessages ->
                     // Build the final prompt with budgeted history
                     val prompt = AimoPrompt(

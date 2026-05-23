@@ -22,32 +22,18 @@ interface AimoConversationClient {
      fun createChatClient(): AimoChatClient
 
      /**
-      * Return cached conversation history (no DAO access).
+      * Return conversation history from durable storage.
       *
-      * Returns null only if the cache is empty (seed has not been called yet).
-      * To populate the cache initially, call [seedMessages].
+      * Loads most recent history up to the specified character limit, or all history if limit is null.
       *
-      * @return cached conversation messages, or null if cache is empty
+      * @param maxCacheCharacters optional maximum characters to load from durable storage; null means no limit
+      * @return conversation messages, or null if no history exists
       */
-     fun getMessages(): List<AimoChatMessage>?
-
-      /**
-       * Populate the session cache by loading history from durable storage.
-       *
-       * Loads most recent history up to the specified character limit, or all history if limit is null.
-       * Can be called multiple times with different character limits to adjust the cached dataset.
-       *
-       * @param maxCacheCharacters optional maximum characters to load from durable storage; null means no limit
-       * @return loaded messages, or empty list if no history exists
-       */
-      fun seedMessages(maxCacheCharacters: Long? = null): List<AimoChatMessage>
-
+      fun getMessages(maxCacheCharacters: Long? = null): List<AimoChatMessage>?
       /**
        * Append chat messages to this conversation's history.
        *
-       * Implementations should persist the messages to the conversation backing store and update
-       * any cache layer used for faster history access. If maxCacheCharacters is specified, old messages
-       * are removed from the cache to stay within the limit (messages still persist to DAO).
+       * Implementations should persist the messages to the conversation backing store.
        *
        * The provided requestId is used as the durable request identifier for persistence. This allows
        * callers (especially [AimoChatClient]) to maintain correlation between the response ID
@@ -56,7 +42,7 @@ interface AimoConversationClient {
        *
        * @param requestId The unique request identifier to use for history persistence (typically the responseId from the chat response)
        * @param messages messages to append, in the order they should appear in the conversation
-       * @param maxCacheCharacters optional maximum characters to keep in cache; old messages dropped if exceeded (but still persisted to DAO)
+       * @param maxCacheCharacters deprecated and unused; kept for backward compatibility
        */
       fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long? = null)
 

@@ -22,6 +22,8 @@ data class ChatMessage (
     val content: String?,
     val thinking: String?,
     val toolName: String?,
+    val toolCallId: String? = null,
+    val toolCalls: List<ToolCall>? = null,
     val done: Boolean?,
 ) {
     enum class Role {
@@ -31,6 +33,12 @@ data class ChatMessage (
         TOOL
     }
 }
+
+data class ToolCall(
+    val id: String,
+    val name: String,
+    val arguments: String,
+)
 
 data class ChatHistoryRequest (
     val chatId: UUID,

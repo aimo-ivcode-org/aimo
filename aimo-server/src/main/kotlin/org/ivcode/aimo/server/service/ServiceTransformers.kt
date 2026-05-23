@@ -13,6 +13,7 @@ import org.ivcode.aimo.server.model.ChatMessage
 import org.ivcode.aimo.server.model.ChatRequest
 import org.ivcode.aimo.server.model.ChatResponse
 import org.ivcode.aimo.server.model.ChatConversationInfo
+import org.ivcode.aimo.server.model.ToolCall
 import org.ivcode.aimo.server.model.ChatUsage
 import org.ivcode.aimo.server.model.ChatPromptCacheUsage
 
@@ -35,6 +36,8 @@ internal fun AimoChatMessage.toChatMessage() = ChatMessage(
     content = content,
     thinking = thinking,
     toolName = toolName,
+    toolCallId = toolCallId,
+    toolCalls = toolCalls?.map { ToolCall(id = it.id, name = it.name, arguments = it.arguments) },
     done = done,
 )
 

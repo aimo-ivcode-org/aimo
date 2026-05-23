@@ -38,30 +38,17 @@ internal class AimoConversationClientImpl(
         )
     }
 
-    override fun getMessages(): List<AimoChatMessage>? {
-        @Suppress("UNCHECKED_CAST")
-        val cached = sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>
-        return cached.takeIf { it?.isNotEmpty() == true }
-    }
-
-    override fun seedMessages(maxCacheCharacters: Long?): List<AimoChatMessage> {
-        // Load from DAO with optional character limit (may override existing cache)
-        val loaded = if (maxCacheCharacters == null) {
+    override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
+        // Load from DAO with optional character limit
+        val messages = if (maxCacheCharacters == null) {
             dao.getChatRequests(chatId)
-                .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
         } else {
             dao.getChatRequests(
                 chatId = chatId,
                 maxRequestCharacters = maxCacheCharacters.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-            ).flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
-        }
-
-        // Populate/replace the cache
-        if (loaded.isNotEmpty()) {
-            sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, loaded as Any)
-        }
-
-        return loaded
+            )
+        }.flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+        return messages.takeIf { it.isNotEmpty() }
     }
 
     override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
@@ -69,6 +56,7 @@ internal class AimoConversationClientImpl(
             throw IllegalArgumentException("AimoConversationClientImpl addMessages should have at least one message")
         }
 
+        // Persist to DAO (source of truth)
         dao.addChatRequest(
             ChatRequestEntity(
                 chatId = chatId,
@@ -78,27 +66,6 @@ internal class AimoConversationClientImpl(
                 createdAt = Instant.now(),
             )
         )
-
-        // Append to cache and optionally cycle old messages if over limit
-        @Suppress("UNCHECKED_CAST")
-        val cached = (sessionCache.getSessionProperty(CACHE_KEY__MESSAGES) as? List<AimoChatMessage>)?.toMutableList() ?: mutableListOf()
-        cached.addAll(messages)
-
-        // Cap cache if maxCacheCharacters is specified
-        val updated = if (maxCacheCharacters != null) {
-            var charCount = 0L
-            cached.asReversed()
-                .takeWhile { msg ->
-                    val msgSize = (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
-                    charCount += msgSize
-                    charCount <= maxCacheCharacters
-                }
-                .reversed()
-        } else {
-            cached
-        }
-
-        sessionCache.writeSessionProperty(CACHE_KEY__MESSAGES, updated as Any)
     }
 
     override fun getChatMetadata(): Map<String, Any> {
@@ -146,10 +113,4 @@ internal class AimoConversationClientImpl(
 
     private fun requireChatConversation() = dao.getChatConversation(chatId)
         ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
-
-    private companion object {
-        const val CACHE_KEY__MESSAGES = "chat.messages"
-    }
 }
-
-
