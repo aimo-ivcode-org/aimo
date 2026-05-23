@@ -369,6 +369,51 @@ class AimoChatClientImplMessageIdTest {
         assertEquals(engineFinalUsage, returnedResponse.usage)
     }
 
+    @Test
+    fun `chat handles unknown tool names by sending error message instead of silently ignoring`() {
+        val dao = AimoChatClientDaoMemory()
+        val chatId = dao.createChatConversation().chatId
+        val client = AimoChatClientImpl(
+            chatId = chatId,
+            conversation = TestSessionClient(chatId, dao),
+            model = testModel(
+                engine = SequencedResponseEngine(
+                    listOf(
+                        // First response: assistant requests an unknown tool "unknown_tool"
+                        responseWithToolCall(toolName = "unknown_tool", arguments = "{}", toolCallId = "call-1"),
+                        // Second response: assistant responds normally after receiving the error
+                        simpleResponse(),
+                    )
+                ),
+                contextSize = 4000,
+            ),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper),
+            systemMessages = emptyList(),
+        )
+
+        val response = client.chat(AimoChatRequest(prompt = "use unknown tool", context = emptyMap()))
+
+        // Verify: A TOOL error message was emitted for the unknown tool (not silently skipped)
+        val toolMessages = dao.getMessages(chatId).filter { it.type == "TOOL" }
+        assertEquals(1, toolMessages.size)
+        assertEquals("unknown_tool", toolMessages.single().toolName)
+        assertEquals("call-1", toolMessages.single().toolCallId)
+        assertTrue((toolMessages.single().content ?: "").contains("not available"),
+            "Expected error message containing 'not available', got: ${toolMessages.single().content}")
+
+        // Verify: The response contains expected message types in order:
+        // ASSISTANT (with tool call) -> TOOL (error) -> ASSISTANT (final)
+        val responseTypes = response.messages.map { it.type }
+        assertEquals(
+            listOf(AimoChatMessageType.ASSISTANT, AimoChatMessageType.TOOL, AimoChatMessageType.ASSISTANT),
+            responseTypes,
+        )
+
+        // Verify: The last message is the final assistant response (chat terminated, no infinite loop)
+        assertEquals(AimoChatMessageType.ASSISTANT, response.messages.last().type)
+        assertEquals("ok", response.messages.last().content)
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
