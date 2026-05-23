@@ -1,4 +1,4 @@
-package org.ivcode.aimo.session.cache.ehcache.utils
+package org.ivcode.aimo.core.util
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.locks.ReentrantLock
