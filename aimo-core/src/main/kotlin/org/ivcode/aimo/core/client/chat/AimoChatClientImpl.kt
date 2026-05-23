@@ -212,25 +212,35 @@ internal class AimoChatClientImpl (
                         return@forEach
                     }
 
-                    // Look up the tool callback by name
-                    val toolCallback = toolCallbacks[toolCall.name] ?: return@forEach
-
-                    // Invoke the tool and capture its result (or error)
-                    val message = try {
+                    // Look up the tool callback by name; if not found, send error to model
+                    val toolCallback = toolCallbacks[toolCall.name]
+                    val message = if (toolCallback == null) {
+                        // Tool not found: create an error message so the model knows this tool is unavailable
+                        // and can continue deterministically instead of requesting the same unknown tool again
                         createToolMessage(
                             messageId = 2 + taskMessages.size,
-                            content = toolCallback.call(toolCall.arguments, toolContext),
+                            content = "Error: Tool '${toolCall.name}' is not available",
                             toolName = toolCall.name,
                             toolCallId = toolCall.id,
                         )
-                    } catch (e: Exception) {
-                        // Wrap exceptions in an error message
-                        createToolMessage(
-                            messageId = 2 + taskMessages.size,
-                            content = "Error: ${e.message}",
-                            toolName = toolCall.name,
-                            toolCallId = toolCall.id,
-                        )
+                    } else {
+                        // Invoke the tool and capture its result (or error)
+                        try {
+                            createToolMessage(
+                                messageId = 2 + taskMessages.size,
+                                content = toolCallback.call(toolCall.arguments, toolContext),
+                                toolName = toolCall.name,
+                                toolCallId = toolCall.id,
+                            )
+                        } catch (e: Exception) {
+                            // Wrap exceptions in an error message
+                            createToolMessage(
+                                messageId = 2 + taskMessages.size,
+                                content = "Error: ${e.message}",
+                                toolName = toolCall.name,
+                                toolCallId = toolCall.id,
+                            )
+                        }
                     }
 
                     taskMessages.add(message)
