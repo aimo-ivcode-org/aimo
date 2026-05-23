@@ -565,11 +565,7 @@ class AimoChatClientImplMessageIdTest {
         override fun readChatMetadata(): Map<String, Any> = metadata.toMap()
         override fun getChatProperty(property: String): Any? = metadata[property]
         override fun readChatProperty(property: String): Any? = metadata[property]
-        override fun writeChatProperty(property: String, value: Any) { metadata[property] = value }
-        override fun deleteChatProperty(property: String): Boolean = metadata.remove(property) != null
-        override fun getRuntimeMetadata(): Map<String, Any> = runtimeMetadata.toMap()
-        override fun getRuntimeProperty(property: String): Any? = runtimeMetadata[property]
-        override fun writeRuntimeProperty(property: String, value: Any) { runtimeMetadata[property] = value }
-        override fun deleteRuntimeProperty(property: String): Boolean = runtimeMetadata.remove(property) != null
-    }
+         override fun writeChatProperty(property: String, value: Any) { metadata[property] = value }
+         override fun deleteChatProperty(property: String): Boolean = metadata.remove(property) != null
+     }
 }

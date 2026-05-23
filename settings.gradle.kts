@@ -23,7 +23,6 @@ rootProject.name = "aimo"
 include("aimo-core")
 include("aimo-model-ollama")
 include("aimo-model-bedrock")
-include("aimo-session-cache-ehcache")
 include("aimo-server")
 include("aimo-plugin-ui")
 include("aimo-ui")

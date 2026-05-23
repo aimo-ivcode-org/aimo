@@ -2,8 +2,6 @@ package org.ivcode.aimo.core.conf
 
 import org.ivcode.aimo.core.Aimo
 import org.ivcode.aimo.core.AimoImpl
-import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.controller.ChatController
 import org.ivcode.aimo.core.controller.ChatControllerEntity
 import org.ivcode.aimo.core.controller.SystemMessageCallback
@@ -13,7 +11,6 @@ import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.getBeansWithAnnotation
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
@@ -87,20 +84,18 @@ class AimoConfig {
         )
     }
 
-    @Bean
-    fun createAimo (
-        primaryModel: AimoChatModel,
-        chatClientDao: AimoChatClientDao,
-        tools: List<AimoToolCallback>,
-        systemMessages: List<SystemMessageCallback>,
-        sessionCacheProviderProvider: ObjectProvider<AimoSessionCacheProvider>,
-    ): Aimo {
-        return AimoImpl(
-            model = primaryModel,
-            chatClientDao = chatClientDao,
-            tools = tools,
-            systemMessage = systemMessages,
-            sessionCacheProvider = sessionCacheProviderProvider.ifAvailable ?: NoOpAimoSessionCacheProvider,
-        )
-    }
+     @Bean
+     fun createAimo (
+         primaryModel: AimoChatModel,
+         chatClientDao: AimoChatClientDao,
+         tools: List<AimoToolCallback>,
+         systemMessages: List<SystemMessageCallback>,
+     ): Aimo {
+         return AimoImpl(
+             model = primaryModel,
+             chatClientDao = chatClientDao,
+             tools = tools,
+             systemMessage = systemMessages,
+         )
+     }
 }

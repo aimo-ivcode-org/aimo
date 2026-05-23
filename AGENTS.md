@@ -1,16 +1,16 @@
 # AGENTS Guide for `aimo`
 
 ## Big Picture
-- `aimo` is a multi-module Gradle workspace: core orchestration (`aimo-core`), transport (`aimo-server`), model adapters (`aimo-model-ollama`, `aimo-model-bedrock`), optional runtime cache (`aimo-session-cache-ehcache`), UI plugin (`aimo-plugin-ui`), React UI (`aimo-ui`), runnable apps in `examples/*`.
+- `aimo` is a multi-module Gradle workspace: core orchestration (`aimo-core`), transport (`aimo-server`), model adapters (`aimo-model-ollama`, `aimo-model-bedrock`), UI plugin (`aimo-plugin-ui`), React UI (`aimo-ui`), runnable apps in `examples/*`.
 - Runtime composition happens in example apps (`examples/simple-ollama`, `examples/simple-bedrock`): they wire `aimo-server` + `aimo-plugin-ui` + one model provider + DAO bean (`AimoChatClientDaoMemory`).
 - Core seam: `AimoChatModelProviderFactory` -> `AimoChatModel` -> `AimoChatEngine` (`aimo-core/src/main/kotlin/org/ivcode/aimo/core/model/AimoChatEngine.kt`). Keep provider-specific logic in adapter modules.
 
 ## Request/Data Flow (important)
 - HTTP entrypoint is `POST /aimo-api/chat/{chatId}` (`aimo-server/.../controller/ChatController.kt`), streamed as NDJSON via `StreamingResponseBody`.
 - `ChatService` merges request metadata + conversation durable metadata into chat context before calling core (`aimo-server/.../service/ChatService.kt`).
-- `AimoChatClientImpl` loop (`aimo-core/.../client/chat/AimoChatClientImpl.kt`): system messages -> history budget -> model call -> optional tool calls -> persist prompt + generated messages.
-- History source is cache-first then DAO lazy-load; persistence always goes through `AimoConversationClient.addMessages`.
-- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`), runtime-only metadata lives in session cache (`writeRuntimeProperty`) (`aimo-core/.../client/conversation/AimoConversationClientImpl.kt`).
+- `AimoChatClientImpl` loop (`aimo-core/.../client/chat/AimoChatClientImpl.kt`): system messages -> fetch history from DAO -> prompt budget -> model call -> optional tool calls -> persist prompt + generated messages.
+- All message history is read from DAO; persistence always goes through `AimoConversationClient.addMessages`.
+- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../client/conversation/AimoConversationClientImpl.kt`).
 
 ## Project-Specific Conventions
 - Tool/system discovery is reflection-based from `@ChatController` beans (`aimo-core/.../conf/AimoConfig.kt`).
@@ -24,7 +24,6 @@
 - Frontend clients are hand-maintained wrappers at `aimo-ui/src/api/aimo-client` and `aimo-ui/src/api/aimo-ui-client`; default base URL is hardcoded to `http://localhost:8080`.
 - Frontend streaming parser (`ResponseBuilder`) expects newline-delimited JSON and aggregates partial assistant chunks (`aimo-ui/src/api/aimo-client/ResponseBuilder.test.ts`).
 - `aimo-plugin-ui` depends on `aimo-ui` and forwards `/` to static `index.html` (`aimo-plugin-ui/.../config/WebConfig.kt`).
-- Session cache provider is optional and auto-wired with `@ConditionalOnMissingBean(AimoSessionCacheProvider::class)` (`aimo-session-cache-ehcache/.../SessionCacheEhcacheConfig.kt`).
 
 ## Model Provider Rules
 - Exactly one primary model must resolve globally; if multiple models exist and none are primary, startup fails (`aimo-core/.../conf/AimoConfig.kt`).

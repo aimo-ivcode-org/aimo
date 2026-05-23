@@ -79,28 +79,8 @@ interface AimoConversationClient {
      */
     fun writeChatProperty(property: String, value: Any)
 
-    /**
-     * Delete a persisted chat property from DAO storage.
-     */
-    fun deleteChatProperty(property: String): Boolean
-
-    /**
-     * Return runtime-only metadata that lives only as long as cache state.
-     */
-    fun getRuntimeMetadata(): Map<String, Any>
-
-    /**
-     * Get a runtime-only property.
-     */
-    fun getRuntimeProperty(property: String): Any?
-
-    /**
-     * Write a runtime-only property (cache-only, not DAO persisted).
-     */
-    fun writeRuntimeProperty(property: String, value: Any)
-
-    /**
-     * Delete a runtime-only property.
-     */
-    fun deleteRuntimeProperty(property: String): Boolean
+     /**
+      * Delete a persisted chat property from DAO storage.
+      */
+     fun deleteChatProperty(property: String): Boolean
 }

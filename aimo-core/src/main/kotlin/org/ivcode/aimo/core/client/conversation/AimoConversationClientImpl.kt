@@ -3,9 +3,6 @@ package org.ivcode.aimo.core.client.conversation
 import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoConversationClient
-import org.ivcode.aimo.core.cache.AimoSessionCache
-import org.ivcode.aimo.core.cache.AimoSessionCacheProvider
-import org.ivcode.aimo.core.cache.NoOpAimoSessionCacheProvider
 import org.ivcode.aimo.core.client.chat.AimoChatClientImpl
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.dao.AimoChatClientDao
@@ -23,10 +20,8 @@ internal class AimoConversationClientImpl(
     private val model: AimoChatModel,
     private val tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
-    private val sessionCacheProvider: AimoSessionCacheProvider = NoOpAimoSessionCacheProvider,
 ) : AimoConversationClient {
 
-    private val sessionCache: AimoSessionCache = sessionCacheProvider.get(chatId)
 
     override fun createChatClient(): AimoChatClient {
         return AimoChatClientImpl (
@@ -91,26 +86,10 @@ internal class AimoConversationClientImpl(
         }
     }
 
-    override fun deleteChatProperty(property: String): Boolean {
-        return dao.deleteConversationMetadata(chatId, listOf(property))
-    }
+     override fun deleteChatProperty(property: String): Boolean {
+         return dao.deleteConversationMetadata(chatId, listOf(property))
+     }
 
-    override fun getRuntimeMetadata(): Map<String, Any> {
-        return sessionCache.getSessionProperties()
-    }
-
-    override fun getRuntimeProperty(property: String): Any? {
-        return sessionCache.getSessionProperty(property)
-    }
-
-    override fun writeRuntimeProperty(property: String, value: Any) {
-        sessionCache.writeSessionProperty(property, value)
-    }
-
-    override fun deleteRuntimeProperty(property: String): Boolean {
-        return sessionCache.deleteSessionProperty(property)
-    }
-
-    private fun requireChatConversation() = dao.getChatConversation(chatId)
-        ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
+     private fun requireChatConversation() = dao.getChatConversation(chatId)
+         ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
 }
