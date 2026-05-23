@@ -398,14 +398,28 @@ internal class AimoChatClientImpl (
             )
         }
 
-         // If the model did not emit a terminal chunk, emit one explicitly
+         // If the model did not emit a terminal chunk, emit one explicitly with done=true.
+         // This ensures the client receives a terminal signal in all cases.
+         // If a terminal chunk was already sent, do not emit anything else.
          if (!terminalChunkEmitted) {
-             val terminalResponse = aggregatedFinalResponse.copy(
-                 messages = aggregatedFinalResponse.messages.map { it.copy(done = true) },
-                 createdAt = Instant.now(),
+             val terminalMessage = AimoChatMessage(
+                 messageId = messageId,
+                 type = AimoChatMessageType.ASSISTANT,
+                 content = null,
+                 thinking = null,
+                 toolName = null,
+                 done = true,
              )
-             callback?.invoke(terminalResponse)
-             return terminalResponse
+             callback?.invoke(
+                 AimoChatResponse(
+                     chatId = chatId,
+                     responseId = responseId,
+                     messages = listOf(terminalMessage),
+                     createdAt = Instant.now(),
+                     usage = finalUsage,
+                 )
+             )
+             return aggregatedFinalResponse
          }
 
          return aggregatedFinalResponse
