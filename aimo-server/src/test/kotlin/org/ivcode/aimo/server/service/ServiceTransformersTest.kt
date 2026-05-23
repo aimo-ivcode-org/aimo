@@ -11,6 +11,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertContains
 
 class ServiceTransformersTest {
 
@@ -91,9 +92,9 @@ class ServiceTransformersTest {
         val json = mapper.writeValueAsString(chatResponse)
 
         // Verify JSON contains usage fields
-        assert(json.contains("\"inputTokens\":200")) { "JSON should contain inputTokens: $json" }
-        assert(json.contains("\"outputTokens\":75")) { "JSON should contain outputTokens: $json" }
-        assert(json.contains("\"usage\"")) { "JSON should contain usage object: $json" }
+        assertContains(json, "\"inputTokens\":200")
+        assertContains(json, "\"outputTokens\":75")
+        assertContains(json, "\"usage\"")
     }
 
     @Test
@@ -121,4 +122,3 @@ class ServiceTransformersTest {
         assertEquals(null, chatResponse.usage)
     }
 }
-
