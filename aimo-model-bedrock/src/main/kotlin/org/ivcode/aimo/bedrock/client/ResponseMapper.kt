@@ -37,17 +37,24 @@ internal object ResponseMapper {
         )
 
         val stopReason = response.stopReasonAsString()?.lowercase()?.ifBlank { null } ?: "end_turn"
-        val usage = response.usage()
+        val sdkUsage = response.usage()
+
+        // Only create Usage when SDK provides it
+        val usage = if (sdkUsage != null) {
+            Usage(
+                inputTokens = sdkUsage.inputTokens(),
+                outputTokens = sdkUsage.outputTokens(),
+                cacheReadInputTokens = sdkUsage.cacheReadInputTokens() ?: 0,
+                cacheWriteInputTokens = sdkUsage.cacheWriteInputTokens() ?: 0,
+            )
+        } else {
+            null
+        }
 
         return ConverseResponse(
             output = Output(message = message),
             stopReason = stopReason,
-            usage = Usage(
-                inputTokens = usage?.inputTokens() ?: 0,
-                outputTokens = usage?.outputTokens() ?: 0,
-                cacheReadInputTokens = usage?.cacheReadInputTokens() ?: 0,
-                cacheWriteInputTokens = usage?.cacheWriteInputTokens() ?: 0,
-            )
+            usage = usage,
         )
     }
 

@@ -303,8 +303,8 @@ class ResponseMapperTest {
         )
 
         val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
-        assertEquals(100, response.usage.inputTokens)
-        assertEquals(50, response.usage.outputTokens)
+        assertEquals(100, response.usage?.inputTokens)
+        assertEquals(50, response.usage?.outputTokens)
     }
 
     @Test
@@ -320,8 +320,8 @@ class ResponseMapperTest {
         )
 
         val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
-        assertEquals(77, response.usage.cacheReadInputTokens)
-        assertEquals(55, response.usage.cacheWriteInputTokens)
+        assertEquals(77, response.usage?.cacheReadInputTokens)
+        assertEquals(55, response.usage?.cacheWriteInputTokens)
     }
 
     @Test
@@ -351,7 +351,7 @@ class ResponseMapperTest {
     }
 
     @Test
-    @DisplayName("mapBedrockResponse defaults usage tokens to zero when usage is missing")
+    @DisplayName("mapBedrockResponse returns null usage when usage is missing")
     fun testMapBedrockResponseMissingUsage() {
         val bedrockResponse = createBedrockResponse(
             role = ConversationRole.ASSISTANT,
@@ -360,8 +360,7 @@ class ResponseMapperTest {
         )
 
         val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
-        assertEquals(0, response.usage.inputTokens)
-        assertEquals(0, response.usage.outputTokens)
+        assertEquals(null, response.usage)
     }
 
     @Test
@@ -376,8 +375,7 @@ class ResponseMapperTest {
 
         val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
         assertEquals("end_turn", response.stopReason)
-        assertEquals(0, response.usage.inputTokens)
-        assertEquals(0, response.usage.outputTokens)
+        assertEquals(null, response.usage)
     }
 
     // Helper methods for creating mock Bedrock responses

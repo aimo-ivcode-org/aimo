@@ -406,10 +406,13 @@ internal class BedrockChatEngineImpl(
         )
     }
 
-    private fun buildUsage(usage: org.ivcode.aimo.bedrock.client.Usage): AimoUsage? {
-        // Bedrock represents unavailable usage as all zeros. Return null to distinguish
-        // between "no usage data available" and "actual zero-token response".
-        if (usage.inputTokens == 0 && usage.outputTokens == 0 &&
+    private fun buildUsage(usage: org.ivcode.aimo.bedrock.client.Usage?): AimoUsage? {
+        // Return null if no usage data is available (SDK didn't provide it)
+        if (usage == null) {
+            return null
+        }
+        // Return null if all usage fields are null or zero
+        if (usage.inputTokens == null && usage.outputTokens == null &&
             usage.cacheReadInputTokens == 0 && usage.cacheWriteInputTokens == 0) {
             return null
         }

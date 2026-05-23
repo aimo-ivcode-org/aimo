@@ -111,7 +111,7 @@ internal data class InputSchema(
 internal data class ConverseResponse(
     val output: Output,
     val stopReason: String,
-    val usage: Usage,
+    val usage: Usage? = null,
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -123,8 +123,8 @@ internal data class Output(
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 internal data class Usage(
-    val inputTokens: Int,
-    val outputTokens: Int,
+    val inputTokens: Int? = null,
+    val outputTokens: Int? = null,
     /** Tokens that were served from the Bedrock prompt cache (0 when caching is not used). */
     val cacheReadInputTokens: Int = 0,
     /** Tokens that were written into the Bedrock prompt cache (0 when caching is not used). */

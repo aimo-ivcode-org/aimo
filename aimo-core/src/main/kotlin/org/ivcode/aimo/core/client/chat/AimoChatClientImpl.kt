@@ -184,8 +184,8 @@ internal class AimoChatClientImpl (
                     engineResponse.usage
                 } else {
                     accumulatedUsage.copy(
-                        inputTokens = (accumulatedUsage.inputTokens ?: 0) + (engineResponse.usage.inputTokens ?: 0),
-                        outputTokens = (accumulatedUsage.outputTokens ?: 0) + (engineResponse.usage.outputTokens ?: 0),
+                        inputTokens = accumulatedUsage.inputTokens.addNullAware(engineResponse.usage.inputTokens),
+                        outputTokens = accumulatedUsage.outputTokens.addNullAware(engineResponse.usage.outputTokens),
                         // promptCache is not accumulated; use the latest value which represents current cache state
                         promptCache = engineResponse.usage.promptCache ?: accumulatedUsage.promptCache,
                     )
@@ -339,8 +339,8 @@ internal class AimoChatClientImpl (
                     streamResponse.usage
                 } else {
                     current.copy(
-                        inputTokens = (current.inputTokens ?: 0) + (streamResponse.usage.inputTokens ?: 0),
-                        outputTokens = (current.outputTokens ?: 0) + (streamResponse.usage.outputTokens ?: 0),
+                        inputTokens = current.inputTokens.addNullAware(streamResponse.usage.inputTokens),
+                        outputTokens = current.outputTokens.addNullAware(streamResponse.usage.outputTokens),
                         // promptCache is not accumulated; use the latest value which represents current cache state
                         promptCache = streamResponse.usage.promptCache ?: current.promptCache,
                     )
@@ -523,5 +523,29 @@ internal class AimoChatClientImpl (
             toolCalls.isNullOrEmpty() &&
             toolName.isNullOrBlank() &&
             toolCallId.isNullOrBlank()
+    }
+
+    /**
+     * Aggregates two nullable integer values while preserving null semantics.
+     *
+     * When aggregating optional token counts, null means "not reported" or "unknown".
+     * This function correctly handles:
+     * - `null + value` → `value` (only one side reported, preserve it)
+     * - `value + null` → `value` (only one side reported, preserve it)
+     * - `value + value` → `value + value` (both sides reported, sum them)
+     * - `null + null` → `null` (neither side reported, stay unknown)
+     *
+     * This prevents misreporting where treating null as 0 would fabricate data
+     * (e.g., multi-turn aggregation incorrectly reporting 0 input tokens when
+     * one provider didn't report input tokens at all).
+     *
+     * @param other The value to add to this
+     * @return The sum if both are non-null; the non-null value if only one is present; null if both are absent
+     */
+    private fun Int?.addNullAware(other: Int?): Int? = when {
+        this != null && other != null -> this + other
+        this != null -> this
+        other != null -> other
+        else -> null
     }
 }
