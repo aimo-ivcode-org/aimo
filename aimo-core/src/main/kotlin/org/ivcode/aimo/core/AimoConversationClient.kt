@@ -5,9 +5,8 @@ import java.util.UUID
 /**
  * Represents a client-scoped conversation for interacting with the AIMO chat/assistant service.
  *
- * This API exposes two metadata domains:
- * - Chat metadata: durable conversation metadata persisted in DAO storage and read from that source.
- * - Runtime metadata: cache-lifetime metadata that is never persisted to DAO storage.
+ * This API exposes chat metadata: durable conversation metadata persisted in DAO storage and read
+ * from that source.
  */
 interface AimoConversationClient {
     /**
@@ -42,7 +41,9 @@ interface AimoConversationClient {
        *
        * @param requestId The unique request identifier to use for history persistence (typically the responseId from the chat response)
        * @param messages messages to append, in the order they should appear in the conversation
-       * @param maxCacheCharacters deprecated and unused; kept for backward compatibility
+       * @param maxCacheCharacters optional character-budget hint associated with the caller's
+       * history/cache management strategy; implementations may use it when applying bounded-history
+       * persistence behavior, or ignore it if no such limit is needed
        */
       fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long? = null)
 
