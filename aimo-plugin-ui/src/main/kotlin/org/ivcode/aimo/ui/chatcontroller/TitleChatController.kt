@@ -2,16 +2,16 @@ package org.ivcode.aimo.ui.chatcontroller
 
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoSession
-import org.ivcode.aimo.core.AimoSessionClient
+import org.ivcode.aimo.core.AimoConversationInfo
+import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.controller.ChatController
 import org.ivcode.aimo.core.controller.SystemMessage
 import org.ivcode.aimo.core.controller.Tool
 import org.ivcode.aimo.core.controller.ToolParam
-import org.ivcode.aimo.core.util.getSessionClient
+import org.ivcode.aimo.core.util.getConversationClient
 import org.ivcode.aimo.ui.extentions.getTitle
 import org.ivcode.aimo.ui.extentions.setTitle
-import org.ivcode.aimo.ui.model.SessionTitle
+import org.ivcode.aimo.ui.model.ConversationTitle
 import org.ivcode.aimo.ui.model.TitleResponse
 import tools.jackson.databind.ObjectMapper
 
@@ -45,7 +45,7 @@ class TitleChatController(
 
 
     /**
-     * Tool entrypoint used by the LLM to set a session title.
+     * Tool entrypoint used by the LLM to set a conversation title.
      * Returns a [TitleResponse] where `source` is `ASSISTANT`.
      */
     @Tool(name = TITLE_TOOL_NAME, description = "Set the chat title with source=ASSISTANT. Returns TitleResponse JSON: { title: string, source: \"USER\" | \"ASSISTANT\" } (USER = user-set, ASSISTANT = LLM-set).")
@@ -53,21 +53,21 @@ class TitleChatController(
         @ToolParam(description = "The new title") title: String,
         context: Map<String, Any>
     ): TitleResponse {
-        val sessionClient = context.getSessionClient() ?: throw IllegalStateException("Title cannot be set. No session client found in context")
-        return setTitle(title, sessionClient, AimoChatMessageType.ASSISTANT.name)
+        val conversationClient = context.getConversationClient() ?: throw IllegalStateException("Title cannot be set. No conversation client found in context")
+        return setTitle(title, conversationClient, AimoChatMessageType.ASSISTANT.name)
     }
 
     /**
-     * Sets title for a specific session client and records a TOOL message for model context.
+     * Sets title for a specific conversation client and records a TOOL message for model context.
      * Defaults `source` to `USER` for external user-driven title updates.
      */
-    fun setTitle(title: String, sessionClient: AimoSessionClient, source: String = AimoChatMessageType.USER.name): TitleResponse {
-        val currentTitle = sessionClient.getTitle()
+    fun setTitle(title: String, conversationClient: AimoConversationClient, source: String = AimoChatMessageType.USER.name): TitleResponse {
+        val currentTitle = conversationClient.getTitle()
         if (currentTitle?.source == AimoChatMessageType.USER.name && source == AimoChatMessageType.ASSISTANT.name) {
             throw IllegalStateException("Cannot overwrite a USER-set title with source ASSISTANT")
         }
 
-        sessionClient.setTitle(title, source)
+        conversationClient.setTitle(title, source)
         val response = TitleResponse(
             title = title,
             source = source
@@ -75,7 +75,9 @@ class TitleChatController(
 
         // If set by the user, tell the LLM that the title was set
         if (source == AimoChatMessageType.USER.name) {
-             sessionClient.addMessages(listOf(
+             conversationClient.addMessages(
+                 requestId = java.util.UUID.randomUUID(),
+                 messages = listOf(
                  AimoChatMessage (
                      messageId = 1,
                      type = AimoChatMessageType.TOOL,
@@ -93,18 +95,18 @@ class TitleChatController(
     /**
      * Tool helper that reads the title from the current tool execution context.
      */
-    @Tool(name = "getTitle", description = "Gets the title of the chat session.")
-    fun getTitle(context: Map<String, Any>): SessionTitle? {
-        return context.getSessionClient()?.getTitle()
+    @Tool(name = "getTitle", description = "Gets the title of the conversation.")
+    fun getTitle(context: Map<String, Any>): ConversationTitle? {
+        return context.getConversationClient()?.getTitle()
     }
 
-    /** Reads the title from the provided session client. */
-    fun getTitle(sessionClient: AimoSessionClient): SessionTitle? {
-        return sessionClient.getTitle()
+    /** Reads the title from the provided conversation client. */
+    fun getTitle(conversationClient: AimoConversationClient): ConversationTitle? {
+        return conversationClient.getTitle()
     }
 
-    /** Reads the title from the provided session. */
-    fun getTitle(session: AimoSession): SessionTitle? {
-        return session.getTitle()
+    /** Reads the title from the provided conversation. */
+    fun getTitle(conversation: AimoConversationInfo): ConversationTitle? {
+        return conversation.getTitle()
     }
 }

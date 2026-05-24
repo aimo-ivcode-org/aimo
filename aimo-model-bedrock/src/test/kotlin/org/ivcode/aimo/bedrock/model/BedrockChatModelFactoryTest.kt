@@ -2,9 +2,11 @@ package org.ivcode.aimo.bedrock.model
 
 import org.ivcode.aimo.bedrock.BedrockModelProperties
 import org.ivcode.aimo.bedrock.BedrockContextProperties
+import org.ivcode.aimo.bedrock.PromptCachingStrategy
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoPrompt
+import org.ivcode.aimo.core.model.AimoToolDefinition
 import org.ivcode.aimo.bedrock.client.ConverseRequest
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -181,15 +183,60 @@ class BedrockChatModelFactoryTest {
         assertEquals(0.8, request.additionalModelRequestFields?.get("presence_penalty"))
     }
 
+    @Test
+    @DisplayName("promptCaching SYSTEM adds only system checkpoint")
+    fun promptCachingSystemStrategy() {
+        val properties = mapOf(
+            "model-a" to bedrockProps(
+                awsAccessKeyId = null,
+                awsSecretAccessKey = null,
+                context = BedrockContextProperties(
+                    promptCaching = true,
+                    promptCachingStrategy = PromptCachingStrategy.SYSTEM,
+                ),
+            ),
+        )
+
+        val factory = BedrockChatModelFactory(properties)
+        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val request = buildRequestWithTool(model)
+
+        assertEquals(true, request.cachePointAfterSystem)
+        assertEquals(false, request.cachePointAfterTools)
+    }
+
+    @Test
+    @DisplayName("promptCaching SYSTEM_AND_TOOLS adds system and tools checkpoints")
+    fun promptCachingSystemAndToolsStrategy() {
+        val properties = mapOf(
+            "model-a" to bedrockProps(
+                awsAccessKeyId = null,
+                awsSecretAccessKey = null,
+                context = BedrockContextProperties(
+                    promptCaching = true,
+                    promptCachingStrategy = PromptCachingStrategy.SYSTEM_AND_TOOLS,
+                ),
+            ),
+        )
+
+        val factory = BedrockChatModelFactory(properties)
+        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val request = buildRequestWithTool(model)
+
+        assertEquals(true, request.cachePointAfterSystem)
+        assertEquals(true, request.cachePointAfterTools)
+    }
+
     private fun bedrockProps(
         awsAccessKeyId: String?,
         awsSecretAccessKey: String?,
         region: String = "us-west-2",
         options: Map<String, Any> = mapOf("model" to "test-model"),
+        context: BedrockContextProperties = BedrockContextProperties(),
     ): BedrockModelProperties {
         return BedrockModelProperties(
             region = region,
-            context = BedrockContextProperties(),
+            context = context,
             options = options,
             awsAccessKeyId = awsAccessKeyId,
             awsSecretAccessKey = awsSecretAccessKey,
@@ -210,6 +257,16 @@ class BedrockChatModelFactoryTest {
             messages = listOf(
                 AimoChatMessage(
                     messageId = 0,
+                    type = AimoChatMessageType.SYSTEM,
+                    content = "system",
+                    thinking = null,
+                    toolName = null,
+                    toolCallId = null,
+                    toolCalls = null,
+                    done = null,
+                ),
+                AimoChatMessage(
+                    messageId = 1,
                     type = AimoChatMessageType.USER,
                     content = "hello",
                     thinking = null,
@@ -217,6 +274,43 @@ class BedrockChatModelFactoryTest {
                     toolCallId = null,
                     toolCalls = null,
                     done = null,
+                )
+            )
+        )
+        return method.invoke(model.chatEngine, prompt) as ConverseRequest
+    }
+
+    private fun buildRequestWithTool(model: org.ivcode.aimo.core.model.AimoChatModel): ConverseRequest {
+        val method = model.chatEngine.javaClass.getDeclaredMethod("buildRequest", AimoPrompt::class.java)
+        method.isAccessible = true
+        val prompt = AimoPrompt(
+            messages = listOf(
+                AimoChatMessage(
+                    messageId = 0,
+                    type = AimoChatMessageType.SYSTEM,
+                    content = "system",
+                    thinking = null,
+                    toolName = null,
+                    toolCallId = null,
+                    toolCalls = null,
+                    done = null,
+                ),
+                AimoChatMessage(
+                    messageId = 1,
+                    type = AimoChatMessageType.USER,
+                    content = "hello",
+                    thinking = null,
+                    toolName = null,
+                    toolCallId = null,
+                    toolCalls = null,
+                    done = null,
+                )
+            ),
+            tools = listOf(
+                AimoToolDefinition(
+                    name = "get_title",
+                    description = "Gets title",
+                    inputSchema = tools.jackson.module.kotlin.jacksonObjectMapper().createObjectNode().put("type", "object"),
                 )
             )
         )

@@ -4,7 +4,7 @@ import org.ivcode.aimo.core.AimoToolCall
 import java.time.Instant
 import java.util.UUID
 
-data class ChatSessionEntity (
+data class ChatConversationEntity (
     val chatId: UUID,
     val metadata: Map<String, Any>
 )

@@ -84,13 +84,18 @@ class AimoConfig {
         )
     }
 
-    @Bean
-    fun createAimo (
-        primaryModel: AimoChatModel,
-        chatClientDao: AimoChatClientDao,
-        tools: List<AimoToolCallback>,
-        systemMessages: List<SystemMessageCallback>,
-    ): Aimo {
-        return AimoImpl(primaryModel, chatClientDao, tools, systemMessages)
-    }
+     @Bean
+     fun createAimo (
+         primaryModel: AimoChatModel,
+         chatClientDao: AimoChatClientDao,
+         tools: List<AimoToolCallback>,
+         systemMessages: List<SystemMessageCallback>,
+     ): Aimo {
+         return AimoImpl(
+             model = primaryModel,
+             chatClientDao = chatClientDao,
+             tools = tools,
+             systemMessage = systemMessages,
+         )
+     }
 }

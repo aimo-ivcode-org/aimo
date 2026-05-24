@@ -128,5 +128,41 @@ describe('ResponseBuilder', () => {
 
         expect(builder.last?.messages[0].content).toBe('tail')
     })
+
+    it('propagates usage through streaming chunks', () => {
+        const builder = new ResponseBuilder()
+
+        // First chunk: no usage
+        builder.push(`${JSON.stringify(makeResponse('r1', [{ messageId: 1, type: 'ASSISTANT', content: 'hel', done: false }]))}\n`)
+
+        // Second chunk: includes usage
+        const withUsage: ChatResponse = {
+            chatId: 'chat-1',
+            responseId: 'r1',
+            messages: [{ messageId: 1, type: 'ASSISTANT', content: 'lo', done: true }],
+            createdAt: new Date('2026-04-12T00:00:00.000Z'),
+            usage: { inputTokens: 10, outputTokens: 5 },
+        }
+        builder.push(`${JSON.stringify(withUsage)}\n`)
+
+        expect(builder.last?.usage).toEqual({ inputTokens: 10, outputTokens: 5 })
+    })
+
+    it('includes usage in single message done callbacks', () => {
+        const doneMessages: ChatResponse[] = []
+        const builder = new ResponseBuilder(undefined, (response) => doneMessages.push(response))
+
+        const withUsage: ChatResponse = {
+            chatId: 'chat-1',
+            responseId: 'r1',
+            messages: [{ messageId: 1, type: 'ASSISTANT', content: 'hello', done: true }],
+            createdAt: new Date('2026-04-12T00:00:00.000Z'),
+            usage: { inputTokens: 10, outputTokens: 5 },
+        }
+        builder.push(`${JSON.stringify(withUsage)}\n`)
+
+        expect(doneMessages).toHaveLength(1)
+        expect(doneMessages[0].usage).toEqual({ inputTokens: 10, outputTokens: 5 })
+    })
 })
 

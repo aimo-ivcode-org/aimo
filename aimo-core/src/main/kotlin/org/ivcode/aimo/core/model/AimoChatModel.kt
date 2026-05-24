@@ -7,7 +7,7 @@ package org.ivcode.aimo.core.model
  * @property chatEngine Provider-backed engine used to execute prompts.
  * @property options Default provider-agnostic options applied to requests for this model.
  * @property isPrimary Whether this model is the default selection when multiple models exist.
- * @property context Context-window behavior for this model.
+ * @property context Prompt budgeting behavior for this model.
  */
 data class AimoChatModel (
     val name: String,
@@ -20,7 +20,14 @@ data class AimoChatModel (
 data class AimoChatContext(
     val size: Int = 8192,
     val excludeThinking: Boolean = false,
+    /** Selects how prompt messages are budgeted for this model. */
+    val budgeterType: AimoPromptBudgeterType = AimoPromptBudgeterType.CONTEXT_WINDOW,
 )
+
+enum class AimoPromptBudgeterType {
+    CONTEXT_WINDOW,
+    NO_OP,
+}
 
 /**
  * Provider-local factory for chat models.

@@ -1,6 +1,6 @@
-import {ChatSession} from "./ChatSession";
+import {ChatConversation} from "./ChatConversation";
 
-export class ChatSessionImpl implements ChatSession {
+export class ChatConversationImpl implements ChatConversation {
 
     private currentChatId: string | null = null
     private listeners = new Set<(id: string | null) => Promise<void>>()

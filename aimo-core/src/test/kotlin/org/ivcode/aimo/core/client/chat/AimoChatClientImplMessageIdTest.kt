@@ -5,16 +5,20 @@ import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoSessionClient
+import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.AimoToolCall
+import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.controller.Tool
 import org.ivcode.aimo.core.controller.toAimoToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
+import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoPrompt
+import org.ivcode.aimo.core.toChatMessageEntity
+import org.ivcode.aimo.core.toAimoChatMessage
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
@@ -30,11 +34,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists sequential message ids across requests`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(simpleResponse())),
             tools = emptyList(),
             systemMessages = emptyList(),
@@ -50,11 +53,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists sequential ids even when history lookup returns empty`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(simpleResponse()), contextSize = 0),
             tools = emptyList(),
             systemMessages = emptyList(),
@@ -70,11 +72,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat with tool call persists messages in expected order`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(
                 engine = SequencedResponseEngine(
                     listOf(
@@ -101,11 +102,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists thinking from assistant response`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(responseWithThinking("I thought about it", "the answer")), contextSize = 4000),
             tools = emptyList(),
             systemMessages = emptyList(),
@@ -122,11 +122,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat drops empty assistant response from persistence and return payload`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(simpleResponse(content = "")), contextSize = 4000),
             tools = emptyList(),
             systemMessages = emptyList(),
@@ -143,11 +142,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chatStream persists thinking from streamed assistant response`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
                     responseWithThinking("I thought about it", ""),
@@ -170,13 +168,12 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `thinking-only assistant history is not replayed when context excludes thinking`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val capturedPrompts = mutableListOf<List<AimoChatMessage>>()
 
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(
                 engine = StreamingResponseEngine(
                     listOf(responseWithThinking("I thought about it", "")),
@@ -205,11 +202,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat persists tool message again when same tool call id appears in a later assistant turn`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(
                 engine = SequencedResponseEngine(
                     listOf(
@@ -236,11 +232,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chat de-dupes duplicate tool call ids within the same assistant turn`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(
                 engine = SequencedResponseEngine(
                     listOf(
@@ -270,11 +265,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chatStream done callback includes aggregated content for same message id`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
                     responseWithThinking("", "hello"),
@@ -304,11 +298,10 @@ class AimoChatClientImplMessageIdTest {
     @Test
     fun `chatStream emits final aggregated done callback when provider chunks never mark done`() {
         val dao = AimoChatClientDaoMemory()
-        val chatId = dao.createChatSession().chatId
+        val chatId = dao.createChatConversation().chatId
         val client = AimoChatClientImpl(
             chatId = chatId,
-            session = TestSessionClient(chatId),
-            dao = dao,
+            conversation = TestSessionClient(chatId, dao),
             model = testModel(
                 engine = StreamingResponseEngine(listOf(
                     responseWithThinkingDone(thinking = "", content = "hello", done = false),
@@ -336,6 +329,89 @@ class AimoChatClientImplMessageIdTest {
         val returnedAssistant = returnedResponse.messages.last { it.type == AimoChatMessageType.ASSISTANT }
         assertEquals(true, returnedAssistant.done)
         assertEquals("hello world", returnedAssistant.content)
+    }
+
+    @Test
+    fun `chatStream falls back to engine final response usage when streamed chunks have no usage`() {
+        val dao = AimoChatClientDaoMemory()
+        val chatId = dao.createChatConversation().chatId
+
+        // Scenario: Engine (e.g., Ollama) reports usage ONLY in the final response,
+        // not in intermediate streamed chunks. This simulates providers that accumulate
+        // usage info until the complete response is ready.
+        val engineFinalUsage = AimoUsage(inputTokens = 100, outputTokens = 50)
+        val client = AimoChatClientImpl(
+            chatId = chatId,
+            conversation = TestSessionClient(chatId, dao),
+            model = testModel(
+                engine = StreamingResponseEngineWithFinalUsage(
+                    chunks = listOf(
+                        // Streamed chunks: no usage information
+                        responseWithThinking("", "hello", usage = null),
+                        responseWithThinking("", " world", usage = null),
+                    ),
+                    // Final response: includes accumulated usage (but only from this single turn)
+                    finalUsage = engineFinalUsage,
+                ),
+                contextSize = 4000,
+            ),
+            tools = emptyList(),
+            systemMessages = emptyList(),
+        )
+
+        val returnedResponse = client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { _ -> }
+
+        // Verify: stream() falls back to engine's final response usage when chunks had none.
+        // This ensures token usage is never lost, even when the engine only reports it at the end.
+        // Note: Multi-turn aggregation across tool calls happens at doChat() level, so the
+        // final returned response here has only this single turn's usage. If there were tool calls,
+        // doChat() would accumulate usage from all turns.
+        assertEquals(engineFinalUsage, returnedResponse.usage)
+    }
+
+    @Test
+    fun `chat handles unknown tool names by sending error message instead of silently ignoring`() {
+        val dao = AimoChatClientDaoMemory()
+        val chatId = dao.createChatConversation().chatId
+        val client = AimoChatClientImpl(
+            chatId = chatId,
+            conversation = TestSessionClient(chatId, dao),
+            model = testModel(
+                engine = SequencedResponseEngine(
+                    listOf(
+                        // First response: assistant requests an unknown tool "unknown_tool"
+                        responseWithToolCall(toolName = "unknown_tool", arguments = "{}", toolCallId = "call-1"),
+                        // Second response: assistant responds normally after receiving the error
+                        simpleResponse(),
+                    )
+                ),
+                contextSize = 4000,
+            ),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper),
+            systemMessages = emptyList(),
+        )
+
+        val response = client.chat(AimoChatRequest(prompt = "use unknown tool", context = emptyMap()))
+
+        // Verify: A TOOL error message was emitted for the unknown tool (not silently skipped)
+        val toolMessages = dao.getMessages(chatId).filter { it.type == "TOOL" }
+        assertEquals(1, toolMessages.size)
+        assertEquals("unknown_tool", toolMessages.single().toolName)
+        assertEquals("call-1", toolMessages.single().toolCallId)
+        assertTrue((toolMessages.single().content ?: "").contains("not available"),
+            "Expected error message containing 'not available', got: ${toolMessages.single().content}")
+
+        // Verify: The response contains expected message types in order:
+        // ASSISTANT (with tool call) -> TOOL (error) -> ASSISTANT (final)
+        val responseTypes = response.messages.map { it.type }
+        assertEquals(
+            listOf(AimoChatMessageType.ASSISTANT, AimoChatMessageType.TOOL, AimoChatMessageType.ASSISTANT),
+            responseTypes,
+        )
+
+        // Verify: The last message is the final assistant response (chat terminated, no infinite loop)
+        assertEquals(AimoChatMessageType.ASSISTANT, response.messages.last().type)
+        assertEquals("ok", response.messages.last().content)
     }
 
     // -------------------------------------------------------------------------
@@ -406,7 +482,7 @@ class AimoChatClientImplMessageIdTest {
         createdAt = Instant.now(),
     )
 
-    private fun responseWithThinking(thinking: String, content: String): AimoChatResponse = AimoChatResponse(
+    private fun responseWithThinking(thinking: String, content: String, usage: AimoUsage? = null): AimoChatResponse = AimoChatResponse(
         chatId = UUID.randomUUID(),
         responseId = UUID.randomUUID(),
         messages = listOf(AimoChatMessage(
@@ -418,6 +494,7 @@ class AimoChatClientImplMessageIdTest {
             done = true,
         )),
         createdAt = Instant.now(),
+        usage = usage,
     )
 
     private fun responseWithThinkingDone(thinking: String, content: String, done: Boolean): AimoChatResponse = AimoChatResponse(
@@ -478,6 +555,21 @@ class AimoChatClientImplMessageIdTest {
         }
     }
 
+    private class StreamingResponseEngineWithFinalUsage(
+        private val chunks: List<AimoChatResponse>,
+        private val finalUsage: AimoUsage,
+    ) : AimoChatEngine {
+        override val options = AimoChatOptions()
+        override fun call(prompt: AimoPrompt): AimoChatResponse {
+            return chunks.last().copy(usage = finalUsage)
+        }
+        override fun call(prompt: AimoPrompt, callback: (AimoChatResponse) -> Unit): AimoChatResponse {
+            chunks.forEach { callback(it) }
+            val finalResponse = chunks.last().copy(usage = finalUsage)
+            return finalResponse
+        }
+    }
+
     private class TestTools {
         @Tool(description = "Echo value")
         fun echo(value: String): String = "echo:$value"
@@ -485,16 +577,40 @@ class AimoChatClientImplMessageIdTest {
 
     private class TestSessionClient(
         override val chatId: UUID,
-    ) : AimoSessionClient {
+        private val dao: AimoChatClientDaoMemory? = null,
+    ) : AimoConversationClient {
         private val metadata = mutableMapOf<String, Any>()
+        private val runtimeMetadata = mutableMapOf<String, Any>()
 
         override fun createChatClient(): AimoChatClient = throw UnsupportedOperationException()
-        override fun addMessages(messages: List<AimoChatMessage>) = throw UnsupportedOperationException()
-        override fun getMetadata(): Map<String, Any> = metadata.toMap()
-        override fun readMetadata(): Map<String, Any> = metadata.toMap()
-        override fun getProperty(property: String): Any? = metadata[property]
-        override fun readProperty(property: String): Any? = metadata[property]
-        override fun writeProperty(property: String, value: Any) { metadata[property] = value }
-        override fun deleteProperty(property: String): Boolean = metadata.remove(property) != null
-    }
+        override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
+            val loaded = (dao?.getChatRequests(chatId) ?: emptyList())
+                .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+            if (loaded.isNotEmpty()) {
+                runtimeMetadata["chat.messages"] = loaded
+            }
+            return loaded.takeIf { it.isNotEmpty() }
+        }
+        override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
+            if (messages.isEmpty()) return
+            dao?.addChatRequest(
+                ChatRequestEntity(
+                    chatId = chatId,
+                    requestId = requestId,
+                    messages = messages.map { it.toChatMessageEntity(requestId) },
+                    requestCharacters = messages.sumOf { it.content?.length ?: 0 },
+                    createdAt = Instant.now(),
+                )
+            )
+            // Append to cache
+            val existing = (runtimeMetadata["chat.messages"] as? List<AimoChatMessage>).orEmpty()
+            runtimeMetadata["chat.messages"] = existing + messages
+        }
+        override fun getChatMetadata(): Map<String, Any> = metadata.toMap()
+        override fun readChatMetadata(): Map<String, Any> = metadata.toMap()
+        override fun getChatProperty(property: String): Any? = metadata[property]
+        override fun readChatProperty(property: String): Any? = metadata[property]
+         override fun writeChatProperty(property: String, value: Any) { metadata[property] = value }
+         override fun deleteChatProperty(property: String): Boolean = metadata.remove(property) != null
+     }
 }

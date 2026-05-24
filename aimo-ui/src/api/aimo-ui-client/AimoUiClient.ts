@@ -2,15 +2,15 @@ import {ApiClient} from "../api-client/ApiClient";
 
 const CONTROLLER_TITLE = "/aimo-api/title";
 
-export interface SessionTitle {
+export interface ConversationTitle {
     chatId: string
     source: string
     title: string | null
 }
 
 export interface AimoUiClient {
-    getTitles: () => Promise<SessionTitle[]>
-    getTitle: (chatId: string) => Promise<SessionTitle | null>
+    getTitles: () => Promise<ConversationTitle[]>
+    getTitle: (chatId: string) => Promise<ConversationTitle | null>
     setTitle: (chatId: string, title: string) => Promise<void>
 }
 
@@ -25,7 +25,7 @@ class AimoUiClientImpl extends ApiClient implements AimoUiClient {
         }
 
         const txt = await res.text()
-        return txt ? JSON.parse(txt) as SessionTitle[] : []
+        return txt ? JSON.parse(txt) as ConversationTitle[] : []
     })
 
     getTitle = (chatId: string) => this.GET(CONTROLLER_TITLE, `/${encodeURIComponent(chatId)}`).then(async res => {
@@ -34,7 +34,7 @@ class AimoUiClientImpl extends ApiClient implements AimoUiClient {
         }
 
         const txt = await res.text()
-        return txt ? JSON.parse(txt) as SessionTitle | null : null
+        return txt ? JSON.parse(txt) as ConversationTitle | null : null
     })
 
     setTitle = (

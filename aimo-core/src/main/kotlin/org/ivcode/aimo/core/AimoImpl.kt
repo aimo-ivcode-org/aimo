@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core
 
-import org.ivcode.aimo.core.client.session.AimoSessionClientImpl
+import org.ivcode.aimo.core.client.conversation.AimoConversationClientImpl
 import org.ivcode.aimo.core.controller.SystemMessageCallback
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModel
@@ -11,38 +11,36 @@ internal class AimoImpl (
     private val model: AimoChatModel,
     private val chatClientDao: AimoChatClientDao,
     private val tools: List<AimoToolCallback>,
-    private val systemMessage: List<SystemMessageCallback>
+    private val systemMessage: List<SystemMessageCallback>,
 ): Aimo {
-    override fun getSessionClient(chatId: UUID): AimoSessionClient? = chatClientDao.getChatSession(chatId)?.let {
-        val session = chatClientDao.getChatSession(chatId) ?: return@let null
-
-        AimoSessionClientImpl (
-            chatId = it.chatId,
+    override fun getConversationClient(chatId: UUID): AimoConversationClient? = chatClientDao.getChatConversation(chatId)?.let { conversation ->
+        AimoConversationClientImpl (
+            chatId = conversation.chatId,
             model = model,
             dao = chatClientDao,
             tools = tools,
             systemMessages = systemMessage,
-            metadata = session.metadata
         )
     }
 
-    override fun createSession(): AimoSession  {
-        return chatClientDao.createChatSession().toAimoSession()
+    override fun createConversation(): AimoConversationInfo {
+        val conversation = chatClientDao.createChatConversation()
+        return conversation.toAimoConversationInfo()
     }
 
-    override fun getSessions(): List<AimoSession> {
-        return chatClientDao.getChatSessions().map { it.toAimoSession() }
+    override fun getConversations(): List<AimoConversationInfo> {
+        return chatClientDao.getChatConversations().map { it.toAimoConversationInfo() }
     }
 
-    override fun deleteSession(chatId: UUID): Boolean {
-        return chatClientDao.deleteChatSession(chatId)
-    }
+     override fun deleteConversation(chatId: UUID): Boolean {
+         return chatClientDao.deleteChatConversation(chatId)
+     }
 
     override fun getChatHistory(chatId: UUID): List<AimoHistoryRequest> {
         return chatClientDao.getChatRequests(chatId).map { it.toAimoHistoryRequest() }
     }
 
-    override fun upsertSession(chatId: UUID, metadata: Map<String, String>): Boolean {
-        return chatClientDao.upsertSessionMetadata(chatId, metadata)
+    override fun upsertConversation(chatId: UUID, metadata: Map<String, String>): Boolean {
+        return chatClientDao.upsertConversationMetadata(chatId, metadata)
     }
 }

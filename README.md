@@ -1,6 +1,6 @@
 # Aimo
 
-Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring project for building AI chat applications with session memory, tool-calling controllers, an Ollama-backed model adapter, and a React UI.
+Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring project for building AI chat applications with conversation memory, tool-calling controllers, an Ollama-backed model adapter, and a React UI.
 
 ## What this repository contains
 
@@ -8,9 +8,9 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 
 | Module | Purpose |
 | --- | --- |
-| `aimo-core` | Core abstractions and runtime (`Aimo`, sessions, chat clients, model-facing prompt flow, tool/system-message annotations). |
+| `aimo-core` | Core abstractions and runtime (`Aimo`, conversations, chat clients, model-facing prompt flow, tool/system-message annotations). |
 | `aimo-model-ollama` | Ollama-backed Aimo model integration. |
-| `aimo-server` | REST API layer for sessions, chat streaming, and history. |
+| `aimo-server` | REST API layer for conversations, chat streaming, and history. |
 | `aimo-plugin-ui` | UI-specific server plugin (title endpoints + title tool controller). |
 | `aimo-ui` | React + Vite frontend packaged into resources for server distribution. |
 | `examples/simple-ollama` | Runnable Spring Boot app that composes server + UI plugin + Ollama model module. |
@@ -26,7 +26,7 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 
 1. `examples/simple-ollama` starts Spring Boot and pulls in the other modules as dependencies.
 2. `aimo-server` exposes API routes under `/aimo-api/*`.
-3. `aimo-core` manages sessions, history, tool callbacks, and model prompt orchestration.
+3. `aimo-core` manages conversations, history, tool callbacks, and model prompt orchestration.
 4. `aimo-model-ollama` provides the `ChatModel` implementation used by `aimo-core`.
 5. `aimo-ui` consumes the API and `aimo-plugin-ui` adds title-specific behavior.
 
@@ -60,11 +60,11 @@ Default API base URL used by the frontend clients:
 
 All routes are rooted at `/aimo-api`.
 
-- `POST /aimo-api/session/` - create session
-- `GET /aimo-api/session/` - list sessions
-- `DELETE /aimo-api/session/{chatId}` - delete session
+- `POST /aimo-api/conversation/` - create conversation
+- `GET /aimo-api/conversation/` - list conversations
+- `DELETE /aimo-api/conversation/{chatId}` - delete conversation
 - `POST /aimo-api/chat/{chatId}` - stream chat response
-- `GET /aimo-api/history/{chatId}` - fetch session history
+- `GET /aimo-api/history/{chatId}` - fetch conversation history
 - `GET /aimo-api/title/` - list titles
 - `GET /aimo-api/title/{chatId}` - read title
 - `PUT /aimo-api/title/{chatId}/{title}` - set title

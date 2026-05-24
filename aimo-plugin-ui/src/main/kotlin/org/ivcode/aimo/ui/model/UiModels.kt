@@ -8,7 +8,7 @@ data class TitleResponse (
     val source: String,
 )
 
-data class SessionTitle (
+data class ConversationTitle (
     val chatId: UUID,
     val source: String,
     val title: String?,

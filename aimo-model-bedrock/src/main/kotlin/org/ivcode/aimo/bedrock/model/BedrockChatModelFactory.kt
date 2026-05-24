@@ -3,7 +3,9 @@ package org.ivcode.aimo.bedrock.model
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatResponse
+import org.ivcode.aimo.core.AimoPromptCacheUsage
 import org.ivcode.aimo.core.AimoToolCall
+import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModel
 import org.ivcode.aimo.core.model.AimoChatContext
@@ -12,6 +14,7 @@ import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoToolDefinition
 import org.ivcode.aimo.bedrock.BedrockModelProperties
+import org.ivcode.aimo.bedrock.PromptCachingStrategy
 import org.ivcode.aimo.bedrock.client.BedrockChatClient
 import org.ivcode.aimo.bedrock.client.ContentBlock
 import org.ivcode.aimo.bedrock.client.ConverseMessage
@@ -21,8 +24,8 @@ import org.ivcode.aimo.bedrock.client.InputSchema
 import org.ivcode.aimo.bedrock.client.SystemContentBlock
 import org.ivcode.aimo.bedrock.client.Tool
 import org.ivcode.aimo.bedrock.client.ToolConfiguration
-import org.ivcode.aimo.bedrock.client.ToolUse
 import org.ivcode.aimo.bedrock.client.ToolSpec
+import org.ivcode.aimo.bedrock.client.ToolUse
 import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.security.MessageDigest
@@ -90,7 +93,13 @@ class BedrockChatModelFactory(
             )
         val rawOptions = resolveOptions(name, props.options)
         val aimoOptions = rawOptions.toAimoChatOptions()
-        val engine = BedrockChatEngineImpl(client, name, aimoOptions)
+        val engine = BedrockChatEngineImpl(
+            client = client,
+            modelName = name,
+            options = aimoOptions,
+            promptCaching = props.context.promptCaching,
+            promptCachingStrategy = props.context.promptCachingStrategy,
+        )
         return AimoChatModel(
             name = name,
             chatEngine = engine,
@@ -256,6 +265,8 @@ internal class BedrockChatEngineImpl(
     private val client: BedrockChatClient,
     private val modelName: String,
     override val options: AimoChatOptions,
+    private val promptCaching: Boolean = false,
+    private val promptCachingStrategy: PromptCachingStrategy = PromptCachingStrategy.SYSTEM,
 ) : AimoChatEngine {
 
     private val mapper = jacksonObjectMapper()
@@ -279,12 +290,15 @@ internal class BedrockChatEngineImpl(
         return toAimoChatResponse(response, done = true)
     }
 
+
     // -------------------------------------------------------------------------
     // Request building
     // -------------------------------------------------------------------------
 
     private fun buildRequest(prompt: AimoPrompt): ConverseRequest {
         val merged = merge(options, prompt.options)
+        val cacheAfterSystem = promptCaching && systemCacheEnabled()
+        val cacheAfterTools = promptCaching && toolSchemaCacheEnabled()
         val systemBlocks = prompt.messages
             .asSequence()
             .filter { it.type == AimoChatMessageType.SYSTEM }
@@ -310,7 +324,18 @@ internal class BedrockChatEngineImpl(
                 ToolConfiguration(tools = tools.map { it.toTool() })
             },
             additionalModelRequestFields = merged.additionalModelRequestFields(),
+            cachePointAfterSystem = cacheAfterSystem && systemBlocks.isNotEmpty(),
+            cachePointAfterTools = cacheAfterTools && prompt.tools.isNotEmpty(),
         )
+    }
+
+    private fun systemCacheEnabled(): Boolean {
+        return promptCachingStrategy == PromptCachingStrategy.SYSTEM ||
+            promptCachingStrategy == PromptCachingStrategy.SYSTEM_AND_TOOLS
+    }
+
+    private fun toolSchemaCacheEnabled(): Boolean {
+        return promptCachingStrategy == PromptCachingStrategy.SYSTEM_AND_TOOLS
     }
 
     private fun merge(base: AimoChatOptions, override: AimoChatOptions?): AimoChatOptions {
@@ -377,6 +402,32 @@ internal class BedrockChatEngineImpl(
             responseId = UUID.randomUUID(),
             messages = listOf(aimoMessage),
             createdAt = Instant.now(),
+            usage = if (done) buildUsage(response.usage) else null,
+        )
+    }
+
+    private fun buildUsage(usage: org.ivcode.aimo.bedrock.client.Usage?): AimoUsage? {
+        // Return null if no usage data is available (SDK didn't provide it)
+        if (usage == null) {
+            return null
+        }
+        // Return null if all usage fields are null or zero
+        if (usage.inputTokens == null && usage.outputTokens == null &&
+            usage.cacheReadInputTokens == 0 && usage.cacheWriteInputTokens == 0) {
+            return null
+        }
+
+        val cacheRead = usage.cacheReadInputTokens
+        val cacheWrite = usage.cacheWriteInputTokens
+        return AimoUsage(
+            inputTokens = usage.inputTokens,
+            outputTokens = usage.outputTokens,
+            promptCache = if (cacheRead > 0 || cacheWrite > 0) {
+                AimoPromptCacheUsage(
+                    cacheReadInputTokens = cacheRead,
+                    cacheWriteInputTokens = cacheWrite,
+                )
+            } else null,
         )
     }
 }

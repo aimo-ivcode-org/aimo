@@ -2,6 +2,7 @@ package org.ivcode.aimo.bedrock.client
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
+import software.amazon.awssdk.services.bedrockruntime.model.CachePointType
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse as BedrockConverseResponse
 import software.amazon.awssdk.services.bedrockruntime.model.Message as BedrockMessage
 import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock as BedrockContentBlock
@@ -59,6 +60,50 @@ class ResponseMapperTest {
         assertNotNull(fields.system)
         assertEquals(1, fields.system!!.size)
         assertEquals("You are helpful", fields.system!![0].text())
+    }
+
+    @Test
+    @DisplayName("toBedrockFields appends system cache point when enabled")
+    fun testToBedrockFieldsSystemCachePoint() {
+        val request = ConverseRequest(
+            model = "test-model",
+            messages = emptyList(),
+            system = listOf(SystemContentBlock(text = "You are helpful")),
+            cachePointAfterSystem = true,
+        )
+
+        val fields = ResponseMapper.toBedrockFields(request)
+        assertNotNull(fields.system)
+        assertEquals(2, fields.system!!.size)
+        assertEquals("You are helpful", fields.system!![0].text())
+        assertEquals(CachePointType.DEFAULT, fields.system!![1].cachePoint().type())
+    }
+
+    @Test
+    @DisplayName("toBedrockFields appends tool cache point when enabled")
+    fun testToBedrockFieldsToolCachePoint() {
+        val request = ConverseRequest(
+            model = "test-model",
+            messages = emptyList(),
+            toolConfig = ToolConfiguration(
+                tools = listOf(
+                    Tool(
+                        toolSpec = ToolSpec(
+                            name = "calculator",
+                            description = "Adds numbers",
+                            inputSchema = InputSchema(json = mapOf("type" to "object")),
+                        )
+                    )
+                )
+            ),
+            cachePointAfterTools = true,
+        )
+
+        val fields = ResponseMapper.toBedrockFields(request)
+        assertNotNull(fields.toolConfig)
+        assertEquals(2, fields.toolConfig!!.tools().size)
+        assertNotNull(fields.toolConfig!!.tools()[0].toolSpec())
+        assertEquals(CachePointType.DEFAULT, fields.toolConfig!!.tools()[1].cachePoint().type())
     }
 
     @Test
@@ -258,8 +303,25 @@ class ResponseMapperTest {
         )
 
         val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
-        assertEquals(100, response.usage.inputTokens)
-        assertEquals(50, response.usage.outputTokens)
+        assertEquals(100, response.usage?.inputTokens)
+        assertEquals(50, response.usage?.outputTokens)
+    }
+
+    @Test
+    @DisplayName("mapBedrockResponse extracts cache read/write input tokens")
+    fun testMapBedrockResponseCacheUsage() {
+        val bedrockResponse = createBedrockResponse(
+            role = ConversationRole.ASSISTANT,
+            textContent = "Response",
+            inputTokens = 100,
+            outputTokens = 50,
+            cacheReadInputTokens = 77,
+            cacheWriteInputTokens = 55,
+        )
+
+        val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
+        assertEquals(77, response.usage?.cacheReadInputTokens)
+        assertEquals(55, response.usage?.cacheWriteInputTokens)
     }
 
     @Test
@@ -289,7 +351,7 @@ class ResponseMapperTest {
     }
 
     @Test
-    @DisplayName("mapBedrockResponse defaults usage tokens to zero when usage is missing")
+    @DisplayName("mapBedrockResponse returns null usage when usage is missing")
     fun testMapBedrockResponseMissingUsage() {
         val bedrockResponse = createBedrockResponse(
             role = ConversationRole.ASSISTANT,
@@ -298,8 +360,7 @@ class ResponseMapperTest {
         )
 
         val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
-        assertEquals(0, response.usage.inputTokens)
-        assertEquals(0, response.usage.outputTokens)
+        assertEquals(null, response.usage)
     }
 
     @Test
@@ -314,8 +375,7 @@ class ResponseMapperTest {
 
         val response = ResponseMapper.mapBedrockResponse(bedrockResponse)
         assertEquals("end_turn", response.stopReason)
-        assertEquals(0, response.usage.inputTokens)
-        assertEquals(0, response.usage.outputTokens)
+        assertEquals(null, response.usage)
     }
 
     // Helper methods for creating mock Bedrock responses
@@ -324,6 +384,8 @@ class ResponseMapperTest {
         textContent: String? = null,
         inputTokens: Int = 0,
         outputTokens: Int = 0,
+        cacheReadInputTokens: Int = 0,
+        cacheWriteInputTokens: Int = 0,
         stopReason: String = "end_turn",
         includeStopReason: Boolean = true,
         includeUsage: Boolean = true,
@@ -351,6 +413,8 @@ class ResponseMapperTest {
             builder.usage { usage ->
                 usage.inputTokens(inputTokens)
                 usage.outputTokens(outputTokens)
+                usage.cacheReadInputTokens(cacheReadInputTokens)
+                usage.cacheWriteInputTokens(cacheWriteInputTokens)
             }
         }
 

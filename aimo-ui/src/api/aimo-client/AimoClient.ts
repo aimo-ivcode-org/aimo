@@ -1,9 +1,9 @@
 import {
     ChatCallback,
+    ChatConversationInfo,
     ChatHistoryRequest,
     ChatRequest,
     ChatResponse,
-    ChatSession
 } from "./AimoClientModel";
 import { normalizeChatResponse, normalizeHistoryRequest } from "./AimoClientNormalizers";
 import {ApiClient} from "../api-client/ApiClient";
@@ -11,14 +11,14 @@ import {ResponseBuilder} from "./ResponseBuilder";
 
 const CONTROLLER_CHAT = "/aimo-api/chat"
 const CONTROLLER_HISTORY = "/aimo-api/history"
-const CONTROLLER_SESSION = "/aimo-api/session"
+const CONTROLLER_CONVERSATION = "/aimo-api/conversation"
 
 export interface AimoClient {
     chat: (chatId: string, request: ChatRequest, callback: ChatCallback) => Promise<ChatResponse | null>
     getHistory: (chatId: string) => Promise<ChatHistoryRequest[]>
-    createChatSession: () => Promise<ChatSession>
-    getChatSessions: () => Promise<ChatSession[]>
-    deleteChatSession: (chatId: string) => Promise<void>
+    createChatConversation: () => Promise<ChatConversationInfo>
+    getChatConversations: () => Promise<ChatConversationInfo[]>
+    deleteChatConversation: (chatId: string) => Promise<void>
 }
 
 class AimoClientImpl extends ApiClient implements AimoClient {
@@ -84,34 +84,34 @@ class AimoClientImpl extends ApiClient implements AimoClient {
         return parsed.map((req) => normalizeHistoryRequest(req))
     })
 
-    createChatSession = () => this.POST(CONTROLLER_SESSION, "/").then(async res => {
+    createChatConversation = () => this.POST(CONTROLLER_CONVERSATION, "/").then(async res => {
         if(!res.ok) {
-            throw new Error(`failed to create new session: ${res.status} ${res.statusText}`)
+            throw new Error(`failed to create conversation: ${res.status} ${res.statusText}`)
         }
 
         const txt = await res.text()
         const parsed = JSON.parse(txt)
 
-        return parsed as ChatSession
+        return parsed as ChatConversationInfo
     })
 
-    deleteChatSession = (
+    deleteChatConversation = (
         chatId: string
-    ) => this.DELETE(CONTROLLER_SESSION, `/${encodeURIComponent(chatId)}`).then(async res => {
+    ) => this.DELETE(CONTROLLER_CONVERSATION, `/${encodeURIComponent(chatId)}`).then(async res => {
         if(!res.ok) {
-            throw new Error(`failed to delete session: ${res.status} ${res.statusText}`)
+            throw new Error(`failed to delete conversation: ${res.status} ${res.statusText}`)
         }
     })
 
-    getChatSessions = () => this.GET(CONTROLLER_SESSION, "/").then(async res => {
+    getChatConversations = () => this.GET(CONTROLLER_CONVERSATION, "/").then(async res => {
         if(!res.ok) {
-            throw new Error(`failed to get session: ${res.status} ${res.statusText}`)
+            throw new Error(`failed to get conversations: ${res.status} ${res.statusText}`)
         }
 
         const txt = await res.text()
         const parsed = JSON.parse(txt)
 
-        return parsed as ChatSession[]
+        return parsed as ChatConversationInfo[]
     })
 
 }

@@ -58,8 +58,8 @@ internal class RequestExecutor(
                 "Bedrock converse response modelId={}, stopReason={}, usageIn={}, usageOut={}, contentBlocks={}",
                 modelId,
                 transformed.stopReason,
-                transformed.usage.inputTokens,
-                transformed.usage.outputTokens,
+                transformed.usage?.inputTokens,
+                transformed.usage?.outputTokens,
                 transformed.output.message.content.size,
             )
             if (log.isTraceEnabled) {

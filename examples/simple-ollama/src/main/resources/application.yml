@@ -10,7 +10,7 @@ aimo.model.ollama:
     base-url: http://localhost:11434
     primary: true
     context:
-      size: 8192
+      size: 1000
       excludeThinking: true
     options:
       model: gpt-oss:20b
