@@ -122,6 +122,7 @@ internal class ContextWindowPromptBudgeter(
      */
     private fun truncateHistoryByTokens(history: List<AimoChatMessage>, tokenBudget: Int): List<AimoChatMessage> {
         if (tokenBudget <= 0) {
+            logger.debug("History budget is $tokenBudget (≤ 0); returning empty history. Available messages: ${history.size}")
             return emptyList()
         }
 
@@ -131,12 +132,19 @@ internal class ContextWindowPromptBudgeter(
         for (message in history.asReversed()) {
             val messageTokens = estimateTokens(messagePayloadForBudgeting(message))
             if (tokenCount + messageTokens > tokenBudget) {
+                logger.debug(
+                    "Stopping history inclusion - next message would exceed budget. " +
+                    "Current tokens: $tokenCount, next message tokens: $messageTokens, budget: $tokenBudget. " +
+                    "Included ${result.size} messages so far."
+                )
                 return result.asReversed() // Return what fits; don't add this message
             }
             result.add(message)
             tokenCount += messageTokens
+            logger.debug("Added message to history (tokens: $messageTokens, running total: $tokenCount/$tokenBudget)")
         }
 
+        logger.debug("Included all ${result.size} history messages (total tokens: $tokenCount/$tokenBudget)")
         return result.asReversed()
     }
 
@@ -288,6 +296,17 @@ internal class ContextWindowPromptBudgeter(
         val fixedMessages = systemMessages + listOf(prompt) + taskMessages
         val fixedInputTokens = estimateMessagesTokens(fixedMessages) + estimateToolTokens(tools)
 
+        // Log fixed token breakdown for debugging
+        val systemTokens = estimateMessagesTokens(systemMessages)
+        val promptTokens = estimateTokens(messagePayloadForBudgeting(prompt))
+        val taskTokens = estimateMessagesTokens(taskMessages)
+        val toolTokens = estimateToolTokens(tools)
+
+        logger.debug(
+            "Token budget breakdown - System: $systemTokens, Prompt: $promptTokens, " +
+                "Task messages: $taskTokens, Tools: $toolTokens, Total fixed: $fixedInputTokens, Max available: $maxInputTokens"
+        )
+
         if (fixedInputTokens > maxInputTokens) {
             logger.warn(
                 "Fixed request components (system messages, prompt, task messages, and tools) exceed context window. " +
@@ -295,7 +314,19 @@ internal class ContextWindowPromptBudgeter(
             )
         }
 
-        val historyForPrompt = truncateHistoryByTokens(history, maxInputTokens - fixedInputTokens)
+        val historyBudget = maxInputTokens - fixedInputTokens
+        logger.debug(
+            "History budget available: $historyBudget tokens (max: $maxInputTokens - fixed: $fixedInputTokens). " +
+                "Total history messages available: ${history.size}"
+        )
+
+        val historyForPrompt = truncateHistoryByTokens(history, historyBudget)
+
+        logger.debug(
+            "History included in prompt: ${historyForPrompt.size} messages out of ${history.size} " +
+                "(tokens used: ${estimateMessagesTokens(historyForPrompt)}/$historyBudget)"
+        )
+
         val promptMessages = systemMessages + historyForPrompt + prompt + taskMessages
         val normalizedPromptMessages = promptMessages
             .let { messages ->
@@ -305,6 +336,11 @@ internal class ContextWindowPromptBudgeter(
                 }
             }
             .filterNot { it.isEmptyPayload() }
+
+        logger.debug(
+            "Final prompt: ${normalizedPromptMessages.size} messages " +
+                "(after filtering empty payloads: ${promptMessages.size - normalizedPromptMessages.size} removed)"
+        )
 
         return PromptPlan(
             history = historyForPrompt,

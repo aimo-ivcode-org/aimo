@@ -3,7 +3,7 @@ spring.mvc.async.request-timeout: 0s
 logging:
   level:
     # Trace all Ollama client request/response and streaming event logs.
-    org.ivcode.aimo.ollama.client: TRACE
+    org.ivcode.aimo: TRACE
 
 aimo:
   # Path where chat conversations and requests are persisted (file-based DAO)
