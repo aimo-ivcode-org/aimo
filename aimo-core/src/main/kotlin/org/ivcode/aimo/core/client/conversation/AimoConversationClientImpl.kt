@@ -18,10 +18,10 @@ internal class AimoConversationClientImpl(
     override val chatId: UUID,
     private val dao: AimoChatClientDao,
     private val model: AimoChatModel,
+    private val userId: String? = null,
     private val tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
 ) : AimoConversationClient {
-
 
     override fun createChatClient(): AimoChatClient {
         return AimoChatClientImpl (
@@ -36,9 +36,10 @@ internal class AimoConversationClientImpl(
     override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
         // Load from DAO with optional character limit
         val messages = if (maxCacheCharacters == null) {
-            dao.getChatRequests(chatId)
+            dao.getChatRequests(userId, chatId)
         } else {
             dao.getChatRequests(
+                userId = userId,
                 chatId = chatId,
                 maxRequestCharacters = maxCacheCharacters.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
             )
@@ -53,7 +54,8 @@ internal class AimoConversationClientImpl(
 
         // Persist to DAO (source of truth)
         dao.addChatRequest(
-            ChatRequestEntity(
+            userId = userId,
+            request = ChatRequestEntity(
                 chatId = chatId,
                 requestId = requestId,
                 messages = messages.map { it.toChatMessageEntity(requestId) },
@@ -80,16 +82,16 @@ internal class AimoConversationClientImpl(
     }
 
     override fun writeChatProperty(property: String, value: Any) {
-        val success = dao.upsertConversationMetadata(chatId, mapOf(property to value))
+        val success = dao.upsertConversationMetadata(chatId, userId, mapOf(property to value))
         if (!success) {
             throw IllegalStateException("Conversation not found for chatId: $chatId")
         }
     }
 
      override fun deleteChatProperty(property: String): Boolean {
-         return dao.deleteConversationMetadata(chatId, listOf(property))
+         return dao.deleteConversationMetadata(chatId, userId, listOf(property))
      }
 
-     private fun requireChatConversation() = dao.getChatConversation(chatId)
+     private fun requireChatConversation() = dao.getChatConversation(chatId, userId)
          ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
 }

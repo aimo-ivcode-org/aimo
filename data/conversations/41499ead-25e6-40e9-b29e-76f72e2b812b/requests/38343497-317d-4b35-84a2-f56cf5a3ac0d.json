@@ -1,0 +1,69 @@
+{
+  "chatId" : "41499ead-25e6-40e9-b29e-76f72e2b812b",
+  "requestId" : "38343497-317d-4b35-84a2-f56cf5a3ac0d",
+  "messages" : [ {
+    "requestId" : "38343497-317d-4b35-84a2-f56cf5a3ac0d",
+    "messageId" : 1,
+    "type" : "USER",
+    "content" : "Hi",
+    "thinking" : null,
+    "toolName" : null,
+    "toolCallId" : null,
+    "toolCalls" : null
+  }, {
+    "requestId" : "38343497-317d-4b35-84a2-f56cf5a3ac0d",
+    "messageId" : 2,
+    "type" : "ASSISTANT",
+    "content" : "",
+    "thinking" : "We need to respond to the user. Also we should check if title is missing or not descriptive. There's no title currently. We should set a title. Use set_title tool. Title should be concise, representative of conversation. Currently conversation is just \"Hi\". So maybe \"Greeting\". That is1 word. Under5 words. Use set_title with title \"Greeting\". Source will be \"ASSISTANT\". We'll call the function.",
+    "toolName" : null,
+    "toolCallId" : null,
+    "toolCalls" : [ {
+      "id" : "call_jd77lxsy",
+      "name" : "set_title",
+      "arguments" : "{\"title\":\"Greeting\"}"
+    } ]
+  }, {
+    "requestId" : "38343497-317d-4b35-84a2-f56cf5a3ac0d",
+    "messageId" : 3,
+    "type" : "TOOL",
+    "content" : "{\"title\":\"Greeting\",\"source\":\"ASSISTANT\"}",
+    "thinking" : null,
+    "toolName" : "set_title",
+    "toolCallId" : "call_jd77lxsy",
+    "toolCalls" : null
+  }, {
+    "requestId" : "38343497-317d-4b35-84a2-f56cf5a3ac0d",
+    "messageId" : 4,
+    "type" : "ASSISTANT",
+    "content" : "",
+    "thinking" : "We need to call set_title. The instruction: Use the \"set_title\" tool to update the chat title when it is missing or no longer descriptive. The user says \"Hi\". The assistant responded \"Greeting\" as title. We should check: Did the user set a title? No. So we can set title. But we need to call the tool. We already called set_title. We should output the result? The tool returns TitleResponse JSON. The assistant should output that JSON? The instructions: \"Use the 'set_title' tool to update the chat title when it is missing or no longer descriptive.\" So we should call the tool. We did. We need to respond with the result? The system says \"Formatted content as Markdown\". So we need to output the JSON? The tool output is likely returned automatically. We should respond with nothing else? The assistant should respond with nothing else or just the tool call? According to guidelines, we should output the tool call. We did. But we need to respond with the result? Usually we don't output anything else. The tool will return JSON. The assistant should output that JSON. So we should output the JSON. Let's output the result.",
+    "toolName" : null,
+    "toolCallId" : null,
+    "toolCalls" : [ {
+      "id" : "call_0blwtkvr",
+      "name" : "set_title",
+      "arguments" : "{\"title\":\"Greeting\"}"
+    } ]
+  }, {
+    "requestId" : "38343497-317d-4b35-84a2-f56cf5a3ac0d",
+    "messageId" : 5,
+    "type" : "TOOL",
+    "content" : "{\"title\":\"Greeting\",\"source\":\"ASSISTANT\"}",
+    "thinking" : null,
+    "toolName" : "set_title",
+    "toolCallId" : "call_0blwtkvr",
+    "toolCalls" : null
+  }, {
+    "requestId" : "38343497-317d-4b35-84a2-f56cf5a3ac0d",
+    "messageId" : 6,
+    "type" : "ASSISTANT",
+    "content" : "Hello! How can I help you today?",
+    "thinking" : "We need to respond to the user \"Hi\". We already set title \"Greeting\". According to instructions, we should keep title concise. The title is already set. We should respond politely. No further title changes.",
+    "toolName" : null,
+    "toolCallId" : null,
+    "toolCalls" : null
+  } ],
+  "requestCharacters" : 116,
+  "createdAt" : "2026-05-24T21:10:48.242302900Z"
+}

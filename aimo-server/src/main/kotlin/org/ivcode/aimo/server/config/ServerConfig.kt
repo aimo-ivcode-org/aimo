@@ -23,6 +23,7 @@ import org.ivcode.aimo.server.service.HistoryService
 ])
 class ServerConfig {
 
+
     /** Permissive CORS for local dev (e.g. Vite on another port than the API). */
     @Bean
     fun aimoCorsConfigurer(): WebMvcConfigurer {

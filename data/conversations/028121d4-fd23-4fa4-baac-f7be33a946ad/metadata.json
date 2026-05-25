@@ -1,0 +1,11 @@
+{
+  "chatId" : "028121d4-fd23-4fa4-baac-f7be33a946ad",
+  "userId" : "ollama-user2",
+  "metadata" : {
+    "title" : {
+      "chatId" : "028121d4-fd23-4fa4-baac-f7be33a946ad",
+      "source" : "ASSISTANT",
+      "title" : "Cats"
+    }
+  }
+}

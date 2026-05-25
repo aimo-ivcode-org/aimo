@@ -13,34 +13,37 @@ internal class AimoImpl (
     private val tools: List<AimoToolCallback>,
     private val systemMessage: List<SystemMessageCallback>,
 ): Aimo {
-    override fun getConversationClient(chatId: UUID): AimoConversationClient? = chatClientDao.getChatConversation(chatId)?.let { conversation ->
-        AimoConversationClientImpl (
-            chatId = conversation.chatId,
-            model = model,
-            dao = chatClientDao,
-            tools = tools,
-            systemMessages = systemMessage,
-        )
+
+    override fun getConversationClient(chatId: UUID, userId: String?): AimoConversationClient? {
+        return chatClientDao.getChatConversation(chatId, userId)?.let { conversation ->
+            AimoConversationClientImpl (
+                chatId = conversation.chatId,
+                model = model,
+                dao = chatClientDao,
+                userId = userId,
+                tools = tools,
+                systemMessages = systemMessage,
+            )
+        }
     }
 
-    override fun createConversation(): AimoConversationInfo {
-        val conversation = chatClientDao.createChatConversation()
-        return conversation.toAimoConversationInfo()
+    override fun createConversation(userId: String): AimoConversationInfo {
+        return chatClientDao.createChatConversation(userId).toAimoConversationInfo()
     }
 
-    override fun getConversations(): List<AimoConversationInfo> {
-        return chatClientDao.getChatConversations().map { it.toAimoConversationInfo() }
+    override fun getConversations(userId: String?): List<AimoConversationInfo> {
+        return chatClientDao.getChatConversations(userId).map { it.toAimoConversationInfo() }
     }
 
-     override fun deleteConversation(chatId: UUID): Boolean {
-         return chatClientDao.deleteChatConversation(chatId)
-     }
-
-    override fun getChatHistory(chatId: UUID): List<AimoHistoryRequest> {
-        return chatClientDao.getChatRequests(chatId).map { it.toAimoHistoryRequest() }
+    override fun deleteConversation(chatId: UUID, userId: String?): Boolean {
+        return chatClientDao.deleteChatConversation(chatId, userId)
     }
 
-    override fun upsertConversation(chatId: UUID, metadata: Map<String, String>): Boolean {
-        return chatClientDao.upsertConversationMetadata(chatId, metadata)
+    override fun getChatHistory(chatId: UUID, userId: String?): List<AimoHistoryRequest> {
+        return chatClientDao.getChatRequests(userId, chatId).map { it.toAimoHistoryRequest() }
+    }
+
+    override fun upsertConversation(chatId: UUID, metadata: Map<String, String>, userId: String?): Boolean {
+        return chatClientDao.upsertConversationMetadata(chatId, userId, metadata)
     }
 }

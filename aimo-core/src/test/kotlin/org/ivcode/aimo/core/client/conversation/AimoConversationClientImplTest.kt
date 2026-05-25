@@ -15,27 +15,27 @@ import kotlin.test.assertTrue
 
 class AimoConversationClientImplTest {
 
-     @Test
-     fun `chat metadata reads latest durable values from dao`() {
-         val dao = AimoChatClientDaoMemory()
-         val conversation = dao.createChatConversation(mapOf("title" to "first"))
-         val client = createConversationClient(dao, conversation.chatId)
+    @Test
+    fun `chat metadata reads latest durable values from dao`() {
+        val dao = AimoChatClientDaoMemory()
+        val conversation = dao.createChatConversation(userId = "user1", metadata = mapOf("title" to "first"))
+        val client = createConversationClient(dao, conversation.chatId, "user1")
 
-         dao.upsertConversationMetadata(conversation.chatId, mapOf("title" to "second", "status" to "open"))
+        dao.upsertConversationMetadata(conversation.chatId, userId = "user1", metadata = mapOf("title" to "second", "status" to "open"))
 
-         assertEquals("second", client.getChatProperty("title"))
-         assertEquals(
-             mapOf("title" to "second", "status" to "open"),
-             client.getChatMetadata(),
-         )
-     }
+        assertEquals("second", client.getChatProperty("title"))
+        assertEquals(
+            mapOf("title" to "second", "status" to "open"),
+            client.getChatMetadata(),
+        )
+    }
 
-     @Test
-     fun `chat property writes and deletes are visible across conversation clients`() {
-         val dao = AimoChatClientDaoMemory()
-         val conversation = dao.createChatConversation()
-         val firstClient = createConversationClient(dao, conversation.chatId)
-         val secondClient = createConversationClient(dao, conversation.chatId)
+    @Test
+    fun `chat property writes and deletes are visible across conversation clients`() {
+        val dao = AimoChatClientDaoMemory()
+        val conversation = dao.createChatConversation("user1")
+        val firstClient = createConversationClient(dao, conversation.chatId, "user1")
+        val secondClient = createConversationClient(dao, conversation.chatId, "user1")
 
          firstClient.writeChatProperty("title", "Shared")
          assertEquals("Shared", secondClient.getChatProperty("title"))
@@ -47,10 +47,12 @@ class AimoConversationClientImplTest {
      private fun createConversationClient(
          dao: AimoChatClientDaoMemory,
          chatId: UUID,
+         userId: String,
      ): AimoConversationClientImpl {
          return AimoConversationClientImpl(
              chatId = chatId,
              dao = dao,
+             userId = userId,
              model = testModel(),
              tools = emptyList(),
              systemMessages = emptyList(),

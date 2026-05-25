@@ -1,5 +1,6 @@
 package org.ivcode.aimo.server.controller
 
+import org.ivcode.aimo.core.security.AimoUserProvider
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
 import org.ivcode.aimo.server.model.ChatConversationInfo
 import org.ivcode.aimo.server.service.ConversationService
@@ -15,22 +16,26 @@ import java.util.UUID
 @RequestMapping("/$API_CONTROLLER_CONTEXT/conversation")
 class ConversationController (
     private val conversationService: ConversationService,
+    private val userProvider: AimoUserProvider,
 ) {
 
     @PostMapping("/")
     fun createChatConversation(): ChatConversationInfo {
-        return conversationService.createConversation()
+        val user = userProvider.getCurrentUser()
+        return conversationService.createConversation(user.userId)
     }
 
     @GetMapping("/")
     fun getChatConversations(): List<ChatConversationInfo> {
-        return conversationService.getConversations()
+        val user = userProvider.getCurrentUser()
+        return conversationService.getConversations(user.userId)
     }
 
     @DeleteMapping("/{chatId}")
     fun deleteChatConversation(
         @PathVariable chatId: UUID
     ) {
-        conversationService.deleteConversation(chatId)
+        val user = userProvider.getCurrentUser()
+        conversationService.deleteConversation(chatId, user.userId)
     }
 }
