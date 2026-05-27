@@ -20,11 +20,11 @@ import java.util.UUID
  * Thread-safe via synchronized access patterns.
  *
  * @param dataDir the root directory where all chat data is persisted
- * @param objectMapper JSON serializer (default: new ObjectMapper())
+ * @param objectMapper JSON serializer
  */
 class AimoChatClientDaoFile(
     private val dataDir: File,
-    private val objectMapper: ObjectMapper = ObjectMapper()
+    private val objectMapper: ObjectMapper
 ) : AimoChatClientDao {
 
     private val lock = Any()
@@ -147,9 +147,13 @@ class AimoChatClientDaoFile(
         }
     }
 
-    override fun addChatRequest(userId: String?, request: ChatRequestEntity) {
+    override fun addChatRequest(userId: String?, request: ChatRequestEntity): Boolean {
         synchronized(lock) {
+            val conversation = loadConversation(getMetadataFile(request.chatId)) ?: return false
+            if (!canAccess(conversation, userId)) return false
+
             saveRequest(getRequestFile(request.chatId, request.requestId), request)
+            return true
         }
     }
 

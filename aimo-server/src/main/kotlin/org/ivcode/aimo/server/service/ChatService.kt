@@ -16,7 +16,7 @@ class ChatService (
     private val aimo: Aimo,
     private val mapper: ObjectMapper,
 ) {
-    fun chat (chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream, userId: String? = null) {
+    fun chat (chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream, userId: String) {
         val conversation = aimo.getConversationClient(chatId, userId) ?: throw NotFoundException("Conversation with id $chatId not found or not authorized")
         val client = conversation.createChatClient()
 

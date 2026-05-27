@@ -5,11 +5,16 @@ import java.util.UUID
 /**
  * Core orchestration interface for the aimo chat system.
  *
- * Aimo is the main entry point for managing AI-powered conversations. It coordinates:
+ * Aimo is the primary entry point for managing AI-powered conversations. It provides two sets of methods:
+ *
+ * 1. **User-scoped methods** (require userId): Enforce strict user isolation and authorization
+ * 2. **Admin methods** (no userId): Bypass user isolation for administrative operations
+ *
+ * Aimo coordinates:
  * - **Conversation Lifecycle**: Create, retrieve, delete conversations
  * - **Chat Operations**: Access conversation clients for sending messages and handling chat
  * - **Message History**: Track and retrieve conversation history
- * - **User Isolation**: Enforce user ownership and access control on all operations
+ * - **User Isolation**: Enforce user ownership on all user-scoped operations
  * - **LLM Integration**: Route requests to configured language models via [AimoChatModel]
  *
  * ## Architecture
@@ -26,26 +31,24 @@ import java.util.UUID
  *    - Supports streaming and tool calling
  *    - Provider-specific implementations: Ollama, Bedrock, etc.
  *
- * ## User Isolation
+ * ## User-Scoped Operations
  *
- * All Aimo operations respect user ownership:
+ * All user-scoped operations strictly enforce user ownership:
  * - **Conversation Creation**: Requires a userId; each conversation belongs to one user
- * - **Conversation Access**: userId must match conversation owner (null userId denied)
+ * - **Conversation Access**: userId parameter must match conversation owner
  * - **Message History**: Scoped to the requesting user
  *
  * Example:
  * ```kotlin
  * // Create conversation for "alice"
  * val convInfo = aimo.createConversation("alice")  // ✅ succeeds
- * aimo.createConversation(null)                     // ❌ fails - null userId rejected
  *
  * // Access conversation (must provide matching userId)
  * val client = aimo.getConversationClient(convInfo.chatId, "alice")   // ✅ owner access
  * val denied = aimo.getConversationClient(convInfo.chatId, "bob")     // ❌ denied
- * val denied = aimo.getConversationClient(convInfo.chatId, null)      // ❌ denied
  * ```
  *
- * ## Typical Usage
+ * ## Typical Usage (User-Scoped)
  *
  * ```kotlin
  * // 1. Create conversation
@@ -67,9 +70,25 @@ import java.util.UUID
  * val history = aimo.getChatHistory(conv.chatId, userId = "user123")
  * ```
  *
+ * ## Admin Operations
+ *
+ * Admin methods (suffixed with "Admin") bypass user isolation for administrative tasks.
+ * These should only be exposed through authenticated admin-only endpoints.
+ *
+ * **SECURITY WARNING**: Admin operations completely bypass user isolation. Never expose these
+ * methods to untrusted callers.
+ *
+ * Example:
+ * ```kotlin
+ * // Admin bypass: access any conversation without user check
+ * val adminClient = aimo.getConversationClientAdmin(anyConversationId)
+ * val allConversations = aimo.getConversationsAdmin()
+ * val deleted = aimo.deleteConversationAdmin(anyConversationId)
+ * ```
+ *
  * ## Implementation
  *
- * Aimo is typically constructed via [org.ivcode.aimo.core.AimoFactory.create] with:
+ * Aimo is typically constructed via [org.ivcode.aimo.core.conf.AimoConfig.createAimo] with:
  * - A configured [AimoChatModel]
  * - A [AimoChatClientDao] implementation
  * - Optional [org.ivcode.aimo.core.model.AimoToolCallback] tools
@@ -88,16 +107,15 @@ interface Aimo {
      * - Stream chat responses ([AimoConversationClient.chatStream])
      * - Manage conversation metadata ([AimoConversationClient.writeChatProperty], [AimoConversationClient.getChatMetadata])
      *
-     * **Authorization**: If userId is provided, this method verifies the user owns the conversation.
-     * If userId is null, no authorization check is performed.
+     * **Authorization**: This method verifies the user owns the conversation before granting access.
      *
      * @param chatId the unique identifier of the conversation
-     * @param userId optional user ID requesting access; if provided, must match conversation owner
+     * @param userId user ID requesting access; must match conversation owner
      * @return a [AimoConversationClient] for this conversation, or null if:
      *         - conversation not found
-     *         - userId is provided but doesn't match conversation owner
+     *         - userId doesn't match conversation owner
      */
-    fun getConversationClient(chatId: UUID, userId: String? = null): AimoConversationClient?
+    fun getConversationClient(chatId: UUID, userId: String): AimoConversationClient?
 
     /**
      * Create a new conversation.
@@ -115,27 +133,28 @@ interface Aimo {
     /**
      * Get all conversations owned by a user.
      *
-     * @param userId the user ID to list conversations for; if null, returns empty list (no admin access)
-     * @return list of conversations owned by the userId, or empty list if userId is null or has no conversations
+     * Returns only conversations where the user is the owner.
+     *
+     * @param userId the user ID to list conversations for (required)
+     * @return list of conversations owned by the userId, or empty list if user has no conversations
      */
-    fun getConversations(userId: String? = null): List<AimoConversationInfo>
+    fun getConversations(userId: String): List<AimoConversationInfo>
 
     /**
      * Delete a conversation and all of its message history.
      *
      * This operation is permanent and cannot be undone.
      *
-     * **Authorization**: If userId is provided, this method verifies the user owns the conversation.
-     * If userId is null, no authorization check is performed and any conversation can be deleted.
+     * **Authorization**: This method verifies the user owns the conversation before deletion.
      *
      * @param chatId the conversation to delete
-     * @param userId optional user ID requesting deletion; if provided, must match conversation owner
+     * @param userId user ID requesting deletion; must match conversation owner
      * @return true if the conversation was successfully deleted
      *         false if:
      *         - conversation not found
-     *         - userId is provided but doesn't match conversation owner
+     *         - userId doesn't match conversation owner
      */
-    fun deleteConversation(chatId: UUID, userId: String? = null): Boolean
+    fun deleteConversation(chatId: UUID, userId: String): Boolean
 
     /**
      * Get the message history for a conversation.
@@ -143,17 +162,16 @@ interface Aimo {
      * Returns all requests (user questions) and their responses (assistant messages, tool results)
      * for the specified conversation in chronological order.
      *
-     * **Authorization**: If userId is provided, this method verifies the user owns the conversation.
-     * If userId is null, no authorization check is performed and history is returned regardless.
+     * **Authorization**: This method verifies the user owns the conversation before returning history.
      *
      * @param chatId the conversation to retrieve history for
-     * @param userId optional user ID requesting the history; if provided, must match conversation owner
+     * @param userId user ID requesting the history; must match conversation owner
      * @return list of all requests and responses in chronological order, or empty list if:
      *         - conversation not found
-     *         - userId is provided but doesn't match conversation owner
+     *         - userId doesn't match conversation owner
      *         - conversation has no history
      */
-    fun getChatHistory(chatId: UUID, userId: String? = null): List<AimoHistoryRequest>
+    fun getChatHistory(chatId: UUID, userId: String): List<AimoHistoryRequest>
 
     /**
      * Update metadata for an existing conversation identified by [chatId].
@@ -163,16 +181,91 @@ interface Aimo {
      *
      * This does not create a new conversation when [chatId] is missing.
      *
-     * **Authorization**: If userId is provided, this method verifies the user owns the conversation.
-     * If userId is null, no authorization check is performed.
+     * **Authorization**: This method verifies the user owns the conversation before updating metadata.
      *
      * @param chatId the conversation to update
      * @param metadata key/value pairs to insert or update on the conversation
-     * @param userId optional user ID requesting the update; if provided, must match conversation owner
+     * @param userId user ID requesting the update; must match conversation owner
      * @return true if metadata was successfully updated
      *         false if:
      *         - conversation not found
-     *         - userId is provided but doesn't match conversation owner
+     *         - userId doesn't match conversation owner
      */
-    fun upsertConversation(chatId: UUID, metadata: Map<String, String>, userId: String? = null): Boolean
+    fun upsertConversation(chatId: UUID, metadata: Map<String, String>, userId: String): Boolean
+
+    // ============================================
+    // Admin methods (no user isolation)
+    // ============================================
+
+    /**
+     * Get a client for any conversation without user authorization checks.
+     *
+     * This is an admin-only operation that bypasses user isolation.
+     * The returned client will not enforce user ownership validation.
+     *
+     * **SECURITY WARNING**: This method bypasses all user authorization. Only expose through admin endpoints.
+     *
+     * @param chatId the unique identifier of the conversation
+     * @return an [AimoConversationClient] for this conversation, or null if conversation not found
+     *
+     * @see getConversationClient User version requiring userId
+     */
+    fun getConversationClientAdmin(chatId: UUID): AimoConversationClient?
+
+    /**
+     * Get all conversations regardless of owner.
+     *
+     * This is an admin-only operation that returns every conversation in the system.
+     *
+     * **SECURITY WARNING**: This method bypasses all user authorization. Only expose through admin endpoints.
+     *
+     * @return list of all conversations
+     *
+     * @see getConversations User version limited to specific userId
+     */
+    fun getConversationsAdmin(): List<AimoConversationInfo>
+
+    /**
+     * Delete any conversation without user authorization checks.
+     *
+     * This is an admin-only operation that can delete any conversation regardless of owner.
+     * This operation is permanent and cannot be undone.
+     *
+     * **SECURITY WARNING**: This method bypasses all user authorization. Only expose through admin endpoints.
+     *
+     * @param chatId the conversation to delete
+     * @return true if the conversation was successfully deleted, false if not found
+     *
+     * @see deleteConversation User version requiring userId match
+     */
+    fun deleteConversationAdmin(chatId: UUID): Boolean
+
+    /**
+     * Get the message history for any conversation without user authorization checks.
+     *
+     * This is an admin-only operation that returns all requests and responses regardless of conversation owner.
+     *
+     * **SECURITY WARNING**: This method bypasses all user authorization. Only expose through admin endpoints.
+     *
+     * @param chatId the conversation to retrieve history for
+     * @return list of all requests and responses in chronological order, or empty list if conversation not found
+     *
+     * @see getChatHistory User version requiring userId match
+     */
+    fun getChatHistoryAdmin(chatId: UUID): List<AimoHistoryRequest>
+
+    /**
+     * Update metadata for any conversation without user authorization checks.
+     *
+     * This is an admin-only operation that can modify metadata of any conversation.
+     *
+     * **SECURITY WARNING**: This method bypasses all user authorization. Only expose through admin endpoints.
+     *
+     * @param chatId the conversation to update
+     * @param metadata key/value pairs to insert or update on the conversation
+     * @return true if metadata was successfully updated, false if conversation not found
+     *
+     * @see upsertConversation User version requiring userId match
+     */
+    fun upsertConversationAdmin(chatId: UUID, metadata: Map<String, String>): Boolean
 }

@@ -123,20 +123,27 @@ interface AimoChatClientDao {
       fun deleteChatConversation(chatId: UUID, userId: String? = null): Boolean
 
 
-      /**
-       * Add a chat request to a conversation.
-       *
-       * @param userId optional user ID adding the request; not stored in request data
-       * @param request the request to add
-       */
-      fun addChatRequest(userId: String? = null, request: ChatRequestEntity)
+       /**
+        * Add a chat request to a conversation.
+        *
+        * **Authorization**: If userId is provided, verifies the user owns the conversation.
+        * If userId is null, no authorization check is performed.
+        *
+        * @param userId optional user ID adding the request; if provided, must match conversation owner
+        * @param request the request to add
+        * @return true if the request was successfully added
+        *         false if:
+        *         - conversation not found
+        *         - userId is provided but doesn't match conversation owner
+        */
+       fun addChatRequest(userId: String? = null, request: ChatRequestEntity): Boolean
 
-      /**
-       * Add a chat request (unscoped - internal use only).
-       *
-       * **Warning**: This bypasses user isolation checks. Use [addChatRequest] with userId instead.
-       */
-      fun addChatRequest(request: ChatRequestEntity) = addChatRequest(null, request)
+       /**
+        * Add a chat request (unscoped - internal use only).
+        *
+        * **Warning**: This bypasses user isolation checks. Use [addChatRequest] with userId instead.
+        */
+       fun addChatRequest(request: ChatRequestEntity) = addChatRequest(null, request)
 
       /**
        * Get chat requests for a conversation.

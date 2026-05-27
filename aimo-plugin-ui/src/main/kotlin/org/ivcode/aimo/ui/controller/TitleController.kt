@@ -31,14 +31,14 @@ class TitleController constructor(
     fun getTitle(
         @PathVariable chatId: UUID
     ): ConversationTitle? {
-        val conversationClient = aimo.getConversationClient(chatId) ?: throw NotFoundException("Conversation with id $chatId not found")
+        val conversationClient = aimo.getConversationClientAdmin(chatId) ?: throw NotFoundException("Conversation with id $chatId not found")
         return titleChatController.getTitle(conversationClient)
     }
 
     /** Returns title metadata for all conversations that currently have a stored title. */
     @GetMapping("/")
     fun getTitles(): List<ConversationTitle> {
-        return aimo.getConversations().mapNotNull { conversation ->
+        return aimo.getConversationsAdmin().mapNotNull { conversation ->
             titleChatController.getTitle(conversation)
         }
     }
@@ -55,7 +55,8 @@ class TitleController constructor(
         @PathVariable chatId: UUID,
         @PathVariable title: String
     ) {
-        val conversationClient = aimo.getConversationClient(chatId) ?: throw NotFoundException("Conversation with id $chatId not found")
+        val conversationClient = aimo.getConversationClientAdmin(chatId) ?: throw NotFoundException("Conversation with id $chatId not found")
         titleChatController.setTitle(title, conversationClient)
     }
 }
+

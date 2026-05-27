@@ -17,13 +17,25 @@ class ConversationService (
     }
 
     fun deleteConversation(chatId: UUID, userId: String?) {
-        if(!aimo.deleteConversation(chatId, userId)) {
+        val deleted = if (userId != null) {
+            aimo.deleteConversation(chatId, userId)
+        } else {
+            aimo.deleteConversationAdmin(chatId)
+        }
+
+        if (!deleted) {
             throw NotFoundException("Conversation with id $chatId not found or not authorized")
         }
     }
 
     fun getConversations(userId: String?): List<ChatConversationInfo> {
-        return aimo.getConversations(userId).map { it.toChatConversationInfo() }
+        val conversations = if (userId != null) {
+            aimo.getConversations(userId)
+        } else {
+            aimo.getConversationsAdmin()
+        }
+        return conversations.map { it.toChatConversationInfo() }
     }
 }
+
 

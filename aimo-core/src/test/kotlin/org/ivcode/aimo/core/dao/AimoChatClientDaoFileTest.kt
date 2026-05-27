@@ -19,10 +19,12 @@ class AimoChatClientDaoFileTest {
         return dir
     }
 
+    private fun createObjectMapper(): ObjectMapper = ObjectMapper()
+
     @Test
     fun `file dao creates and retrieves conversations`() {
         val dataDir = createTempDir()
-        val dao = AimoChatClientDaoFile(dataDir)
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
 
         val conversation = dao.createChatConversation(userId = "user1")
         assertNotNull(conversation)
@@ -41,12 +43,12 @@ class AimoChatClientDaoFileTest {
         val dataDir = createTempDir()
 
         // Create and store a conversation
-        val dao1 = AimoChatClientDaoFile(dataDir)
+        val dao1 = AimoChatClientDaoFile(dataDir, createObjectMapper())
         val conversation = dao1.createChatConversation(userId = "user1")
         val chatId = conversation.chatId
 
         // Create a new DAO instance pointing to same directory
-        val dao2 = AimoChatClientDaoFile(dataDir)
+        val dao2 = AimoChatClientDaoFile(dataDir, createObjectMapper())
         val retrieved = dao2.getChatConversation(chatId)
         assertNotNull(retrieved)
         assertEquals(chatId, retrieved.chatId)
@@ -56,9 +58,9 @@ class AimoChatClientDaoFileTest {
     }
 
     @Test
-    fun `file dao handles user isolation`() {
+    fun `file dao handles null userId with message retrieval`() {
         val dataDir = createTempDir()
-        val dao = AimoChatClientDaoFile(dataDir)
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
 
         val conv1 = dao.createChatConversation(userId = "user1")
         val conv2 = dao.createChatConversation(userId = "user2")
@@ -83,7 +85,7 @@ class AimoChatClientDaoFileTest {
     @Test
     fun `file dao stores and retrieves requests`() {
         val dataDir = createTempDir()
-        val dao = AimoChatClientDaoFile(dataDir)
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
 
         val conversation = dao.createChatConversation(userId = "user1")
         val requestId = UUID.randomUUID()
@@ -105,7 +107,7 @@ class AimoChatClientDaoFileTest {
             createdAt = Instant.now()
         )
 
-        dao.addChatRequest(userId = "user1", request)
+         assert(dao.addChatRequest(userId = "user1", request))
 
         val retrieved = dao.getChatRequests(userId = "user1", chatId = conversation.chatId)
         assertEquals(1, retrieved.size)
@@ -117,7 +119,7 @@ class AimoChatClientDaoFileTest {
     @Test
     fun `file dao metadata upsert and delete`() {
         val dataDir = createTempDir()
-        val dao = AimoChatClientDaoFile(dataDir)
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
 
         val conversation = dao.createChatConversation(userId = "user1")
 
@@ -153,7 +155,7 @@ class AimoChatClientDaoFileTest {
     @Test
     fun `file dao respects character budget when retrieving requests`() {
         val dataDir = createTempDir()
-        val dao = AimoChatClientDaoFile(dataDir)
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
 
         val conversation = dao.createChatConversation(userId = "user1")
 
@@ -169,7 +171,7 @@ class AimoChatClientDaoFileTest {
                 toolName = null
             )
             Thread.sleep(10) // Ensure different timestamps
-            dao.addChatRequest(
+            assert(dao.addChatRequest(
                 userId = "user1",
                 ChatRequestEntity(
                     chatId = conversation.chatId,
@@ -178,7 +180,7 @@ class AimoChatClientDaoFileTest {
                     requestCharacters = (i + 1) * 50,  // 50, 100, 150
                     createdAt = Instant.now()
                 )
-            )
+            ))
         }
 
         // Get all requests for inspection
@@ -193,6 +195,117 @@ class AimoChatClientDaoFileTest {
         // With budget of 250, should get newest 150 + previous 100 = 2 requests
         val requests250 = dao.getChatRequests(userId = "user1", chatId = conversation.chatId, maxRequestCharacters = 250)
         assertEquals(2, requests250.size)
+
+        dataDir.deleteRecursively()
+    }
+
+    @Test
+    fun `file dao addChatRequest fails when user is not authorized for the conversation`() {
+        val dataDir = createTempDir()
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
+
+        val user1Conversation = dao.createChatConversation(userId = "user1")
+
+        // user2 tries to add a request to user1's conversation - should fail
+        val requestId = UUID.randomUUID()
+        val message = ChatMessageEntity(
+            requestId = requestId,
+            messageId = 1,
+            type = "USER",
+            content = "unauthorized",
+            thinking = null,
+            toolName = null
+        )
+
+        val result = dao.addChatRequest(
+            userId = "user2",
+            request = ChatRequestEntity(
+                chatId = user1Conversation.chatId,
+                requestId = requestId,
+                messages = listOf(message),
+                requestCharacters = 12,
+                createdAt = Instant.now()
+            )
+        )
+
+        assert(!result) { "addChatRequest should return false when user is not authorized" }
+
+        // Verify the request was not added
+        val requests = dao.getChatRequests(userId = "user1", chatId = user1Conversation.chatId)
+        assertEquals(emptyList(), requests)
+
+        dataDir.deleteRecursively()
+    }
+
+    @Test
+    fun `file dao addChatRequest fails when conversation does not exist`() {
+        val dataDir = createTempDir()
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
+
+        val nonExistentChatId = UUID.randomUUID()
+
+        // Try to add request to non-existent conversation - should fail
+        val requestId = UUID.randomUUID()
+        val message = ChatMessageEntity(
+            requestId = requestId,
+            messageId = 1,
+            type = "USER",
+            content = "no-conv",
+            thinking = null,
+            toolName = null
+        )
+
+        val result = dao.addChatRequest(
+            userId = "user1",
+            request = ChatRequestEntity(
+                chatId = nonExistentChatId,
+                requestId = requestId,
+                messages = listOf(message),
+                requestCharacters = 7,
+                createdAt = Instant.now()
+            )
+        )
+
+        assert(!result) { "addChatRequest should return false when conversation does not exist" }
+
+        dataDir.deleteRecursively()
+    }
+
+    @Test
+    fun `file dao addChatRequest succeeds when user owns the conversation`() {
+        val dataDir = createTempDir()
+        val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
+
+        val conversation = dao.createChatConversation(userId = "user1")
+
+        // user1 adds request to their own conversation - should succeed
+        val requestId = UUID.randomUUID()
+        val message = ChatMessageEntity(
+            requestId = requestId,
+            messageId = 1,
+            type = "USER",
+            content = "authorized",
+            thinking = null,
+            toolName = null
+        )
+
+        val result = dao.addChatRequest(
+            userId = "user1",
+            request = ChatRequestEntity(
+                chatId = conversation.chatId,
+                requestId = requestId,
+                messages = listOf(message),
+                requestCharacters = 10,
+                createdAt = Instant.now()
+            )
+        )
+
+        assert(result) { "addChatRequest should return true when user owns the conversation" }
+
+        // Verify the request was added
+        val requests = dao.getChatRequests(userId = "user1", chatId = conversation.chatId)
+        assertEquals(1, requests.size)
+        assertEquals("authorized", requests.single().messages.single().content)
 
         dataDir.deleteRecursively()
     }

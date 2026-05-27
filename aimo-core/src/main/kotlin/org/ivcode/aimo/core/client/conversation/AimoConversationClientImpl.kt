@@ -53,7 +53,7 @@ internal class AimoConversationClientImpl(
         }
 
         // Persist to DAO (source of truth)
-        dao.addChatRequest(
+        val success = dao.addChatRequest(
             userId = userId,
             request = ChatRequestEntity(
                 chatId = chatId,
@@ -63,6 +63,9 @@ internal class AimoConversationClientImpl(
                 createdAt = Instant.now(),
             )
         )
+        if (!success) {
+            throw IllegalStateException("Failed to persist messages: conversation not found or user not authorized for chatId: $chatId")
+        }
     }
 
     override fun getChatMetadata(): Map<String, Any> {

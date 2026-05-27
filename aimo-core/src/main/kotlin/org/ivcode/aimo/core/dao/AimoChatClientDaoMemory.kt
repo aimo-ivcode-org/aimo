@@ -89,11 +89,14 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
          return true
      }
 
-    override fun addChatRequest(userId: String?, request: ChatRequestEntity) {
-        // userId is provided for authorization context but not stored in the request
-        // (it's already implicit in the conversation)
+    override fun addChatRequest(userId: String?, request: ChatRequestEntity): Boolean {
+        val conversation = conversations[request.chatId] ?: return false
+        // Check authorization
+        if (!canAccess(conversation, userId)) return false
+
         val list = requests.getOrPut(request.chatId) { mutableListOf() }
         list.add(request)
+        return true
     }
 
     override fun getChatRequests(userId: String?, chatId: UUID): List<ChatRequestEntity> {
