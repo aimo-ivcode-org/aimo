@@ -33,40 +33,67 @@ internal class AimoConversationClientImpl(
         )
     }
 
-    override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
-        // Load from DAO with optional character limit
-        val messages = if (maxCacheCharacters == null) {
-            dao.getChatRequests(userId, chatId)
-        } else {
-            dao.getChatRequests(
-                userId = userId,
-                chatId = chatId,
-                maxRequestCharacters = maxCacheCharacters.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-            )
-        }.flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
-        return messages.takeIf { it.isNotEmpty() }
-    }
+     override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
+         // Load from DAO with optional character limit
+         val messages = if (userId != null) {
+             // User-scoped access
+             if (maxCacheCharacters == null) {
+                 dao.getChatRequests(userId, chatId)
+             } else {
+                 dao.getChatRequests(
+                     userId = userId,
+                     chatId = chatId,
+                     maxRequestCharacters = maxCacheCharacters.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                 )
+             }
+         } else {
+             // Admin access (no auth check)
+             if (maxCacheCharacters == null) {
+                 dao.getChatRequestsAdmin(chatId)
+             } else {
+                 dao.getChatRequestsAdmin(
+                     chatId = chatId,
+                     maxRequestCharacters = maxCacheCharacters.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                 )
+             }
+         }.flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
+         return messages.takeIf { it.isNotEmpty() }
+     }
 
-    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
-        if(messages.isEmpty()) {
-            throw IllegalArgumentException("AimoConversationClientImpl addMessages should have at least one message")
-        }
+     override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
+         if(messages.isEmpty()) {
+             throw IllegalArgumentException("AimoConversationClientImpl addMessages should have at least one message")
+         }
 
-        // Persist to DAO (source of truth)
-        val success = dao.addChatRequest(
-            userId = userId,
-            request = ChatRequestEntity(
-                chatId = chatId,
-                requestId = requestId,
-                messages = messages.map { it.toChatMessageEntity(requestId) },
-                requestCharacters = messages.sumOf { it.content?.length ?: 0 },
-                createdAt = Instant.now(),
-            )
-        )
-        if (!success) {
-            throw IllegalStateException("Failed to persist messages: conversation not found or user not authorized for chatId: $chatId")
-        }
-    }
+         // Persist to DAO (source of truth)
+         val success = if (userId != null) {
+             // User-scoped write
+             dao.addChatRequest(
+                 userId = userId,
+                 request = ChatRequestEntity(
+                     chatId = chatId,
+                     requestId = requestId,
+                     messages = messages.map { it.toChatMessageEntity(requestId) },
+                     requestCharacters = messages.sumOf { it.content?.length ?: 0 },
+                     createdAt = Instant.now(),
+                 )
+             )
+         } else {
+             // Admin write (no auth check)
+             dao.addChatRequestAdmin(
+                 ChatRequestEntity(
+                     chatId = chatId,
+                     requestId = requestId,
+                     messages = messages.map { it.toChatMessageEntity(requestId) },
+                     requestCharacters = messages.sumOf { it.content?.length ?: 0 },
+                     createdAt = Instant.now(),
+                 )
+             )
+         }
+         if (!success) {
+             throw IllegalStateException("Failed to persist messages: conversation not found or user not authorized for chatId: $chatId")
+         }
+     }
 
     override fun getChatMetadata(): Map<String, Any> {
         return requireChatConversation().metadata.toMap()
@@ -84,17 +111,28 @@ internal class AimoConversationClientImpl(
         return getChatProperty(property)
     }
 
-    override fun writeChatProperty(property: String, value: Any) {
-        val success = dao.upsertConversationMetadata(chatId, userId, mapOf(property to value))
-        if (!success) {
-            throw IllegalStateException("Conversation not found for chatId: $chatId")
-        }
-    }
-
-     override fun deleteChatProperty(property: String): Boolean {
-         return dao.deleteConversationMetadata(chatId, userId, listOf(property))
+     override fun writeChatProperty(property: String, value: Any) {
+         val success = if (userId != null) {
+             dao.upsertConversationMetadata(chatId, userId, mapOf(property to value))
+         } else {
+             dao.upsertConversationMetadataAdmin(chatId, mapOf(property to value))
+         }
+         if (!success) {
+             throw IllegalStateException("Conversation not found for chatId: $chatId")
+         }
      }
 
-     private fun requireChatConversation() = dao.getChatConversation(chatId, userId)
-         ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
+      override fun deleteChatProperty(property: String): Boolean {
+          return if (userId != null) {
+              dao.deleteConversationMetadata(chatId, userId, listOf(property))
+          } else {
+              dao.deleteConversationMetadataAdmin(chatId, listOf(property))
+          }
+      }
+
+      private fun requireChatConversation() = if (userId != null) {
+          dao.getChatConversation(chatId, userId)
+      } else {
+          dao.getChatConversationAdmin(chatId)
+      } ?: throw IllegalStateException("Conversation not found for chatId: $chatId")
 }

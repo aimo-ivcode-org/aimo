@@ -67,17 +67,17 @@ class AimoChatClientDaoFileTest {
 
         // User1 can only see their own conversation
         val user1Convs = dao.getChatConversations(userId = "user1")
-        assertEquals(1, user1Convs.size)
-        assertEquals(conv1.chatId, user1Convs.first().chatId)
+         assertEquals(1, user1Convs.size)
+         assertEquals(conv1.chatId, user1Convs.first().chatId)
 
-        // User2 can only see their own conversation
-        val user2Convs = dao.getChatConversations(userId = "user2")
-        assertEquals(1, user2Convs.size)
-        assertEquals(conv2.chatId, user2Convs.first().chatId)
+         // User2 can only see their own conversation
+         val user2Convs = dao.getChatConversations(userId = "user2")
+         assertEquals(1, user2Convs.size)
+         assertEquals(conv2.chatId, user2Convs.first().chatId)
 
-        // Admin (null userId) can see all
-        val adminConvs = dao.getChatConversations(userId = null)
-        assertEquals(2, adminConvs.size)
+         // Admin can see all conversations
+         val adminConvs = dao.getChatConversationsAdmin()
+         assertEquals(2, adminConvs.size)
 
         dataDir.deleteRecursively()
     }

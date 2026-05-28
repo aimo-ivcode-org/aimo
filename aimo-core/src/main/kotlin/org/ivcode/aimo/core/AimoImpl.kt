@@ -56,7 +56,7 @@ internal class AimoImpl (
     // ============================================
 
     override fun getConversationClientAdmin(chatId: UUID): AimoConversationClient? {
-        return chatClientDao.getChatConversation(chatId, null)?.let { conversation ->
+        return chatClientDao.getChatConversationAdmin(chatId)?.let { conversation ->
             AimoConversationClientImpl (
                 chatId = conversation.chatId,
                 model = model,
@@ -69,19 +69,19 @@ internal class AimoImpl (
     }
 
     override fun getConversationsAdmin(): List<AimoConversationInfo> {
-        return chatClientDao.getChatConversations(null).map { it.toAimoConversationInfo() }
+        return chatClientDao.getChatConversationsAdmin().map { it.toAimoConversationInfo() }
     }
 
     override fun deleteConversationAdmin(chatId: UUID): Boolean {
-        return chatClientDao.deleteChatConversation(chatId, null)
+        return chatClientDao.deleteChatConversationAdmin(chatId)
     }
 
     override fun getChatHistoryAdmin(chatId: UUID): List<AimoHistoryRequest> {
-        return chatClientDao.getChatRequests(null, chatId).map { it.toAimoHistoryRequest() }
+        return chatClientDao.getChatRequestsAdmin(chatId).map { it.toAimoHistoryRequest() }
     }
 
     override fun upsertConversationAdmin(chatId: UUID, metadata: Map<String, String>): Boolean {
-        return chatClientDao.upsertConversationMetadata(chatId, null, metadata)
+        return chatClientDao.upsertConversationMetadataAdmin(chatId, metadata)
     }
 }
 

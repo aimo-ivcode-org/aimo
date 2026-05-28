@@ -593,7 +593,7 @@ class AimoChatClientImplMessageIdTest {
         }
         override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
             if (messages.isEmpty()) return
-            dao?.addChatRequest(
+            dao?.addChatRequestAdmin(
                 ChatRequestEntity(
                     chatId = chatId,
                     requestId = requestId,
