@@ -1,6 +1,7 @@
 package org.ivcode.aimo.ui.controller
 
 import org.ivcode.aimo.core.Aimo
+import org.ivcode.aimo.core.security.AimoUserProvider
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
 import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.ui.chatcontroller.TitleChatController
@@ -23,7 +24,8 @@ import java.util.UUID
 @RequestMapping("/$API_CONTROLLER_CONTEXT/title")
 class TitleController constructor(
     private val aimo: Aimo,
-    private val titleChatController: TitleChatController
+    private val titleChatController: TitleChatController,
+    private val userProvider: AimoUserProvider
 ) {
 
     /** Returns the current title metadata for a single conversation. */
@@ -31,14 +33,16 @@ class TitleController constructor(
     fun getTitle(
         @PathVariable chatId: UUID
     ): ConversationTitle? {
-        val conversationClient = aimo.getConversationClientAdmin(chatId) ?: throw NotFoundException("Conversation with id $chatId not found")
+        val user = userProvider.getCurrentUser()
+        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found")
         return titleChatController.getTitle(conversationClient)
     }
 
     /** Returns title metadata for all conversations that currently have a stored title. */
     @GetMapping("/")
     fun getTitles(): List<ConversationTitle> {
-        return aimo.getConversationsAdmin().mapNotNull { conversation ->
+        val user = userProvider.getCurrentUser()
+        return aimo.getConversations(user.userId).mapNotNull { conversation ->
             titleChatController.getTitle(conversation)
         }
     }
@@ -55,7 +59,8 @@ class TitleController constructor(
         @PathVariable chatId: UUID,
         @PathVariable title: String
     ) {
-        val conversationClient = aimo.getConversationClientAdmin(chatId) ?: throw NotFoundException("Conversation with id $chatId not found")
+        val user = userProvider.getCurrentUser()
+        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found")
         titleChatController.setTitle(title, conversationClient)
     }
 }
