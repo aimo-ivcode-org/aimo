@@ -28,5 +28,5 @@ interface AimoUserProvider {
      * @param userId the user identifier to look up
      * @return the user if found, or null if not supported or not found
      */
-    fun getUserByI (userId: String): AimoUser? = null
+    fun getUserById (userId: String): AimoUser? = null
 }

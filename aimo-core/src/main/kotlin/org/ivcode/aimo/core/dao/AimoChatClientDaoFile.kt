@@ -1,5 +1,6 @@
 package org.ivcode.aimo.core.dao
 
+import org.slf4j.LoggerFactory
 import tools.jackson.databind.ObjectMapper
 import java.io.File
 import java.util.UUID
@@ -27,6 +28,7 @@ class AimoChatClientDaoFile(
     private val objectMapper: ObjectMapper
 ) : AimoChatClientDao {
 
+    private val log = LoggerFactory.getLogger(javaClass)
     private val lock = Any()
 
     init {
@@ -45,6 +47,7 @@ class AimoChatClientDaoFile(
             try {
                 objectMapper.readValue(file, ChatConversationEntity::class.java)
             } catch (e: Exception) {
+                log.warn("Failed to deserialize conversation metadata from {}: {}", file.absolutePath, e.message, e)
                 null
             }
         } else {
@@ -62,6 +65,7 @@ class AimoChatClientDaoFile(
             try {
                 objectMapper.readValue(file, ChatRequestEntity::class.java)
             } catch (e: Exception) {
+                log.warn("Failed to deserialize chat request from {}: {}", file.absolutePath, e.message, e)
                 null
             }
         } else {
