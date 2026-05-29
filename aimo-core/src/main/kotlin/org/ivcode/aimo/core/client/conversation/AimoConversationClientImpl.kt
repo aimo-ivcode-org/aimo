@@ -118,7 +118,7 @@ internal class AimoConversationClientImpl(
              dao.upsertConversationMetadataAdmin(chatId, mapOf(property to value))
          }
          if (!success) {
-             throw IllegalStateException("Conversation not found for chatId: $chatId")
+             throw IllegalStateException("Conversation not found or not authorized for chatId: $chatId")
          }
      }
 
