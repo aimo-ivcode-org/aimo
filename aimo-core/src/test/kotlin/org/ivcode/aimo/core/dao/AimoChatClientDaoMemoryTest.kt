@@ -2,6 +2,8 @@ package org.ivcode.aimo.core.dao
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 import java.time.Instant
 import java.util.UUID
 
@@ -12,9 +14,9 @@ class AimoChatClientDaoMemoryTest {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatConversation("user1").chatId
 
-        assert(dao.addChatRequest("user1", request(chatId, 1, 10, "r1")))
-        assert(dao.addChatRequest("user1", request(chatId, 2, 20, "r2")))
-        assert(dao.addChatRequest("user1", request(chatId, 3, 30, "r3")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 1, 10, "r1")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 2, 20, "r2")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 3, 30, "r3")))
 
         val result = dao.getChatRequests("user1", chatId, maxRequestCharacters = 50)
 
@@ -25,7 +27,7 @@ class AimoChatClientDaoMemoryTest {
     fun `getChatRequests with maxRequestCharacters returns empty for zero or negative budget`() {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatConversation("user1").chatId
-        assert(dao.addChatRequest("user1", request(chatId, 1, 10, "r1")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 1, 10, "r1")))
 
         assertEquals(emptyList(), dao.getChatRequests("user1", chatId, maxRequestCharacters = 0))
         assertEquals(emptyList(), dao.getChatRequests("user1", chatId, maxRequestCharacters = -1))
@@ -36,8 +38,8 @@ class AimoChatClientDaoMemoryTest {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatConversation("user1").chatId
 
-        assert(dao.addChatRequest("user1", request(chatId, 1, 10, "r1")))
-        assert(dao.addChatRequest("user1", request(chatId, 2, 40, "r2")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 1, 10, "r1")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 2, 40, "r2")))
 
         val result = dao.getChatRequests("user1", chatId, maxRequestCharacters = 30)
 
@@ -52,7 +54,7 @@ class AimoChatClientDaoMemoryTest {
         val requestId1 = UUID.randomUUID()
         val requestId2 = UUID.randomUUID()
 
-        assert(dao.addChatRequest("user1",
+        assertTrue(dao.addChatRequest("user1",
             ChatRequestEntity(
                 chatId = chatId,
                 requestId = requestId1,
@@ -64,7 +66,7 @@ class AimoChatClientDaoMemoryTest {
                 createdAt = Instant.now(),
             )
         ))
-        assert(dao.addChatRequest("user1",
+        assertTrue(dao.addChatRequest("user1",
             ChatRequestEntity(
                 chatId = chatId,
                 requestId = requestId2,
@@ -89,7 +91,7 @@ class AimoChatClientDaoMemoryTest {
 
         // Add multiple messages
         repeat(3) { i ->
-            assert(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
+            assertTrue(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
         }
 
         // Request with budget 0 should return empty
@@ -103,7 +105,7 @@ class AimoChatClientDaoMemoryTest {
 
         // Add messages of size 10
         repeat(3) { i ->
-            assert(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
+            assertTrue(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
         }
 
         // Budget 5 is less than message size 10, should return empty
@@ -117,7 +119,7 @@ class AimoChatClientDaoMemoryTest {
 
         // Add messages of size 10
         repeat(3) { i ->
-            assert(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
+            assertTrue(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
         }
 
         // Budget 10 should return newest message only (msg-2)
@@ -132,7 +134,7 @@ class AimoChatClientDaoMemoryTest {
 
         // Add messages of size 10
         repeat(3) { i ->
-            assert(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
+            assertTrue(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
         }
 
         // Budget 20 should accumulate exactly 2 newest (10 + 10 = 20)
@@ -148,7 +150,7 @@ class AimoChatClientDaoMemoryTest {
 
         // Add messages of size 10
         repeat(3) { i ->
-            assert(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
+            assertTrue(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
         }
 
         // Budget 25 is enough for 2 messages (20) but not 3 (30)
@@ -163,7 +165,7 @@ class AimoChatClientDaoMemoryTest {
 
         // Add messages of size 10
         repeat(3) { i ->
-            assert(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
+            assertTrue(dao.addChatRequest("user1", request(chatId, i + 1, 10, "msg-$i")))
         }
 
         // Budget 30 is exactly enough for all 3 messages
@@ -177,9 +179,9 @@ class AimoChatClientDaoMemoryTest {
         val chatId = dao.createChatConversation("user1").chatId
 
         // Add messages in order: 10, 20, 30
-        assert(dao.addChatRequest("user1", request(chatId, 1, 10, "first")))
-        assert(dao.addChatRequest("user1", request(chatId, 2, 20, "second")))
-        assert(dao.addChatRequest("user1", request(chatId, 3, 30, "third")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 1, 10, "first")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 2, 20, "second")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 3, 30, "third")))
 
         // With budget 50, we take newest two (30 + 20 = 50, adding 10 would be 60 > 50)
         val result = dao.getChatRequests("user1", chatId, maxRequestCharacters = 50)
@@ -196,9 +198,9 @@ class AimoChatClientDaoMemoryTest {
         val chatId = dao.createChatConversation("user1").chatId
 
         // Add messages of varying sizes: 5, 15, 8
-        assert(dao.addChatRequest("user1", request(chatId, 1, 5, "small")))
-        assert(dao.addChatRequest("user1", request(chatId, 2, 15, "medium")))
-        assert(dao.addChatRequest("user1", request(chatId, 3, 8, "tiny")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 1, 5, "small")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 2, 15, "medium")))
+        assertTrue(dao.addChatRequest("user1", request(chatId, 3, 8, "tiny")))
 
         // Budget 20: newest is 8 (fits), next is 15 (8+15=23 > 20, doesn't fit)
         val result = dao.getChatRequests("user1", chatId, maxRequestCharacters = 20)
@@ -217,7 +219,7 @@ class AimoChatClientDaoMemoryTest {
         // user2 tries to add a request to user1's conversation - should fail
         val result = dao.addChatRequest("user2", request(user1Conversation.chatId, 1, 10, "unauthorized"))
 
-        assert(!result) { "addChatRequest should return false when user is not authorized" }
+        assertFalse(result, "addChatRequest should return false when user is not authorized")
 
         // Verify the request was not added
         val requests = dao.getChatRequests("user1", user1Conversation.chatId)
@@ -232,7 +234,7 @@ class AimoChatClientDaoMemoryTest {
         // Try to add request to non-existent conversation - should fail
         val result = dao.addChatRequest("user1", request(nonExistentChatId, 1, 10, "no-conv"))
 
-        assert(!result) { "addChatRequest should return false when conversation does not exist" }
+        assertFalse(result, "addChatRequest should return false when conversation does not exist")
     }
 
     @Test
@@ -243,7 +245,7 @@ class AimoChatClientDaoMemoryTest {
         // user1 adds request to their own conversation - should succeed
         val result = dao.addChatRequest("user1", request(conversation.chatId, 1, 10, "authorized"))
 
-        assert(result) { "addChatRequest should return true when user owns the conversation" }
+        assertTrue(result, "addChatRequest should return true when user owns the conversation")
 
         // Verify the request was added
         val requests = dao.getChatRequests("user1", conversation.chatId)
