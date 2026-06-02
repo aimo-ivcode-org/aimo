@@ -1,6 +1,7 @@
 package org.ivcode.aimo.server.controller
 
 import jakarta.servlet.http.HttpServletRequest
+import org.ivcode.aimo.core.security.AimoUserProvider
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
 import org.ivcode.aimo.server.model.ChatRequest
 import org.ivcode.aimo.server.model.RequestMetadata
@@ -21,7 +22,8 @@ import java.util.UUID
 @RestController
 @RequestMapping("/$API_CONTROLLER_CONTEXT/chat")
 class ChatController (
-    private val chatClientService: ChatService
+    private val chatClientService: ChatService,
+    private val userProvider: AimoUserProvider,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -33,13 +35,14 @@ class ChatController (
         servletRequest: HttpServletRequest,
     ): ResponseEntity<StreamingResponseBody> {
         val requestMetadata = RequestMetadata.from(servletRequest)
+        val user = userProvider.getCurrentUser()
 
         val stream = StreamingResponseBody { output ->
             try {
                 // Capture request metadata once and pass a read-only map into chat context.
                 chatClientService.chat(chatId, request, mapOf(
                     PROPERTY_NAME_REQUEST_METADATA to requestMetadata
-                ), output)
+                ), output, user.userId)
             } catch (ex: Exception) {
                 log.error("Error while streaming chat for chatId=$chatId", ex)
             }

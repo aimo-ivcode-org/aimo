@@ -10,20 +10,32 @@ import java.util.UUID
 class ConversationService (
     private val aimo: Aimo
 ) {
-    fun createConversation(): ChatConversationInfo {
+    fun createConversation(userId: String): ChatConversationInfo {
         return ChatConversationInfo(
-            aimo.createConversation().chatId
+            aimo.createConversation(userId).chatId
         )
     }
 
-    fun deleteConversation(chatId: UUID) {
-        if(!aimo.deleteConversation(chatId)) {
-            throw NotFoundException("Conversation with id $chatId not found")
+    fun deleteConversation(chatId: UUID, userId: String?) {
+        val deleted = if (userId != null) {
+            aimo.deleteConversation(chatId, userId)
+        } else {
+            aimo.deleteConversationAdmin(chatId)
+        }
+
+        if (!deleted) {
+            throw NotFoundException("Conversation with id $chatId not found or not authorized")
         }
     }
 
-    fun getConversations(): List<ChatConversationInfo> {
-        return aimo.getConversations().map { it.toChatConversationInfo() }
+    fun getConversations(userId: String?): List<ChatConversationInfo> {
+        val conversations = if (userId != null) {
+            aimo.getConversations(userId)
+        } else {
+            aimo.getConversationsAdmin()
+        }
+        return conversations.map { it.toChatConversationInfo() }
     }
 }
+
 
