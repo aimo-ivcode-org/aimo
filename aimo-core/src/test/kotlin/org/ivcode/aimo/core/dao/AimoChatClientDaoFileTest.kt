@@ -18,7 +18,7 @@ class AimoChatClientDaoFileTest {
         return dir
     }
 
-    private fun createObjectMapper(): ObjectMapper = ObjectMapper()
+    private fun createObjectMapper(): ObjectMapper = tools.jackson.module.kotlin.jacksonObjectMapper()
 
     private inline fun withTempDir(testBlock: (File) -> Unit) {
         val dataDir = createTempDir()
@@ -63,7 +63,7 @@ class AimoChatClientDaoFileTest {
     }
 
     @Test
-    fun `file dao handles null userId with message retrieval`() {
+    fun `file dao isolates conversations by userId and admin can list all`() {
         withTempDir { dataDir ->
             val dao = AimoChatClientDaoFile(dataDir, createObjectMapper())
 
@@ -111,7 +111,7 @@ class AimoChatClientDaoFileTest {
                 createdAt = Instant.now()
             )
 
-            assert(dao.addChatRequest(userId = "user1", request))
+            assertTrue(dao.addChatRequest(userId = "user1", request))
 
             val retrieved = dao.getChatRequests(userId = "user1", chatId = conversation.chatId)
             assertEquals(1, retrieved.size)
@@ -173,7 +173,7 @@ class AimoChatClientDaoFileTest {
                     toolName = null
                 )
                 Thread.sleep(10) // Ensure different timestamps
-                assert(dao.addChatRequest(
+                assertTrue(dao.addChatRequest(
                     userId = "user1",
                     ChatRequestEntity(
                         chatId = conversation.chatId,
@@ -229,7 +229,7 @@ class AimoChatClientDaoFileTest {
                 )
             )
 
-            assert(!result) { "addChatRequest should return false when user is not authorized" }
+            assertTrue(!result, "addChatRequest should return false when user is not authorized")
 
             // Verify the request was not added
             val requests = dao.getChatRequests(userId = "user1", chatId = user1Conversation.chatId)
@@ -266,7 +266,7 @@ class AimoChatClientDaoFileTest {
                 )
             )
 
-            assert(!result) { "addChatRequest should return false when conversation does not exist" }
+            assertTrue(!result, "addChatRequest should return false when conversation does not exist")
         }
     }
 
@@ -299,7 +299,7 @@ class AimoChatClientDaoFileTest {
                 )
             )
 
-            assert(result) { "addChatRequest should return true when user owns the conversation" }
+            assertTrue(result, "addChatRequest should return true when user owns the conversation")
 
             // Verify the request was added
             val requests = dao.getChatRequests(userId = "user1", chatId = conversation.chatId)

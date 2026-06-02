@@ -34,7 +34,7 @@ class TitleController constructor(
         @PathVariable chatId: UUID
     ): ConversationTitle? {
         val user = userProvider.getCurrentUser()
-        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found")
+        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found or not authorized")
         return titleChatController.getTitle(conversationClient)
     }
 
@@ -60,7 +60,7 @@ class TitleController constructor(
         @PathVariable title: String
     ) {
         val user = userProvider.getCurrentUser()
-        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found")
+        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found or not authorized")
         titleChatController.setTitle(title, conversationClient)
     }
 }
