@@ -1,5 +1,11 @@
 # Aimo
 
+> ⚠️ **Active Development Notice**
+> 
+> This project is functional and in a working state, but is currently undergoing **heavy development and serious refactoring** toward a 1.0 release. APIs, module structure, and core architecture are subject to significant change.
+> 
+> See the [Roadmap](./ROADMAP.md) for planned changes and current direction.
+
 Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring project for building AI chat applications with conversation memory, tool-calling controllers, an Ollama-backed model adapter, and a React UI.
 
 ## What this repository contains
