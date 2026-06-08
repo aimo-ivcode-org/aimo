@@ -46,6 +46,16 @@ In the new model:
   - Each builder specifies its own configuration
   - Builders return configured chat clients ready to execute
   - Builders apply all relevant interceptors (security, guard-rails)
+
+**Interceptor Architecture**:
+- Core interfaces (e.g., `ChatClient`, Agent Provider) accept generic interceptors
+- Interceptors are the unified mechanism for cross-cutting concerns
+- Examples of interceptor-driven features:
+  - **Guard-Rails**: Intercept ChatClient requests/responses to validate or transform
+  - **Security Filtering**: Intercept agent listing to filter by user permissions
+  - **Logging/Tracing**: Intercept any point for observability
+- Interceptors are registered via the builder at runtime
+- No feature requires a special-purpose hook — all use the same interceptor interface
   
 **Example Flow**:
 1. Application starts with properties-based configuration
@@ -119,13 +129,13 @@ Agent
 - **Agent Provider**: Central service for retrieving and creating agents
   - Loads predefined agents from application.yaml (under `aimo.agents`)
   - Supports runtime agent creation without registration
-  - Integrates with interceptors for access control
+  - Accepts generic interceptors for filtering/access control
   - Initialized by BuilderFactory
 
-- **Interceptors**: Filter agents based on context
-  - Apply user permissions if security is enabled (Spring Security interceptor)
-  - Can restrict access to certain agents based on roles
-  - Optional: no interceptors if security is disabled
+- **Interceptors on Agent Provider**: Filter agents based on context
+  - Security module provides interceptors that filter by user permissions
+  - Applied only if security interceptors are registered (optional)
+  - Use the same interceptor interface as ChatClient interceptors
   - Part of broader interceptor framework
 
 **Agent Sources**:
@@ -169,9 +179,11 @@ Agent
 The conversation's `agentId` will be stored in conversation metadata (the `AimoConversationInfo.metadata` / `Map<String, Any>` that already exists in the DAO). No schema changes are needed for this — it uses the existing `writeChatProperty`/`readChatProperty` mechanism.
 
 ### Phase 3: Spring Security
-**Goal**: Provide optional Spring Security integration
-- Configuration and setup
-- Interceptors for hooking into the system
+**Goal**: Provide optional Spring Security integration via interceptors
+- Spring Security module provides pre-built interceptors
+- Interceptors hook into ChatClient and Agent Provider to enforce security
+- Users register the interceptors via the builder — no special-purpose wiring needed
+- Uses standard Spring Security annotations (`@Secured`, `@PreAuthorize`) on tools
 
 **⚠️ Existing User Concept in Codebase**:
 The current codebase already has a user/security concept:
@@ -269,7 +281,8 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
 **Goal**: Implement lightweight interceptors for ChatClient request/response validation and enrichment
 
 **Definition**:
-- Guard-rails use interceptors to intercept ChatClient requests and responses
+- Guard-rails are interceptors registered on the ChatClient
+- They use the same generic interceptor interface as security and other cross-cutting concerns
 - Leverage fast, lightweight LLMs for quick checks and operations
 - Enable content moderation, safety checks, and response enhancement
 
