@@ -303,6 +303,22 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
   - Integrated as interceptors in the builder pipeline
   - Applied automatically when builder chains ChatClient
 
+### Phase 8: Additional Model Providers
+**Goal**: Add first-party support for OpenAI (ChatGPT) and Anthropic as model providers
+
+**New Modules**:
+- `aimo-model-openai` — OpenAI provider (ChatGPT, GPT-4, etc.)
+- `aimo-model-anthropic` — Anthropic provider (Claude models)
+
+**Existing Providers** (already implemented):
+- `aimo-model-ollama` — Ollama (local models)
+- `aimo-model-bedrock` — AWS Bedrock
+
+**Design**:
+- Follow the existing `AimoChatModelProviderFactory` pattern used by Ollama and Bedrock
+- Configured under `aimo.models` in application.yaml alongside existing providers
+- Drop-in addition — no core changes required
+
 
 ---
 
