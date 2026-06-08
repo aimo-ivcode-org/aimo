@@ -5,11 +5,28 @@
 ### Phase 1: Configuration
 **Goal**: Make the system configurable through properties and runtime builders
 
+**⚠️ Architecture Change — Replacing the `Aimo` Facade**:
+The current codebase has an `Aimo` interface (`aimo-core/Aimo.kt`) that acts as the monolithic entry point. It manages conversations, chat clients, and admin operations. This interface **will be replaced** by the BuilderFactory + Builder pattern. The existing `Aimo`, `AimoImpl`, and `AimoConfig.createAimo()` bean are candidates for removal or significant restructuring.
+
+**⚠️ Terminology — Current vs Future**:
+Current codebase uses two overlapping client concepts:
+- `AimoConversationClient` — manages a conversation: creates chat clients, reads/writes history & metadata
+- `AimoChatClient` — executes chat: `chat()` and `chatStream()` methods
+
+In the new model:
+- **Conversations** = pure history/metadata storage (backed by memory, file, RDS, MongoDB, etc.)
+- **Builders** = accept a conversation, configure runtime behavior, return a `ChatClient`
+- The `AimoConversationClient.createChatClient()` pattern becomes the builder pattern
+
+**⚠️ Existing `AimoChatModelFactory`**: An `AimoChatModelFactory` interface already exists in the codebase. The new `BuilderFactory` is a higher-level concept — it wraps model factories, agents, guard-rails and config into a single entry point. Do not conflate the two.
+
 **Application Properties** (application.yaml):
 - Define predefined models and their configurations (under `aimo.models`)
 - Define agents and their tool scoping (under `aimo.agents`)
+- Define guard-rails configuration (under `aimo.guardRails`)
 - Base configuration for the system
-- Minimal changes to the existing property structure
+- Minimal changes to existing property structure
+- Properties bootstrap BuilderFactory on startup
 
 **Conversation Model** (Terminology Change):
 - Conversations represent a chat's message history
@@ -21,12 +38,14 @@
 - **BuilderFactory**: Entry point for runtime configuration
   - Initializes from application properties
   - Creates builder instances for runtime customization
+  - Manages application-level state (predefined models, agents, guard-rails)
   
 - **Builders**: Composable instances for specific runtime scenarios
   - Accept a conversation as input
   - Users configure runtime behavior (model, agent, tools, etc.)
   - Each builder specifies its own configuration
-  - Builders return configured chat clients or agents
+  - Builders return configured chat clients ready to execute
+  - Builders apply all relevant interceptors (security, guard-rails)
   
 **Example Flow**:
 1. Application starts with properties-based configuration
@@ -51,16 +70,35 @@ chatClient.chat("user message")
 
 *Note: This is a conceptual example to show the builder pattern. The actual API may differ.*
 
-### Phase 1.5: Refactor ChatController to ChatService
-**Goal**: Rename ChatController to ChatService for clearer semantics
+### Phase 1.5: Rename `@ChatController` Annotation to `@ChatService`
+**Goal**: Rename the `@ChatController` annotation to `@ChatService` for clearer semantics
+
+**⚠️ Naming Collision Warning**:
+There are currently TWO different things using the "ChatController" name in the codebase:
+1. `@ChatController` annotation (`aimo-core/.../controller/Annotations.kt`) — applied to **user-defined beans** that declare tools and system messages. This is the annotation being renamed.
+2. `ChatControllerEntity` (`aimo-core/.../controller/ChatControllerEntity.kt`) — internal wrapper that holds tool callbacks and system message callbacks discovered from `@ChatController` beans.
+
+There is also already a `ChatService` class in `aimo-server` (the HTTP service layer). The new `@ChatService` annotation is in `aimo-core` and is a completely different concept — it is a **user-facing annotation** applied to beans that register tools and system messages with the AI engine.
 
 **Changes**:
-- Rename `ChatController` to `ChatService` throughout the codebase
-- Updates core architecture terminology to reflect business logic focus
-- Foundational change before implementing new phases
+- Rename annotation `@ChatController` → `@ChatService` in `Annotations.kt`
+- Rename `ChatControllerEntity` → `ChatServiceEntity` throughout the codebase
+- Update `AimoConfig.kt` which uses reflection to find `@ChatController` beans
+- Update all existing `@ChatController` usages in `aimo-plugin-ui` and examples
 
 ### Phase 2: Agents
 **Goal**: Define agents as scoped collections of tools with customizable system messages
+
+**⚠️ Current Tool Discovery (Will Change)**:
+Tools are currently discovered **globally at startup** via reflection in `AimoConfig.createControllerEntities()`. All `@ChatService` beans are scanned, and ALL their tools are registered. This means there is no filtering — every tool is available to every request today.
+
+Agent scoping must **filter at runtime**, not at startup. The full tool registry is still built at startup, but only the agent's allowed tools are passed to `AimoChatClientImpl` when building a prompt.
+
+**⚠️ `SystemMessageContext` Is Currently Just a Context Map**:
+`SystemMessageContext` currently only contains `context: Map<String, Any>` with no `agentId`. Adding `agentId` as a field is required for Phase 3.3 (system message selection by agent).
+
+**⚠️ `@ChatService` Annotation Scoping**:
+The `agents` property added to `@ChatService`, `@Tool`, and `@SystemMessage` annotations does not exist yet. It must be added as part of this phase. If no `agents` property is set on an annotation, the component is available to all agents (backwards compatible).
 
 **Definition**:
 - Agents are named configurations that bind a subset of tools to a specific system message
@@ -79,14 +117,16 @@ Agent
 
 **Agent Provider Architecture**:
 - **Agent Provider**: Central service for retrieving and creating agents
-  - Manages predefined agents from registry
+  - Loads predefined agents from application.yaml (under `aimo.agents`)
   - Supports runtime agent creation without registration
   - Integrates with interceptors for access control
+  - Initialized by BuilderFactory
 
 - **Interceptors**: Filter agents based on context
-  - Apply user permissions if security is enabled
+  - Apply user permissions if security is enabled (Spring Security interceptor)
   - Can restrict access to certain agents based on roles
   - Optional: no interceptors if security is disabled
+  - Part of broader interceptor framework
 
 **Agent Sources**:
 1. **Predefined Agents**: Programmatically or via configuration file
@@ -120,18 +160,42 @@ Agent
 - Interceptors filter available agents based on permissions (if security enabled)
 
 **Annotation-Based Scoping**:
-- `@ChatService(agents = {"admin", "public"})`: Scope service to specific agents
-- `@Tool(agents = {"admin", "retrieval"})`: Scope tool to specific agents
-- `@SystemMessage(agents = {"admin"})`: Scope system message to specific agents
-- If no agents are specified, the component is available to all agents
+- `@ChatService(agents = ["admin", "public"])`: Scope service to specific agents
+- `@Tool(agents = ["admin", "retrieval"])`: Scope tool to specific agents
+- `@SystemMessage(agents = ["admin"])`: Scope system message to specific agents
+- If no agents specified, the component is available to all agents (default)
+
+**⚠️ DAO Storage for Agent Binding**:
+The conversation's `agentId` will be stored in conversation metadata (the `AimoConversationInfo.metadata` / `Map<String, Any>` that already exists in the DAO). No schema changes are needed for this — it uses the existing `writeChatProperty`/`readChatProperty` mechanism.
 
 ### Phase 3: Spring Security
 **Goal**: Provide optional Spring Security integration
 - Configuration and setup
 - Interceptors for hooking into the system
 
+**⚠️ Existing User Concept in Codebase**:
+The current codebase already has a user/security concept:
+- `AimoUserProvider` interface (`aimo-core/.../security/`) — provides the current user from execution context
+- `AimoUser` data class — holds `userId` and `metadata`
+- `GlobalUserProvider` — default implementation, always returns "global" user (single-user mode)
+- `AimoSecurityConfig` — registers `GlobalUserProvider` as default via `@ConditionalOnMissingBean`
+
+This existing mechanism handles user scoping (all DAO operations are scoped by `userId`). The decision is **pending** on whether to:
+1. Remove this custom user concept and rely entirely on Spring Security
+2. Bridge it to Spring Security (Spring Security principal populates `AimoUserProvider`)
+
+This decision must be made before implementing Phase 3.
+
+**User Concept**:
+- Conversation API defines user context
+- Decision pending: Remove existing user concept or integrate with Spring Security
+- To be determined in Phase 3 implementation
+
 ### Phase 4: Reusable Kotlin/Java Aimo Client
 **Goal**: Extract and publish a standalone, reusable Kotlin/Java client for Aimo
+
+**⚠️ Not the Same as In-JVM BuilderFactory**:
+This client is an **HTTP client** for communicating with a remote Aimo server. It is the external-facing API wrapper. It is NOT the same as the internal `BuilderFactory` or `AimoChatClient` used inside the JVM. Do not conflate the two.
 
 **Features**:
 - Type-safe client for communicating with Aimo backend
@@ -139,13 +203,19 @@ Agent
 - Support for agent/model selection
 - Message history management
 - Reusable across different JVM applications and tools
-- **Critical for Phase 5**: Enables remote server communication
+- **Critical for Phase 5**: Enables remote server communication for agent forwarding
+- Published on Maven Central for easy consumption
+
+**Usage Contexts**:
+- Remote Agent Forwarding: Tools use client to call other Aimo instances
+- Standalone JVM Applications: Integrate Aimo into non-UI JVM services
+- Sample applications and tools
 
 **Deliverables**:
-- Published package on Maven Central for easy consumption
+- Published package to custom Maven repository
 - Clear API documentation
 - Kotlin/Java types for all Aimo concepts
-- Example usage in sample applications and tools
+- Example usage in sample applications
 
 ### Phase 5: Agent Forwarding
 **Dependencies**: Requires Phase 4 (Kotlin/Java Aimo Client) for remote server communication
@@ -159,12 +229,14 @@ Agent
 **Forwarding Modes**:
 1. **In-JVM Forwarding**: 
    - Tools call other agents/chat clients within the same JVM
-   - Direct API invocation
+   - Direct API invocation via builders
+   - No network overhead
    
 2. **Remote Aimo Requests**: 
-   - Tools can forward requests to remote Aimo instances
+   - Tools use Kotlin/Java Aimo Client to call remote Aimo instances
    - HTTP-based communication to other Aimo deployments
    - Streaming responses from remote instances
+   - Client library provides type-safe remote access
 
 **Use Cases**:
 - Tool calls another agent to handle sub-tasks
@@ -212,10 +284,11 @@ Agent
   - Safety verification
   - Response formatting or enhancement
 
-- **Interceptor Integration**:
-  - Hooks into existing interceptor framework (same as agents, tooling)
-  - Configurable via application.yaml under `aimo.guardRails`
-  - Lightweight model selection for fast execution
+- **Configuration & Interceptor Integration**:
+  - Guard-rails defined in application.yaml under `aimo.guardRails`
+  - Use lightweight model selection (configured in `aimo.models`)
+  - Integrated as interceptors in the builder pipeline
+  - Applied automatically when builder chains ChatClient
 
 
 ---
@@ -232,18 +305,27 @@ Agent
 ### Phase 0: Reusable TypeScript Aimo Client
 **Goal**: Extract and publish a standalone, reusable TypeScript client for Aimo
 
+**⚠️ Already Partially Exists**:
+There are already hand-maintained TypeScript API wrappers in `aimo-ui/src/api/aimo-client` and `aimo-ui/src/api/aimo-ui-client`. This phase extracts and formalizes them into a proper standalone package. Do not rewrite from scratch — build on what exists.
+
 **Features**:
 - Type-safe client for communicating with Aimo backend
 - Handle ChatClient requests and streaming responses
 - Support for agent/model selection
 - Message history management
-- Reusable across different UI implementations (debugging tool, custom UIs, etc.)
+- Reusable across different UI implementations
+- Published on npm for easy consumption
+
+**Usage Contexts**:
+- Frontend debugging/chatbot UI
+- Custom UI implementations
+- Third-party integrations
 
 **Deliverables**:
-- Published npm package for easy consumption
+- Published npm package
 - Clear API documentation
 - TypeScript types for all Aimo concepts
-- Example usage in debugging tool
+- Example usage in debugging tool and custom UIs
 
 ### Phase 1: Agent & Model Selection
 **Goal**: UI components for users to select agents and models
@@ -269,6 +351,10 @@ Agent
 ### Phase 4: Agent Debugging Tool
 **Goal**: Comprehensive debugging interface for agents and ChatClient behavior
 
+**Foundation**:
+- Built using TypeScript Aimo Client (Phase 0)
+- Runs alongside or as part of the main UI
+
 **Key Features**:
 - **Agent Execution Trace**: Track agent execution flow and decisions
 - **Tool Call Inspector**: View tool calls, parameters, and results
@@ -284,5 +370,6 @@ Agent
 - Test different agent configurations and models
 - Verify context inclusion and message filtering
 - Monitor guard-rail behavior in real-time
+- Troubleshoot agent forwarding (in-JVM and remote)
 
 
