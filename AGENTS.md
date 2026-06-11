@@ -9,8 +9,8 @@
 - HTTP entrypoint is `POST /aimo-api/chat/{chatId}` (`aimo-server/.../controller/ChatController.kt`), streamed as NDJSON via `StreamingResponseBody`.
 - `ChatService` merges request metadata + conversation durable metadata into chat context before calling core (`aimo-server/.../service/ChatService.kt`).
 - `AimoChatClientImpl` loop (`aimo-core/.../client/chat/AimoChatClientImpl.kt`): system messages -> fetch history from DAO -> prompt budget -> model call -> optional tool calls -> persist prompt + generated messages.
-- All message history is read from DAO; persistence always goes through `AimoConversationClient.addMessages`.
-- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../client/conversation/AimoConversationClientImpl.kt`).
+- All message history is read from DAO; persistence always goes through `Conversation.addMessages`.
+- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../client/conversation/ConversationImpl.kt`).
 
 ## Project-Specific Conventions
 - Tool/system discovery is reflection-based from `@ChatController` beans (`aimo-core/.../conf/AimoConfig.kt`).

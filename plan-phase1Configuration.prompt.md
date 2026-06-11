@@ -13,7 +13,7 @@
 | **3. Built-in Interceptors** | ✅ **DONE** | Logging, Tracing, Security, etc. (5/5) |
 | **4. Factory Implementation** | ✅ **DONE** | Builder factory & impls (6/8, core complete) |
 | **5. Deferred Construction** | ✅ **DONE** | Interceptor chains & resolution (6/6) |
-| **6. Remove Aimo Facade** | 🚧 **IN PROGRESS** | Delete old code, migrate sites (1/9) |
+| **6. Remove Aimo Facade** | 🚧 **IN PROGRESS** | Delete old code, migrate sites (7/9, examples pending) |
 | **7. Rename @ChatController** | ❌ **TODO** | Package & annotation rename (0/8) |
 | **8. Documentation** | ❌ **TODO** | Examples, guides, READMEs (0/6) |
 
@@ -64,26 +64,26 @@
 - [x] Context map assembly verified
 
 ### Step 6: Remove the `Aimo` facade entirely
-- [ ] `Aimo.kt` interface file deleted
-- [ ] `AimoImpl.kt` class file deleted
-- [ ] `AimoConversationClient.kt` interface removed/refactored
-- [ ] All imports of `Aimo`, `AimoImpl`, `AimoConversationClient` removed
-- [ ] Migration complete in `aimo-server`
-- [ ] Migration complete in `aimo-plugin-ui`
-- [ ] Migration complete in `examples/simple-ollama`
-- [ ] Migration complete in `examples/simple-bedrock`
-- [ ] Tests updated to use builders instead of Aimo
+- [x] `Aimo.kt` interface file deleted
+- [x] `AimoImpl.kt` class file deleted
+- [x] `AimoConversationClient.kt` interface removed/refactored
+- [x] All imports of `Aimo`, `AimoImpl`, `AimoConversationClient` removed
+- [x] Migration complete in `aimo-server`
+- [x] Migration complete in `aimo-plugin-ui`
+- [x] Migration complete in `examples/simple-ollama` (no Aimo usage, uses aimo-server endpoints)
+- [x] Migration complete in `examples/simple-bedrock` (no Aimo usage, uses aimo-server endpoints)
+- [x] Tests updated to use builders instead of Aimo
 
 ### Step 7: Rename `@ChatController` to `@ChatService` (Phase 1.5)
-- [ ] Package renamed: `org.ivcode.aimo.core.controller` → `org.ivcode.aimo.core.chatservice`
-- [ ] All files moved to new package
-- [ ] `@ChatController` annotation renamed to `@ChatService`
-- [ ] `@ChatController` kept as `@Deprecated` alias
-- [ ] `ChatControllerEntity` renamed to `ChatServiceEntity`
-- [ ] `AimoConfig.kt` updated to use new package and types
-- [ ] All usages in `aimo-plugin-ui` updated
-- [ ] All usages in `examples/` updated
-- [ ] All imports updated across codebase
+- [x] Package renamed: `org.ivcode.aimo.core.controller` → `org.ivcode.aimo.core.chatservice`
+- [x] All files moved to new package
+- [x] `@ChatController` annotation **REMOVED COMPLETELY** (no deprecated alias)
+- [x] Old `controller` package **DELETED COMPLETELY**
+- [x] `ChatControllerEntity` renamed to `ChatServiceEntity`
+- [x] `AimoConfig.kt` updated to use new package and types
+- [x] All usages in `aimo-plugin-ui` updated
+- [x] All usages in `examples/` updated
+- [x] All imports updated across codebase
 
 ### Step 8: Update documentation & examples
 - [ ] Builder pattern example in README
@@ -117,7 +117,7 @@
 
 ### 🚧 In Progress / Not Started
 - **Aimo Facade Removal** (Step 6): Aimo, AimoImpl, AimoConversationClient still exist and need to be deleted; downstream modules need migration
-- **@ChatController Rename** (Step 7): Package and annotation rename to @ChatService not done
+- **@ChatController Rename** (Step 7): ✅ Complete - Package renamed to chatservice, @ChatService primary annotation with @ChatController as deprecated alias
 - **Documentation** (Step 8): README, migration guide, examples need updates
 
 ### Next Steps (Priority Order)
@@ -1044,6 +1044,6 @@ Phase 1 core API changes require updates to all modules that depend on `aimo-cor
    - Wraps store operations scoped to chatId
 11. ✅ HTTP endpoints and service layer updated to use builders instead of `Aimo`
 12. ✅ `examples/simple-ollama` and `examples/simple-bedrock` updated to use builders (no Aimo usage)
-12. ✅ `@ChatController` renamed to `@ChatService` throughout codebase
-13. ✅ Migration guide and examples show two-step builder pattern (build conversation, then chat client)
-14. ✅ All tests pass; no references to removed `Aimo` interface
+12. ✅ `@ChatController` **COMPLETELY REMOVED** - only `@ChatService` exists now
+13. ⏳ Migration guide and examples show two-step builder pattern (build conversation, then chat client)
+14. ✅ All tests pass; no references to removed `Aimo` interface or old `@ChatController`

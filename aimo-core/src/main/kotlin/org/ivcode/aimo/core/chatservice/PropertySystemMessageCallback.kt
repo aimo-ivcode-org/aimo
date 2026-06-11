@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import kotlin.reflect.KProperty1
 import kotlin.reflect.jvm.isAccessible
@@ -13,4 +13,5 @@ class PropertySystemMessageCallback(
         return property.getter.call(instance)?.toString()
     }
 }
+
 

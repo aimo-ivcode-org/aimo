@@ -4,10 +4,10 @@ import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoConversationInfo
 import org.ivcode.aimo.core.conversation.Conversation
-import org.ivcode.aimo.core.controller.ChatController
-import org.ivcode.aimo.core.controller.SystemMessage
-import org.ivcode.aimo.core.controller.Tool
-import org.ivcode.aimo.core.controller.ToolParam
+import org.ivcode.aimo.core.chatservice.ChatService
+import org.ivcode.aimo.core.chatservice.SystemMessage
+import org.ivcode.aimo.core.chatservice.Tool
+import org.ivcode.aimo.core.chatservice.ToolParam
 import org.ivcode.aimo.core.util.getConversationClient
 import org.ivcode.aimo.ui.extentions.getTitle
 import org.ivcode.aimo.ui.extentions.setTitle
@@ -25,7 +25,7 @@ private const val TITLE_TOOL_NAME = "set_title"
  * - `USER`: title was set by a user action outside the model tool call.
  * - `ASSISTANT`: title was set by the LLM through the `setTitle` tool.
  */
-@ChatController
+@ChatService
 class TitleChatController(
     private val objectMapper: ObjectMapper,
 ) {

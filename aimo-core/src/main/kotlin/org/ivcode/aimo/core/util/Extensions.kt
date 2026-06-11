@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core.util
 
-import org.ivcode.aimo.core.controller.SystemMessageContext
+import org.ivcode.aimo.core.chatservice.SystemMessageContext
 import org.ivcode.aimo.core.conversation.Conversation
 import java.util.UUID
 

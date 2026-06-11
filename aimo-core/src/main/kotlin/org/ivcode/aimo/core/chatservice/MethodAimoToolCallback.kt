@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.model.AimoToolDefinition
@@ -180,4 +180,5 @@ class MethodAimoToolCallback(
         ): MethodAimoToolCallback = toAimoToolCallback(target, method, objectMapper)
     }
 }
+
 

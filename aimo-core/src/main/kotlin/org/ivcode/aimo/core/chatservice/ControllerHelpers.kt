@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.model.AimoToolDefinition
@@ -193,3 +193,4 @@ internal fun toSystemMessageCallbacks(controller: Any): List<SystemMessageCallba
 
     return callbacks
 }
+

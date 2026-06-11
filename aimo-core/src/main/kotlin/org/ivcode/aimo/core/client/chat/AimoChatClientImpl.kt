@@ -7,8 +7,8 @@ import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.conversation.Conversation
-import org.ivcode.aimo.core.controller.SystemMessageCallback
-import org.ivcode.aimo.core.controller.SystemMessageContext
+import org.ivcode.aimo.core.chatservice.SystemMessageCallback
+import org.ivcode.aimo.core.chatservice.SystemMessageContext
  import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoToolCallback

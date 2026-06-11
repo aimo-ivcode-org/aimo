@@ -14,12 +14,14 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 
 | Module | Purpose |
 | --- | --- |
-| `aimo-core` | Core abstractions and runtime (`Aimo`, conversations, chat clients, model-facing prompt flow, tool/system-message annotations). |
+| `aimo-core` | Core abstractions and runtime (conversations, chat clients, builders, model-facing prompt flow, tool/system-message annotations). |
 | `aimo-model-ollama` | Ollama-backed Aimo model integration. |
+| `aimo-model-bedrock` | AWS Bedrock model integration. |
 | `aimo-server` | REST API layer for conversations, chat streaming, and history. |
 | `aimo-plugin-ui` | UI-specific server plugin (title endpoints + title tool controller). |
 | `aimo-ui` | React + Vite frontend packaged into resources for server distribution. |
 | `examples/simple-ollama` | Runnable Spring Boot app that composes server + UI plugin + Ollama model module. |
+| `examples/simple-bedrock` | Runnable Spring Boot app that composes server + UI plugin + Bedrock model module. |
 
 ## Tech stack
 

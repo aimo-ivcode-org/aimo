@@ -4,10 +4,10 @@
 aimo:
   # Data directory for file-based conversation storage
   data-dir: ./data/conversations
-
+  
   # Single-user mode (optional)
   # global-user-id: default-user
-
+  
   # Model configurations
   models:
     # Ollama provider models
@@ -22,12 +22,12 @@ aimo:
         options:
           temperature: 0.7
           top-p: 0.9
-
+      
       # Additional Ollama models
       # llama3:
       #   base-url: http://localhost:11434
       #   primary: false
-
+    
     # Bedrock provider models (example)
     # bedrock:
     #   claude-3-sonnet:
@@ -36,7 +36,7 @@ aimo:
     #     context:
     #       size: 200000
     #       budgeter-type: CONTEXT_WINDOW
-
+  
   # Agent configurations (Phase 2 - prepared but not yet implemented)
   agents:
     default:
@@ -44,27 +44,26 @@ aimo:
       description: "General purpose conversational assistant"
       # system-message: "You are a helpful assistant."
       # tools: []
-
+  
   # Guard-rail configurations (Phase 7 - prepared but not yet implemented)
   guard-rails:
     # content-filter:
     #   enabled: true
     #   model: lightweight-filter-model
-
+  
   # Interceptor configurations (factory-level defaults)
   interceptors:
     # Logging interceptor
     logging:
       enabled: true
       level: INFO  # TRACE, DEBUG, INFO, WARN, ERROR
-
+    
     # Tracing interceptor (for distributed tracing)
     tracing:
       enabled: false
-
+    
     # Error handling interceptor (retry logic)
     error-handling:
       enabled: true
       max-retries: 3
       retry-backoff-ms: 100
-

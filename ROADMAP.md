@@ -5,8 +5,11 @@
 ### Phase 1: Configuration
 **Goal**: Make the system configurable through properties and runtime builders
 
-**⚠️ Architecture Change — Replacing the `Aimo` Facade**:
-The current codebase has an `Aimo` interface (`aimo-core/src/main/kotlin/org/ivcode/aimo/core/Aimo.kt`) that acts as the monolithic entry point. It manages conversations, chat clients, and admin operations. This interface **will be replaced** by the BuilderFactory + Builder pattern. The existing `Aimo`, `AimoImpl`, and `AimoConfig.createAimo()` bean are candidates for removal or significant restructuring.
+**✅ Architecture Change — Completed**:
+The legacy `Aimo` facade has been removed. The system now uses a factory-based pattern:
+- `ConversationFactory` creates per-chat `Conversation` instances
+- `ChatClientBuilderFactory` creates builders that configure and return `AimoChatClient` instances
+- No singleton; each conversation is independently managed
 
 **⚠️ Terminology — Current vs Future**:
 Current codebase uses two overlapping client concepts:

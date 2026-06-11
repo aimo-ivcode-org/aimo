@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import java.lang.reflect.AccessibleObject
 
@@ -38,4 +38,5 @@ internal fun trySetAccessible(obj: AccessibleObject): Boolean {
         false
     }
 }
+
 

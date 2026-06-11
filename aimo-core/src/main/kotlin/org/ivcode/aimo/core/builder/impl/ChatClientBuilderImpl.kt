@@ -9,7 +9,7 @@ import org.ivcode.aimo.core.client.chat.AimoChatClientImpl
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoToolCallback
-import org.ivcode.aimo.core.controller.SystemMessageCallback
+import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import java.util.UUID
 
 /**

@@ -1,9 +1,9 @@
 package org.ivcode.aimo.ui.chatcontroller
 
-import org.ivcode.aimo.core.controller.ChatController
-import org.ivcode.aimo.core.controller.SystemMessage
+import org.ivcode.aimo.core.chatservice.ChatService
+import org.ivcode.aimo.core.chatservice.SystemMessage
 
-@ChatController
+@ChatService
 class GeneralController {
 
     @SystemMessage

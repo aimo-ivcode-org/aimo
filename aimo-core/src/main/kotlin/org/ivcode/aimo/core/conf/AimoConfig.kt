@@ -8,11 +8,11 @@ import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
 import org.ivcode.aimo.core.builder.interceptor.impl.ErrorHandlingInterceptor
 import org.ivcode.aimo.core.builder.interceptor.impl.LoggingInterceptor
 import org.ivcode.aimo.core.builder.interceptor.impl.TracingInterceptor
-import org.ivcode.aimo.core.controller.ChatController
-import org.ivcode.aimo.core.controller.ChatControllerEntity
-import org.ivcode.aimo.core.controller.SystemMessageCallback
-import org.ivcode.aimo.core.controller.toAimoToolCallbacks
-import org.ivcode.aimo.core.controller.toSystemMessageCallbacks
+import org.ivcode.aimo.core.chatservice.ChatService
+import org.ivcode.aimo.core.chatservice.ChatServiceEntity
+import org.ivcode.aimo.core.chatservice.SystemMessageCallback
+import org.ivcode.aimo.core.chatservice.toAimoToolCallbacks
+import org.ivcode.aimo.core.chatservice.toSystemMessageCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
@@ -33,16 +33,16 @@ class AimoConfig {
     fun createControllerEntities(
         ctx: ApplicationContext,
         objectMapper: ObjectMapper,
-    ): List<ChatControllerEntity> {
-        val list = mutableListOf<ChatControllerEntity>()
+    ): List<ChatServiceEntity> {
+        val list = mutableListOf<ChatServiceEntity>()
 
-        ctx.getBeansWithAnnotation<ChatController>().forEach {(beanName, chatController) ->
-            list.add(ChatControllerEntity (
+        ctx.getBeansWithAnnotation<ChatService>().forEach {(beanName, chatService) ->
+            list.add(ChatServiceEntity (
                 name = beanName,
-                clazz = chatController.javaClass,
-                instance = chatController,
-                tools = toAimoToolCallbacks(chatController, objectMapper),
-                systemMessages = toSystemMessageCallbacks(chatController),
+                clazz = chatService.javaClass,
+                instance = chatService,
+                tools = toAimoToolCallbacks(chatService, objectMapper),
+                systemMessages = toSystemMessageCallbacks(chatService),
             ))
         }
 
@@ -50,13 +50,13 @@ class AimoConfig {
     }
 
     @Bean
-    fun createToolCallbacks(chatControllers: List<ChatControllerEntity>): List<AimoToolCallback> {
-        return chatControllers.flatMap { it.tools }
+    fun createToolCallbacks(chatServices: List<ChatServiceEntity>): List<AimoToolCallback> {
+        return chatServices.flatMap { it.tools }
     }
 
     @Bean
-    fun createSystemMessageCallbacks(chatControllers: List<ChatControllerEntity>): List<SystemMessageCallback> {
-        return chatControllers.flatMap { it.systemMessages }
+    fun createSystemMessageCallbacks(chatServices: List<ChatServiceEntity>): List<SystemMessageCallback> {
+        return chatServices.flatMap { it.systemMessages }
     }
 
 

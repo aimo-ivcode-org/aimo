@@ -8,8 +8,8 @@ import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.AimoUsage
-import org.ivcode.aimo.core.controller.Tool
-import org.ivcode.aimo.core.controller.toAimoToolCallbacks
+import org.ivcode.aimo.core.chatservice.Tool
+import org.ivcode.aimo.core.chatservice.toAimoToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatEngine

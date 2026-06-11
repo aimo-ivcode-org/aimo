@@ -8,7 +8,7 @@ import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback
-import org.ivcode.aimo.core.controller.SystemMessageCallback
+import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 
 /**
  * Factory for creating chat client builders.
