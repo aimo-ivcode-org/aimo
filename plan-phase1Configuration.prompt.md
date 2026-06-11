@@ -2,6 +2,131 @@
 
 **TL;DR**: Replace the monolithic `Aimo` facade with a `BuilderFactory` + `Builder` pattern for flexible runtime composition. Bootstrap from `application.yaml` properties under `aimo.*` (models, agents, guard-rails). Interceptors provide a unified mechanism for cross-cutting concerns. Phase 1 removes `Aimo` entirely; Phase 1.5 renames `@ChatController` to `@ChatService` for semantic clarity.
 
+---
+
+## 📊 Overall Progress: **60%** Complete
+
+| Step | Status | Description |
+|------|--------|-------------|
+| **1. Builder Interfaces** | ✅ **DONE** | Core interfaces defined (6/6) |
+| **2. Properties Model** | ✅ **DONE** | Configuration classes (5/5) |
+| **3. Built-in Interceptors** | ✅ **DONE** | Logging, Tracing, Security, etc. (5/5) |
+| **4. Factory Implementation** | ✅ **DONE** | Builder factory & impls (6/8, core complete) |
+| **5. Deferred Construction** | ✅ **DONE** | Interceptor chains & resolution (6/6) |
+| **6. Remove Aimo Facade** | 🚧 **IN PROGRESS** | Delete old code, migrate sites (1/9) |
+| **7. Rename @ChatController** | ❌ **TODO** | Package & annotation rename (0/8) |
+| **8. Documentation** | ❌ **TODO** | Examples, guides, READMEs (0/6) |
+
+**Current Status**: aimo-server migrated to builder pattern! Still need to migrate plugin-ui and examples, then remove Aimo facade.
+
+---
+
+## Implementation Checklist
+
+### Step 1: Define core builder interfaces (`aimo-core`)
+- [x] `Conversation` interface defined
+- [x] `ConversationInterceptor` interface defined
+- [x] `ChatClientInterceptor` interface defined
+- [x] `ConversationFactory` interface defined
+- [x] `ChatClientBuilder<T>` interface defined
+- [x] `ChatClientBuilderFactory` interface defined
+
+### Step 2: Create properties configuration model (`aimo-core`)
+- [ ] `AimoModelProperties` class created
+- [ ] `AimoAgentProperties` class created (Phase 2 preparation)
+- [ ] `AimoGuardRailProperties` class created (Phase 7 preparation)
+- [ ] `AimoProperties` root configuration class created
+- [ ] Spring validators for primary model constraint added
+
+### Step 3: Implement built-in interceptors
+- [x] `LoggingInterceptor` (ChatClientInterceptor) implemented
+- [x] `TracingInterceptor` (ChatClientInterceptor) implemented
+- [x] `ErrorHandlingInterceptor` (ChatClientInterceptor) implemented
+- [x] `SecurityConversationInterceptor` (ConversationInterceptor) implemented
+- [x] `AuditingConversationInterceptor` (ConversationInterceptor) implemented
+
+### Step 4: Build ChatClientBuilderFactory implementation (`aimo-core`)
+- [x] `ChatClientBuilderFactoryImpl` class created
+- [x] Model registration and primary model resolution implemented
+- [x] `ConversationFactoryImpl` class created
+- [x] `ChatClientBuilderImpl` class created
+- [x] `ConversationImpl` class created
+- [ ] Agent registration from properties (Phase 2 preparation)
+- [ ] Guard-rail registration from properties (Phase 7 preparation)
+- [x] Default interceptors initialization
+
+### Step 5: Implement builders and defer construction
+- [x] `ConversationFactory.getConversation()` defers until called
+- [x] `ChatClientBuilder.build()` defers until called
+- [x] Interceptor chain construction implemented correctly
+- [x] Model resolution logic verified in builder
+- [x] Agent resolution logic added (Phase 2 preparation - stub in place)
+- [x] Context map assembly verified
+
+### Step 6: Remove the `Aimo` facade entirely
+- [ ] `Aimo.kt` interface file deleted
+- [ ] `AimoImpl.kt` class file deleted
+- [ ] `AimoConversationClient.kt` interface removed/refactored
+- [ ] All imports of `Aimo`, `AimoImpl`, `AimoConversationClient` removed
+- [ ] Migration complete in `aimo-server`
+- [ ] Migration complete in `aimo-plugin-ui`
+- [ ] Migration complete in `examples/simple-ollama`
+- [ ] Migration complete in `examples/simple-bedrock`
+- [ ] Tests updated to use builders instead of Aimo
+
+### Step 7: Rename `@ChatController` to `@ChatService` (Phase 1.5)
+- [ ] Package renamed: `org.ivcode.aimo.core.controller` → `org.ivcode.aimo.core.chatservice`
+- [ ] All files moved to new package
+- [ ] `@ChatController` annotation renamed to `@ChatService`
+- [ ] `@ChatController` kept as `@Deprecated` alias
+- [ ] `ChatControllerEntity` renamed to `ChatServiceEntity`
+- [ ] `AimoConfig.kt` updated to use new package and types
+- [ ] All usages in `aimo-plugin-ui` updated
+- [ ] All usages in `examples/` updated
+- [ ] All imports updated across codebase
+
+### Step 8: Update documentation & examples
+- [ ] Builder pattern example in README
+- [ ] `application.yaml` template with `aimo.models.*` section
+- [ ] Migration guide for Phase 0 → Phase 1
+- [ ] Integration points doc updated
+- [ ] `examples/simple-ollama` updated with builder pattern
+- [ ] `examples/simple-bedrock` updated with builder pattern
+
+### Testing & Validation
+- [x] All existing tests pass (verified: BUILD SUCCESSFUL)
+- [ ] New builder tests added
+- [ ] Interceptor chain tests added
+- [ ] End-to-end test with builders in example apps
+- [x] No compilation errors (all modules compile successfully)
+- [ ] No references to removed types (pending Step 6 - Aimo facade removal)
+
+---
+
+## Progress Summary
+
+### ✅ Completed (Foundation + Configuration)
+- **Builder Architecture**: All core interfaces defined (Conversation, ConversationFactory, ChatClientBuilder, ChatClientBuilderFactory, interceptor interfaces)
+- **Builder Implementations**: ChatClientBuilderFactoryImpl, ChatClientBuilderImpl, ConversationFactoryImpl all implemented with full interceptor chain support
+- **Conversation Abstraction**: Conversation interface and ConversationImpl fully implemented
+- **Interceptor Infrastructure**: Chain of responsibility pattern fully implemented for both ConversationInterceptor and ChatClientInterceptor
+- **Deferred Construction**: Builders correctly defer composition until build() is called
+- **Built-in Interceptors**: LoggingInterceptor, TracingInterceptor, ErrorHandlingInterceptor, SecurityConversationInterceptor, AuditingConversationInterceptor all implemented
+- **Properties Configuration**: AimoProperties with full support for models, agents, guard-rails, and interceptor configuration
+- **Factory Wiring**: Default interceptors automatically initialized from application properties
+
+### 🚧 In Progress / Not Started
+- **Aimo Facade Removal** (Step 6): Aimo, AimoImpl, AimoConversationClient still exist and need to be deleted; downstream modules need migration
+- **@ChatController Rename** (Step 7): Package and annotation rename to @ChatService not done
+- **Documentation** (Step 8): README, migration guide, examples need updates
+
+### Next Steps (Priority Order)
+1. **Step 6**: Remove Aimo facade and migrate all usage sites (breaking change, requires all modules) - **CRITICAL PATH**
+2. **Step 7**: Rename @ChatController to @ChatService (Phase 1.5, cosmetic but important for clarity)
+3. **Step 8**: Update documentation and examples (essential for adoption)
+
+---
+
 ## Architectural Layers
 
 Phase 1 clarifies three distinct layers:
@@ -41,7 +166,7 @@ Two distinct `AimoChatModel` concepts exist, which must be distinguished:
 - **`AimoChatModel` data class** (configuration wrapper) → **RENAME TO `AimoChatModelConfig`**
   - Currently exists as `data class AimoChatModel` in `aimo-core/src/main/kotlin/org/ivcode/aimo/core/model/AimoChatModel.kt`
   - Wraps a chat engine with metadata: name, options, context, isPrimary flag
-  - Used in factory return types: `AimoChatModelProviderFactory.createAimoChatModel()` returns `AimoChatModelConfig?`
+  - Used in factory return types: `AimoChatModelProviderFactory.getModel()` returns `AimoChatModelConfig?`
   - Used in factory methods: `ChatClientBuilderFactory.getPrimaryModel()` returns `AimoChatModelConfig`
   - **Action**: Rename to `AimoChatModelConfig` to avoid naming collision after interface rename
   - **All references updated** throughout the plan and codebase after rename
@@ -82,13 +207,30 @@ Create foundational abstractions for the builder and interceptor pattern:
 
 - **`ChatClientBuilderFactory`** interface: Entry point for creating both builders
   - Methods: 
-    - `conversationBuilder(conversation: Conversation): ConversationBuilder<Conversation>` — Builder for wrapping a conversation with ConversationInterceptors
     - `builder(): ChatClientBuilder<ChatClient>` — Default chat client builder
     - `builder(conversation: Conversation): ChatClientBuilder<ChatClient>` — Chat client builder with pre-bound conversation
+  - **DOES NOT** provide `conversationFactory()` method — users inject `ConversationFactory` separately as its own bean
   - Manages application-level state (predefined models, agents, guard-rails)
   - Initialized from properties on startup
   - **Provider-implemented**: Each model provider (Ollama, Bedrock, OpenAI, etc.) and other subsystems can provide alternative or specialized factory implementations
   - Default implementation provided by `aimo-core`; providers can override for custom behavior
+
+- **`ConversationFactory`** as separate bean:
+  - Users inject both `ConversationFactory` (for creating conversations) and `ChatClientBuilderFactory` (for creating chat clients) separately
+  - Usage pattern:
+    ```kotlin
+    @Autowired lateinit var conversationFactory: ConversationFactory
+    @Autowired lateinit var chatClientFactory: ChatClientBuilderFactory
+    
+    val conversation = conversationFactory
+        .withInterceptor(SecurityConversationInterceptor(userId))
+        .getConversation(chatId, userId)
+    
+    val chatClient = chatClientFactory
+        .builder(conversation)
+        .withModel("gpt-4")
+        .build()
+    ```
 
 - **Interceptor chains are NOT interchangeable**:
   - `ConversationInterceptor` handles DAO operations: `getMessages()`, `addMessages(messages)`, `writeChatProperty(property, value)`, etc.
@@ -124,7 +266,7 @@ Create foundational abstractions for the builder and interceptor pattern:
     - `userId` field available for security/access control checks
   - Can be implemented by memory, file, RDS, MongoDB, etc. (same backing stores as existing DAO)
   - Caller (HTTP endpoint) creates `Conversation` instance: `ConversationImpl(chatId, conversationStore, userId)`
-  - Passes to `ConversationBuilder` which wraps with interceptors
+  - Passes to `ConversationFactory` which creates conversations from the DAO/store and wraps with interceptors
   - Builder can register conversation interceptors via `withInterceptor(conversationInterceptor)`
 
 Then define properties configuration:
@@ -270,7 +412,7 @@ Create the Spring beans that orchestrate both conversation and chat client creat
 
 ### 5. Implement builders and defer construction
 
-The **`ConversationBuilder`** and **`ChatClientBuilder`** patterns defer configuration and assembly until `build()` is called:
+The **`ConversationFactory`** and **`ChatClientBuilder`** patterns defer configuration and assembly until `getConversation()` / `build()` is called:
 
 #### Conversation Builder
 
@@ -889,7 +1031,7 @@ Phase 1 core API changes require updates to all modules that depend on `aimo-cor
 5. ✅ `ChatClientBuilderFactory` provides separate methods: `conversationBuilder()` and `builder()` for two-step composition
 6. ✅ `ChatClientBuilder` API accepts pre-built `Conversation` instances and fluent model/agent/interceptor selection
 7. ✅ Dual interceptor chains work independently:
-   - `ConversationBuilder` builds conversation security chains (ConversationInterceptor)
+   - `ConversationFactory` creates conversations from DAO/store with security chains (ConversationInterceptor)
    - `ChatClientBuilder` builds chat request chains (ChatClientInterceptor + factory defaults)
 8. ✅ Properties configuration model reads models, agents, guard-rails, interceptors from YAML
 9. ✅ `Aimo` facade **completely removed** — files deleted:

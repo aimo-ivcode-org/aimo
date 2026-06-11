@@ -7,7 +7,7 @@ import org.ivcode.aimo.core.AimoPromptCacheUsage
 import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.model.AimoChatEngine
-import org.ivcode.aimo.core.model.AimoChatModel
+import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
@@ -75,12 +75,12 @@ class BedrockChatModelFactory(
     // AimoChatModelProviderFactory
     // -------------------------------------------------------------------------
 
-    override fun createAimoChatModel(): AimoChatModel? {
+    override fun getDefaultModel(): AimoChatModelConfig? {
         val name = getPrimaryName() ?: properties.keys.firstOrNull() ?: return null
-        return createAimoChatModel(name)
+        return getModel(name)
     }
 
-    override fun createAimoChatModel(name: String): AimoChatModel? {
+    override fun getModel(name: String): AimoChatModelConfig? {
         val props = properties[name]
             ?: return null
         val normalizedCredentials = normalizeCredentials(props)
@@ -100,7 +100,7 @@ class BedrockChatModelFactory(
             promptCaching = props.context.promptCaching,
             promptCachingStrategy = props.context.promptCachingStrategy,
         )
-        return AimoChatModel(
+        return AimoChatModelConfig(
             name = name,
             chatEngine = engine,
             options = aimoOptions,

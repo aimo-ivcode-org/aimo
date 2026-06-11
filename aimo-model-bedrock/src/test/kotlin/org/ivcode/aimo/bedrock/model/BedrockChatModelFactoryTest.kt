@@ -110,7 +110,7 @@ class BedrockChatModelFactoryTest {
         )
 
         val factory = BedrockChatModelFactory(properties)
-        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val model = assertNotNull(factory.getModel("model-a"))
         assertEquals(listOf("alpha", "42", "true", "beta"), model.options.stopSequences)
     }
 
@@ -129,7 +129,7 @@ class BedrockChatModelFactoryTest {
         )
 
         val factory = BedrockChatModelFactory(properties)
-        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val model = assertNotNull(factory.getModel("model-a"))
         assertEquals(listOf("first", "second", "third"), model.options.stopSequences)
     }
 
@@ -149,7 +149,7 @@ class BedrockChatModelFactoryTest {
         )
 
         val factory = BedrockChatModelFactory(properties)
-        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val model = assertNotNull(factory.getModel("model-a"))
         val request = buildRequest(model)
 
         assertEquals(0.4, request.additionalModelRequestFields?.get("frequency_penalty"))
@@ -176,7 +176,7 @@ class BedrockChatModelFactoryTest {
         )
 
         val factory = BedrockChatModelFactory(properties)
-        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val model = assertNotNull(factory.getModel("model-a"))
         val request = buildRequest(model)
 
         assertEquals(0.9, request.additionalModelRequestFields?.get("frequency_penalty"))
@@ -198,7 +198,7 @@ class BedrockChatModelFactoryTest {
         )
 
         val factory = BedrockChatModelFactory(properties)
-        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val model = assertNotNull(factory.getModel("model-a"))
         val request = buildRequestWithTool(model)
 
         assertEquals(true, request.cachePointAfterSystem)
@@ -220,7 +220,7 @@ class BedrockChatModelFactoryTest {
         )
 
         val factory = BedrockChatModelFactory(properties)
-        val model = assertNotNull(factory.createAimoChatModel("model-a"))
+        val model = assertNotNull(factory.getModel("model-a"))
         val request = buildRequestWithTool(model)
 
         assertEquals(true, request.cachePointAfterSystem)
@@ -250,7 +250,7 @@ class BedrockChatModelFactoryTest {
         return clients.size
     }
 
-    private fun buildRequest(model: org.ivcode.aimo.core.model.AimoChatModel): ConverseRequest {
+    private fun buildRequest(model: org.ivcode.aimo.core.model.AimoChatModelConfig): ConverseRequest {
         val method = model.chatEngine.javaClass.getDeclaredMethod("buildRequest", AimoPrompt::class.java)
         method.isAccessible = true
         val prompt = AimoPrompt(
@@ -280,7 +280,7 @@ class BedrockChatModelFactoryTest {
         return method.invoke(model.chatEngine, prompt) as ConverseRequest
     }
 
-    private fun buildRequestWithTool(model: org.ivcode.aimo.core.model.AimoChatModel): ConverseRequest {
+    private fun buildRequestWithTool(model: org.ivcode.aimo.core.model.AimoChatModelConfig): ConverseRequest {
         val method = model.chatEngine.javaClass.getDeclaredMethod("buildRequest", AimoPrompt::class.java)
         method.isAccessible = true
         val prompt = AimoPrompt(

@@ -14,7 +14,7 @@ import kotlin.test.assertFailsWith
 class OllamaChatModelFactoryTest {
 
     @Test
-    fun `createAimoChatModel maps standard and provider options`() {
+    fun `getModel maps standard and provider options`() {
         val factory = OllamaChatModelFactory(
             linkedMapOf(
                 "chatbot" to OllamaModelProperties(
@@ -33,7 +33,7 @@ class OllamaChatModelFactoryTest {
             )
         )
 
-        val model = assertNotNull(factory.createAimoChatModel("chatbot"))
+        val model = assertNotNull(factory.getModel("chatbot"))
 
         assertEquals("chatbot", model.name)
         assertTrue(model.isPrimary)
@@ -55,7 +55,7 @@ class OllamaChatModelFactoryTest {
     }
 
     @Test
-    fun `createAimoChatModel honors explicit model option`() {
+    fun `getModel honors explicit model option`() {
         val factory = OllamaChatModelFactory(
             mapOf(
                 "chatbot" to OllamaModelProperties(
@@ -67,14 +67,14 @@ class OllamaChatModelFactoryTest {
             )
         )
 
-        val model = assertNotNull(factory.createAimoChatModel("chatbot"))
+        val model = assertNotNull(factory.getModel("chatbot"))
 
         assertEquals("llama3.1:8b", model.options.model)
         assertEquals(0.4, model.options.temperature)
     }
 
     @Test
-    fun `createAimoChatModel without name returns provider primary and otherwise first configured`() {
+    fun `getDefaultModel returns provider primary and otherwise first configured`() {
         val primaryFactory = OllamaChatModelFactory(
             linkedMapOf(
                 "fast" to OllamaModelProperties(primary = false),
@@ -88,18 +88,18 @@ class OllamaChatModelFactoryTest {
             )
         )
 
-        assertEquals("smart", primaryFactory.createAimoChatModel()?.name)
+        assertEquals("smart", primaryFactory.getDefaultModel()?.name)
         assertEquals("smart", primaryFactory.getPrimaryName())
-        assertEquals("fast", fallbackFactory.createAimoChatModel()?.name)
+        assertEquals("fast", fallbackFactory.getDefaultModel()?.name)
         assertNull(fallbackFactory.getPrimaryName())
         assertEquals(listOf("fast", "smart"), fallbackFactory.getNames())
     }
 
     @Test
-    fun `createAimoChatModel returns null when the named model is missing`() {
+    fun `getModel returns null when the named model is missing`() {
         val factory = OllamaChatModelFactory(emptyMap())
 
-        assertNull(factory.createAimoChatModel("missing"))
+        assertNull(factory.getModel("missing"))
         assertFalse(factory.getNames().contains("missing"))
     }
 

@@ -7,10 +7,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
-class AimoChatModelTest {
+class AimoChatModelConfigTest {
 
     @Test
-    fun `AimoChatModel stores AimoChatOptions directly`() {
+    fun `AimoChatModelConfig stores AimoChatOptions directly`() {
         val engine = object : AimoChatEngine {
             override val options: AimoChatOptions = AimoChatOptions(model = "engine-default")
 
@@ -33,7 +33,7 @@ class AimoChatModelTest {
             providerOptions = mapOf("format" to "json"),
         )
 
-        val model = AimoChatModel(
+        val model = AimoChatModelConfig(
             name = "chatbot",
             chatEngine = engine,
             options = options,

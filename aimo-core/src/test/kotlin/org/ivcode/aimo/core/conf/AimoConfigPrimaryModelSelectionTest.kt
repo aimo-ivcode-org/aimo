@@ -2,7 +2,7 @@ package org.ivcode.aimo.core.conf
 
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoChatEngine
-import org.ivcode.aimo.core.model.AimoChatModel
+import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoPrompt
@@ -65,14 +65,14 @@ class AimoConfigPrimaryModelSelectionTest {
         assertTrue(ex.message!!.contains("Only one Aimo chat model can be marked primary=true"))
     }
 
-    private fun factory(providerName: String, models: List<AimoChatModel>): AimoChatModelProviderFactory {
+    private fun factory(providerName: String, models: List<AimoChatModelConfig>): AimoChatModelProviderFactory {
         return object : AimoChatModelProviderFactory {
             override val provider: String = providerName
 
-            override fun createAimoChatModel(): AimoChatModel? =
+            override fun getDefaultModel(): AimoChatModelConfig? =
                 models.singleOrNull { it.isPrimary } ?: models.firstOrNull()
 
-            override fun createAimoChatModel(name: String): AimoChatModel? =
+            override fun getModel(name: String): AimoChatModelConfig? =
                 models.firstOrNull { it.name == name }
 
             override fun getNames(): List<String> = models.map { it.name }
@@ -81,8 +81,8 @@ class AimoConfigPrimaryModelSelectionTest {
         }
     }
 
-    private fun model(name: String, isPrimary: Boolean = false): AimoChatModel =
-        AimoChatModel(
+    private fun model(name: String, isPrimary: Boolean = false): AimoChatModelConfig =
+        AimoChatModelConfig(
             name = name,
             chatEngine = TestEngine(),
             options = AimoChatOptions(model = name),

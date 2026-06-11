@@ -81,7 +81,7 @@ Or inject the factory directly:
 @Autowired
 private lateinit var bedrockFactory: AimoChatModelProviderFactory
 
-val model = bedrockFactory.createAimoChatModel("claude-3-sonnet")
+val model = bedrockFactory.getModel("claude-3-sonnet")
 ```
 
 ## Tested Models

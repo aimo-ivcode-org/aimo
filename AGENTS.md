@@ -3,7 +3,7 @@
 ## Big Picture
 - `aimo` is a multi-module Gradle workspace: core orchestration (`aimo-core`), transport (`aimo-server`), model adapters (`aimo-model-ollama`, `aimo-model-bedrock`), UI plugin (`aimo-plugin-ui`), React UI (`aimo-ui`), runnable apps in `examples/*`.
 - Runtime composition happens in example apps (`examples/simple-ollama`, `examples/simple-bedrock`): they wire `aimo-server` + `aimo-plugin-ui` + one model provider + DAO bean (`AimoChatClientDaoMemory`).
-- Core seam: `AimoChatModelProviderFactory` -> `AimoChatModel` -> `AimoChatEngine` (`aimo-core/src/main/kotlin/org/ivcode/aimo/core/model/AimoChatEngine.kt`). Keep provider-specific logic in adapter modules.
+- Core seam: `AimoChatModelProviderFactory` -> `AimoChatModelConfig` -> `AimoChatEngine` (`aimo-core/src/main/kotlin/org/ivcode/aimo/core/model/AimoChatEngine.kt`). Keep provider-specific logic in adapter modules.
 
 ## Request/Data Flow (important)
 - HTTP entrypoint is `POST /aimo-api/chat/{chatId}` (`aimo-server/.../controller/ChatController.kt`), streamed as NDJSON via `StreamingResponseBody`.

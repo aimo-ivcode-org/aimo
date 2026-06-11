@@ -9,7 +9,7 @@ package org.ivcode.aimo.core.model
  * @property isPrimary Whether this model is the default selection when multiple models exist.
  * @property context Prompt budgeting behavior for this model.
  */
-data class AimoChatModel (
+data class AimoChatModelConfig (
     val name: String,
     val chatEngine: AimoChatEngine,
     val options: AimoChatOptions,
@@ -45,21 +45,21 @@ interface AimoChatModelProviderFactory {
     val provider: String
 
     /**
-     * Creates the named model when it exists for this provider.
+     * Gets the named model when it exists for this provider.
      *
      * @return the matching model, or `null` when [name] is unknown.
      */
-    fun createAimoChatModel(name: String): AimoChatModel?
+    fun getModel(name: String): AimoChatModelConfig?
 
     /**
-     * Creates this provider's default model.
+     * Gets this provider's default model.
      *
      * Implementations typically return the provider-local primary model when one is defined,
      * otherwise the provider's first configured model.
      *
      * @return the provider default model, or `null` when no models are configured.
      */
-    fun createAimoChatModel(): AimoChatModel?
+    fun getDefaultModel(): AimoChatModelConfig?
 
     /**
      * Lists all model names known to this provider.
@@ -85,16 +85,16 @@ interface AimoChatModelProviderFactory {
 interface AimoChatModelFactory {
 
     /**
-     * Creates the named model when it exists in the global model set.
+     * Gets the named model when it exists in the global model set.
      *
      * @return the matching model, or `null` when [name] is unknown.
      */
-    fun createAimoChatModel(name: String): AimoChatModel?
+    fun getModel(name: String): AimoChatModelConfig?
 
     /**
-     * Creates the globally selected default model.
+     * Gets the globally selected primary model.
      */
-    fun createAimoChatModel(): AimoChatModel
+    fun getPrimaryModel(): AimoChatModelConfig
 
     /**
      * Lists all globally available model names.

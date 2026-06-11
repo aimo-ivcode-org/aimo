@@ -8,6 +8,8 @@ import org.ivcode.aimo.core.AimoHistoryRequest
 import org.ivcode.aimo.core.AimoConversationInfo
 import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.AimoPromptCacheUsage
+import org.ivcode.aimo.core.dao.ChatConversationEntity
+import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.server.model.ChatHistoryRequest
 import org.ivcode.aimo.server.model.ChatMessage
 import org.ivcode.aimo.server.model.ChatRequest
@@ -57,6 +59,28 @@ internal fun AimoHistoryRequest.toChatHistoryRequest() = ChatHistoryRequest(
 
 internal fun AimoConversationInfo.toChatConversationInfo() = ChatConversationInfo(
     chatId = chatId,
+)
+
+internal fun ChatConversationEntity.toChatConversationInfo() = ChatConversationInfo(
+    chatId = chatId,
+)
+
+internal fun ChatRequestEntity.toChatHistoryRequest() = ChatHistoryRequest(
+    chatId = chatId,
+    requestId = requestId,
+    messages = messages.map { it.toAimoChatMessage().toChatMessage() },
+    createdAt = createdAt
+)
+
+internal fun org.ivcode.aimo.core.dao.ChatMessageEntity.toAimoChatMessage() = AimoChatMessage(
+    messageId = messageId,
+    type = AimoChatMessageType.valueOf(type),
+    content = content,
+    thinking = thinking,
+    toolName = toolName,
+    toolCallId = toolCallId,
+    toolCalls = toolCalls,
+    done = null
 )
 
 internal fun AimoUsage.toChatUsage() = ChatUsage(

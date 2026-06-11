@@ -1,13 +1,13 @@
 package org.ivcode.aimo.server.service
 
-import org.ivcode.aimo.core.Aimo
+import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.server.model.ChatHistoryRequest
 import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
 class HistoryService (
-    private val aimo: Aimo
+    private val conversationStore: AimoChatClientDao
 ) {
     /**
      * Get history for a specific user's conversation.
@@ -18,7 +18,8 @@ class HistoryService (
      * @return The conversation history, or empty list if not found or unauthorized
      */
     fun getHistory(chatId: UUID, userId: String): List<ChatHistoryRequest> {
-        return aimo.getChatHistory(chatId, userId).map { it.toChatHistoryRequest() }
+        val requests = conversationStore.getChatRequests(userId, chatId)
+        return requests.map { it.toChatHistoryRequest() }
     }
 }
 

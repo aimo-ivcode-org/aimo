@@ -1,6 +1,6 @@
 package org.ivcode.aimo.ollama.model
 
-import org.ivcode.aimo.core.model.AimoChatModel
+import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.ollama.OllamaModelProperties
@@ -33,12 +33,12 @@ class OllamaChatModelFactory (
     // AimoChatModelProviderFactory
     // -------------------------------------------------------------------------
 
-    override fun createAimoChatModel(): AimoChatModel? {
+    override fun getDefaultModel(): AimoChatModelConfig? {
         val name = getPrimaryName() ?: properties.keys.firstOrNull() ?: return null
-        return createAimoChatModel(name)
+        return getModel(name)
     }
 
-    override fun createAimoChatModel(name: String): AimoChatModel? {
+    override fun getModel(name: String): AimoChatModelConfig? {
         val props  = properties[name]
             ?: return null
         val client = clients[props.baseUrl]
@@ -46,7 +46,7 @@ class OllamaChatModelFactory (
         val rawOptions = resolveOptions(name, props.options)
         val aimoOptions  = rawOptions.toAimoChatOptions()
         val engine = OllamaChatEngineImpl(client, name, aimoOptions)
-        return AimoChatModel(
+        return AimoChatModelConfig(
             name        = name,
             chatEngine  = engine,
             options     = aimoOptions,

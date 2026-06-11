@@ -1,10 +1,12 @@
 package org.ivcode.aimo.ui.controller
 
-import org.ivcode.aimo.core.Aimo
+import org.ivcode.aimo.core.builder.ConversationFactory
+import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.security.AimoUserProvider
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
 import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.ui.chatcontroller.TitleChatController
+import org.ivcode.aimo.ui.extentions.getTitle
 import org.ivcode.aimo.ui.model.ConversationTitle
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -23,7 +25,8 @@ import java.util.UUID
 @RestController
 @RequestMapping("/$API_CONTROLLER_CONTEXT/title")
 class TitleController constructor(
-    private val aimo: Aimo,
+    private val conversationFactory: ConversationFactory,
+    private val conversationStore: AimoChatClientDao,
     private val titleChatController: TitleChatController,
     private val userProvider: AimoUserProvider
 ) {
@@ -34,16 +37,17 @@ class TitleController constructor(
         @PathVariable chatId: UUID
     ): ConversationTitle? {
         val user = userProvider.getCurrentUser()
-        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found or not authorized")
-        return titleChatController.getTitle(conversationClient)
+        val conversation = conversationFactory.getConversation(chatId, user.userId)
+        return titleChatController.getTitle(conversation)
     }
 
     /** Returns title metadata for all conversations that currently have a stored title. */
     @GetMapping("/")
     fun getTitles(): List<ConversationTitle> {
         val user = userProvider.getCurrentUser()
-        return aimo.getConversations(user.userId).mapNotNull { conversation ->
-            titleChatController.getTitle(conversation)
+        val conversations = conversationStore.getChatConversations(user.userId)
+        return conversations.mapNotNull { entity ->
+            titleChatController.getTitle(entity.chatId, entity.metadata)
         }
     }
 
@@ -60,8 +64,8 @@ class TitleController constructor(
         @PathVariable title: String
     ) {
         val user = userProvider.getCurrentUser()
-        val conversationClient = aimo.getConversationClient(chatId, user.userId) ?: throw NotFoundException("Conversation with id $chatId not found or not authorized")
-        titleChatController.setTitle(title, conversationClient)
+        val conversation = conversationFactory.getConversation(chatId, user.userId)
+        titleChatController.setTitle(title, conversation, "USER")
     }
 }
 
