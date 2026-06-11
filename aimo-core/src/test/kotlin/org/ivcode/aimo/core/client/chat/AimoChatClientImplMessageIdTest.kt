@@ -5,7 +5,7 @@ import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoConversationClient
+import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.controller.Tool
@@ -13,7 +13,7 @@ import org.ivcode.aimo.core.controller.toAimoToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatEngine
-import org.ivcode.aimo.core.model.AimoChatModel
+import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoPrompt
@@ -422,7 +422,7 @@ class AimoChatClientImplMessageIdTest {
         engine: AimoChatEngine,
         contextSize: Int = 1,
         excludeThinking: Boolean = false,
-    ): AimoChatModel = AimoChatModel(
+    ): AimoChatModelConfig = AimoChatModelConfig(
         name = "test",
         chatEngine = engine,
         options = AimoChatOptions(),
@@ -578,11 +578,10 @@ class AimoChatClientImplMessageIdTest {
     private class TestSessionClient(
         override val chatId: UUID,
         private val dao: AimoChatClientDaoMemory? = null,
-    ) : AimoConversationClient {
+    ) : Conversation {
         private val metadata = mutableMapOf<String, Any>()
         private val runtimeMetadata = mutableMapOf<String, Any>()
 
-        override fun createChatClient(): AimoChatClient = throw UnsupportedOperationException()
         override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
             val loaded = (dao?.getChatRequests("user1", chatId) ?: emptyList())
                 .flatMap { it.messages.map { m -> m.toAimoChatMessage() } }
@@ -607,9 +606,7 @@ class AimoChatClientImplMessageIdTest {
             runtimeMetadata["chat.messages"] = existing + messages
         }
         override fun getChatMetadata(): Map<String, Any> = metadata.toMap()
-        override fun readChatMetadata(): Map<String, Any> = metadata.toMap()
         override fun getChatProperty(property: String): Any? = metadata[property]
-        override fun readChatProperty(property: String): Any? = metadata[property]
          override fun writeChatProperty(property: String, value: Any) { metadata[property] = value }
          override fun deleteChatProperty(property: String): Boolean = metadata.remove(property) != null
      }

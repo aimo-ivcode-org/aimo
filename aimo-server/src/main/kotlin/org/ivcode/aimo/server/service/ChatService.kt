@@ -1,9 +1,9 @@
 package org.ivcode.aimo.server.service
 
-import org.ivcode.aimo.core.Aimo
 import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.AimoChatRequest
-import org.ivcode.aimo.server.exceptions.NotFoundException
+import org.ivcode.aimo.core.builder.ChatClientBuilderFactory
+import org.ivcode.aimo.core.builder.ConversationFactory
 import org.ivcode.aimo.server.model.ChatRequest
 import org.ivcode.aimo.server.model.ChatResponse
 import org.springframework.stereotype.Service
@@ -13,15 +13,23 @@ import java.util.UUID
 
 @Service
 class ChatService (
-    private val aimo: Aimo,
+    private val conversationFactory: ConversationFactory,
+    private val chatClientFactory: ChatClientBuilderFactory,
     private val mapper: ObjectMapper,
 ) {
     fun chat (chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream, userId: String) {
-        val conversation = aimo.getConversationClient(chatId, userId) ?: throw NotFoundException("Conversation with id $chatId not found or not authorized")
-        val client = conversation.createChatClient()
+        // Build conversation with security/audit interceptors (from factory)
+        // The factory internally creates ConversationImpl and wraps it with interceptors
+        val conversation = conversationFactory.getConversation(chatId, userId)
 
+        // Build chat client with the secure conversation
+        val client = chatClientFactory
+            .builder(conversation)
+            .build()
+
+        // Merge request context with conversation metadata
         val context: MutableMap<String, Any> = HashMap(context)
-        context.putAll(conversation.readChatMetadata())
+        context.putAll(conversation.getChatMetadata())
 
         if (request.stream) {
             chatStream(client, request.toAimoChatRequest(context.toMap()), output)

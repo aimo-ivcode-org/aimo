@@ -1,7 +1,7 @@
 package org.ivcode.aimo.ui.extentions
 
 import org.ivcode.aimo.core.AimoConversationInfo
-import org.ivcode.aimo.core.AimoConversationClient
+import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.ui.model.ConversationTitle
 import java.util.UUID
 
@@ -33,11 +33,11 @@ fun AimoConversationInfo.getTitle(): ConversationTitle? {
     return toConversationTitle(this.metadata[PROPERTY_NAME__TITLE], this.chatId)
 }
 
-fun AimoConversationClient.getTitle(): ConversationTitle? {
-    return toConversationTitle(this.readChatProperty(PROPERTY_NAME__TITLE), this.chatId)
+fun Conversation.getTitle(): ConversationTitle? {
+    return toConversationTitle(this.getChatProperty(PROPERTY_NAME__TITLE), this.chatId)
 }
 
-fun AimoConversationClient.setTitle(title: String, source: String = DEFAULT_TITLE_SOURCE): ConversationTitle {
+fun Conversation.setTitle(title: String, source: String = DEFAULT_TITLE_SOURCE): ConversationTitle {
     val conversationTitle = ConversationTitle(
         chatId = this.chatId,
         source = source,
@@ -47,3 +47,9 @@ fun AimoConversationClient.setTitle(title: String, source: String = DEFAULT_TITL
     this.writeChatProperty(PROPERTY_NAME__TITLE, conversationTitle)
     return conversationTitle
 }
+
+// Helper to get title from chatId and metadata map
+fun getTitle(chatId: UUID, metadata: Map<String, Any>): ConversationTitle? {
+    return toConversationTitle(metadata[PROPERTY_NAME__TITLE], chatId)
+}
+
