@@ -2,116 +2,135 @@
 
 ## Backend
 
-### Phase 1: Configuration
+### Phase 1: Configuration ✅ **COMPLETE**
 **Goal**: Make the system configurable through properties and runtime builders
 
-**✅ Architecture Change — Completed**:
-The legacy `Aimo` facade has been removed. The system now uses a factory-based pattern:
-- `ConversationFactory` creates per-chat `Conversation` instances
-- `ChatClientBuilderFactory` creates builders that configure and return `AimoChatClient` instances
-- No singleton; each conversation is independently managed
+**Status**: Phase 1 is **100% complete** with all objectives achieved.
 
-**⚠️ Terminology — Current vs Future**:
-Current codebase uses two overlapping client concepts:
-- `AimoConversationClient` — manages a conversation: creates chat clients, reads/writes history & metadata
-- `AimoChatClient` — executes chat: `chat()` and `chatStream()` methods
+**What Was Implemented**:
 
-In the new model:
-- **Conversations** = pure history/metadata storage (backed by memory, file, RDS, MongoDB, etc.)
-- **Builders** = accept a conversation, configure runtime behavior, return a `ChatClient`
-- The `AimoConversationClient.createChatClient()` pattern becomes the builder pattern
+1. **Factory-Based Architecture**:
+   - Removed legacy `Aimo` facade
+   - Implemented `ConversationFactory` for conversation management
+   - Implemented `ChatClientBuilderFactory` for flexible chat client composition
+   - Each conversation is independently managed with no global singleton
 
-**⚠️ Existing `AimoChatModelFactory`**: An `AimoChatModelFactory` interface already exists in the codebase. The new `BuilderFactory` is a higher-level concept — it wraps model factories, agents, guard-rails and config into a single entry point. Do not conflate the two.
+2. **Builder Pattern**:
+   - `ChatClientBuilder<T>` provides fluent API for runtime composition
+   - Supports model selection, agent binding (Phase 2 ready), and custom interceptors
+   - Deferred construction - builds only when `build()` is called
+   - Context injection for request metadata
 
-**Application Properties** (application.yaml):
-- Define predefined models and their configurations (under `aimo.models`)
-- Define agents and their tool scoping (under `aimo.agents`)
-- Define guard-rails configuration (under `aimo.guardRails`)
-- Base configuration for the system
-- Minimal changes to existing property structure
-- Properties bootstrap BuilderFactory on startup
+3. **Conversation Abstraction**:
+   - `Conversation` interface abstracts storage (memory, file, RDS, MongoDB ready)
+   - Conversations manage message history and metadata
+   - Storage-agnostic design via `AimoChatClientDao`
 
-**Conversation Model** (Terminology Change):
-- Conversations represent a chat's message history
-- Storage is abstracted: memory, file, RDS, MongoDB, etc.
-- Conversations are passed to builders as input
-- No longer create chat clients; instead, builders consume conversations
+4. **Interceptor Infrastructure**:
+   - Unified interceptor mechanism for cross-cutting concerns
+   - Two types: `ChatClientInterceptor` (request/response) and `ConversationInterceptor` (storage)
+   - Built-in interceptors: Logging, Tracing, ErrorHandling
+   - Chain of responsibility pattern for composable behavior
+   - Spring-managed beans automatically registered
 
-**Runtime Builder Architecture**:
-- **BuilderFactory**: Entry point for runtime configuration
-  - Initializes from application properties
-  - Creates builder instances for runtime customization
-  - Manages application-level state (predefined models, agents, guard-rails)
-  
-- **Builders**: Composable instances for specific runtime scenarios
-  - Accept a conversation as input
-  - Users configure runtime behavior (model, agent, tools, etc.)
-  - Each builder specifies its own configuration
-  - Builders return configured chat clients ready to execute
-  - Builders apply all relevant interceptors (security, guard-rails)
+5. **Configuration System**:
+   - YAML-based configuration under `aimo.*` prefix
+   - Provider-specific model configuration (`aimo.model.ollama`, `aimo.model.bedrock`)
+   - Interceptor configuration with property-based enablement
+   - Primary model resolution with validation
+   - All interceptors disabled by default (opt-in)
 
-**Interceptor Architecture**:
-- Core interfaces (e.g., `ChatClient`, Agent Provider) accept generic interceptors
-- Interceptors are the unified mechanism for cross-cutting concerns
-- Examples of interceptor-driven features:
-  - **Guard-Rails**: Intercept ChatClient requests/responses to validate or transform
-  - **Security Filtering**: Intercept agent listing to filter by user permissions
-  - **Logging/Tracing**: Intercept any point for observability
-- Interceptors are registered via the builder at runtime
-- No feature requires a special-purpose hook — all use the same interceptor interface
-  
-**Example Flow**:
-1. Application starts with properties-based configuration
-2. Conversation (history) is loaded from storage
-3. BuilderFactory creates builder instances
-4. Users invoke builders, passing in the conversation
-5. Builders return configured chat clients ready to execute
+6. **Documentation**:
+   - Comprehensive README with builder pattern examples
+   - Configuration guide with examples
+   - Programmatic usage guide
+   - Migration guide (MIGRATION-PHASE1.md)
+   - Example application documentation
 
-**Example Usage** (Illustrative - API not fixed):
-```
-Conversation conversation = loadConversation(conversationId)
-
-ChatClient chatClient = builderFactory
-  .builder()
-  .withConversation(conversation)
-  .withAgent("admin")
-  .withModel("gpt-4")
-  .build()
-
-chatClient.chat("user message")
+**Example Usage**:
+```kotlin
+@Service
+class ChatService(
+    private val conversationFactory: ConversationFactory,
+    private val chatClientBuilderFactory: ChatClientBuilderFactory
+) {
+    fun chat(chatId: UUID, message: String): AimoChatResponse {
+        val conversation = conversationFactory.getConversation(chatId)
+        val chatClient = chatClientBuilderFactory
+            .builder(conversation)
+            .withModel("gpt-oss")  // Optional model override
+            .build()
+        
+        return chatClient.chat(AimoChatRequest(userMessage = message))
+    }
+}
 ```
 
-*Note: This is a conceptual example to show the builder pattern. The actual API may differ.*
+**Configuration Example**:
+```yaml
+aimo:
+  data-dir: ./data/conversations
+  global-user-id: default-user
+  
+  model:
+    ollama:
+      gpt-oss:
+        base-url: http://localhost:11434
+        primary: true
+        options:
+          model: gpt-oss:20b
+          temperature: 0.7
+  
+  interceptors:
+    logging:
+      enabled: true
+      level: DEBUG
+```
 
-### Phase 1.5: Rename `@ChatController` Annotation to `@ChatService`
+### Phase 1.5: Rename `@ChatController` to `@ChatService` ✅ **COMPLETE**
 **Goal**: Rename the `@ChatController` annotation to `@ChatService` for clearer semantics
 
-**⚠️ Naming Collision Warning**:
-There are currently TWO different things using the "ChatController" name in the codebase:
-1. `@ChatController` annotation (`aimo-core/.../controller/Annotations.kt`) — applied to **user-defined beans** that declare tools and system messages. This is the annotation being renamed.
-2. `ChatControllerEntity` (`aimo-core/.../controller/ChatControllerEntity.kt`) — internal wrapper that holds tool callbacks and system message callbacks discovered from `@ChatController` beans.
+**Status**: Phase 1.5 is **100% complete**. The annotation has been renamed and all code updated.
 
-There is also already a `ChatService` class in `aimo-server` (the HTTP service layer). The new `@ChatService` annotation is in `aimo-core` and is a completely different concept — it is a **user-facing annotation** applied to beans that register tools and system messages with the AI engine.
+**What Was Changed**:
+1. **Annotation Renamed**: `@ChatController` → `@ChatService`
+2. **Package Renamed**: `org.ivcode.aimo.core.controller` → `org.ivcode.aimo.core.chatservice`
+3. **Entity Renamed**: `ChatControllerEntity` → `ChatServiceEntity`
+4. **All Usages Updated**: In `aimo-core`, `aimo-plugin-ui`, and `examples/`
+5. **Old Code Deleted**: Previous package and annotations completely removed
 
-**Changes**:
-- Rename annotation `@ChatController` → `@ChatService` in `Annotations.kt`
-- Rename `ChatControllerEntity` → `ChatServiceEntity` throughout the codebase
-- Update `AimoConfig.kt` which uses reflection to find `@ChatController` beans
-- Update all existing `@ChatController` usages in `aimo-plugin-ui` and examples
+**Current State**:
+- All tools and system messages use `@ChatService` annotation
+- Discovery mechanism updated in `AimoConfig`
+- No backwards compatibility - clean migration
+
+**Example**:
+```kotlin
+@ChatService
+class CalculatorService {
+    @Tool(description = "Add two numbers")
+    fun add(
+        @ToolParam("First number") a: Int,
+        @ToolParam("Second number") b: Int
+    ): Int = a + b
+}
+```
 
 ### Phase 2: Agents
 **Goal**: Define agents as scoped collections of tools with customizable system messages
 
-**⚠️ Current Tool Discovery (Will Change)**:
+**Status**: Ready to implement. Phase 1 and 1.5 provide the foundation.
+
+**⚠️ Current Tool Discovery**:
 Tools are currently discovered **globally at startup** via reflection in `AimoConfig.createControllerEntities()`. All `@ChatService` beans are scanned, and ALL their tools are registered. This means there is no filtering — every tool is available to every request today.
 
 Agent scoping must **filter at runtime**, not at startup. The full tool registry is still built at startup, but only the agent's allowed tools are passed to `AimoChatClientImpl` when building a prompt.
 
-**⚠️ `SystemMessageContext` Is Currently Just a Context Map**:
-`SystemMessageContext` currently only contains `context: Map<String, Any>` with no `agentId`. Adding `agentId` as a field is required for Phase 3.3 (system message selection by agent).
+**⚠️ `SystemMessageContext` Enhancement Needed**:
+`SystemMessageContext` currently only contains `context: Map<String, Any>` with no `agentId`. Adding `agentId` as a field is required for system message selection by agent.
 
-**⚠️ `@ChatService` Annotation Scoping**:
-The `agents` property added to `@ChatService`, `@Tool`, and `@SystemMessage` annotations does not exist yet. It must be added as part of this phase. If no `agents` property is set on an annotation, the component is available to all agents (backwards compatible).
+**⚠️ Annotation Enhancement Needed**:
+The `agents` property must be added to `@ChatService`, `@Tool`, and `@SystemMessage` annotations. If no `agents` property is set on an annotation, the component is available to all agents (backwards compatible).
 
 **Definition**:
 - Agents are named configurations that bind a subset of tools to a specific system message
