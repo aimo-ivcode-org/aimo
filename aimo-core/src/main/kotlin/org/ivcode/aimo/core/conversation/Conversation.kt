@@ -48,6 +48,7 @@ interface Conversation {
      * @param requestId The unique request identifier to use for history persistence
      * @param messages messages to append, in the order they should appear in the conversation
      * @param maxCacheCharacters optional character-budget hint for bounded-history persistence
+     * @throws IllegalStateException if the messages cannot be persisted
      */
     fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long? = null)
 

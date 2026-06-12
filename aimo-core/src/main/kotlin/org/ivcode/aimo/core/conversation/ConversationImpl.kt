@@ -69,7 +69,8 @@ class ConversationImpl(
             createdAt = Instant.now()
         )
 
-        conversationStore.addChatRequest(userId, request)
+        val success = conversationStore.addChatRequest(userId, request)
+        check(success) { "Failed to persist conversation messages for chat $chatId" }
     }
 
     override fun getChatMetadata(): Map<String, Any> {
