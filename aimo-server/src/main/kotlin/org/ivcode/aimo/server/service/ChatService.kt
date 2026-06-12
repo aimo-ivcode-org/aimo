@@ -19,8 +19,7 @@ class ChatService (
     private val mapper: ObjectMapper,
 ) {
     fun chat (chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream, userId: String) {
-        // Build conversation with security/audit interceptors (from factory)
-        // The factory internally creates ConversationImpl and wraps it with interceptors
+        // Get the conversation instance for this chat
         val conversation = conversationFactory.getConversation(chatId, userId)
             ?: throw NotFoundException("Conversation not found: chatId=$chatId")
 
