@@ -41,6 +41,8 @@ class ConversationImpl(
     }
 
     override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
+        require(messages.isNotEmpty()) { "Cannot add empty messages list to conversation" }
+
         val messageEntities = messages.map { message ->
             ChatMessageEntity(
                 requestId = requestId,
