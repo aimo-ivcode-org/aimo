@@ -167,7 +167,7 @@ data class AimoInterceptorProperties(
 )
 
 data class LoggingInterceptorProperties(
-    var enabled: Boolean = true,
+    var enabled: Boolean = false,
     var level: String = "INFO"
 )
 
