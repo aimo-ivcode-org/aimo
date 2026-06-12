@@ -7,7 +7,6 @@ import org.ivcode.aimo.core.conversation.ConversationImpl
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.AimoChatMessage
 import java.util.UUID
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Concrete implementation of [ConversationFactory] that creates conversations from DAO/store.
