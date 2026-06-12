@@ -49,9 +49,10 @@ class MyChatService(
     private val conversationFactory: ConversationFactory,
     private val chatClientBuilderFactory: ChatClientBuilderFactory
 ) {
-    fun handleRequest(chatId: UUID, message: String): AimoChatResponse {
+    fun handleRequest(chatId: UUID, message: String, userId: String): AimoChatResponse {
         // 2. Get or create conversation
-        val conversation = conversationFactory.getConversation(chatId)
+        val conversation = conversationFactory.getConversation(chatId, userId)
+            ?: throw NotFoundException("Conversation not found")
         
         // 3. Build chat client with optional customization
         val chatClient = chatClientBuilderFactory
@@ -160,8 +161,9 @@ class ChatService(
     private val conversationFactory: ConversationFactory,
     private val chatClientBuilderFactory: ChatClientBuilderFactory
 ) {
-    fun chat(chatId: UUID, userMessage: String): AimoChatResponse {
-        val conversation = conversationFactory.getConversation(chatId)
+    fun chat(chatId: UUID, userMessage: String, userId: String): AimoChatResponse {
+        val conversation = conversationFactory.getConversation(chatId, userId)
+            ?: throw NotFoundException("Conversation not found")
         val chatClient = chatClientBuilderFactory.builder(conversation).build()
         
         return chatClient.chat(AimoChatRequest(userMessage = userMessage))
