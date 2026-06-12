@@ -29,10 +29,34 @@ class ChatClientBuilderFactoryImpl(
 ) : ChatClientBuilderFactory {
 
     // Cache of model name → provider that can create it
-    private val modelRegistry: Map<String, AimoChatModelProviderFactory> =
-        modelProviderFactories.values.flatMap { factory ->
-            factory.getNames().map { name -> name to factory }
-        }.toMap()
+    // Detect duplicate model names across providers and fail-fast
+    private val modelRegistry: Map<String, AimoChatModelProviderFactory> = run {
+        val modelToProvider = mutableMapOf<String, AimoChatModelProviderFactory>()
+        val duplicates = mutableMapOf<String, MutableList<String>>()
+
+        modelProviderFactories.values.forEach { factory ->
+            factory.getNames().forEach { modelName ->
+                val existing = modelToProvider[modelName]
+                if (existing != null) {
+                    // Duplicate detected - track it
+                    duplicates.getOrPut(modelName) { mutableListOf(existing.provider) }
+                        .add(factory.provider)
+                } else {
+                    modelToProvider[modelName] = factory
+                }
+            }
+        }
+
+        // Fail-fast if duplicates found
+        require(duplicates.isEmpty()) {
+            val details = duplicates.entries.joinToString("\n") { (name, providers) ->
+                "  - '$name' in providers: ${providers.joinToString(", ")}"
+            }
+            "Duplicate model names detected across providers. Model names must be unique.\n$details"
+        }
+
+        modelToProvider
+    }
 
     // Primary model resolved at construction time
     private val _primaryModel: AimoChatModelConfig by lazy {
