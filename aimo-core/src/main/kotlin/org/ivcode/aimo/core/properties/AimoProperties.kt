@@ -149,13 +149,13 @@ data class AimoGuardRailProperties(
  * ```yaml
  * aimo.interceptors:
  *   logging:
- *     enabled: true
+ *     enabled: false  # disabled by default
  *     level: INFO
  *   tracing:
- *     enabled: true
+ *     enabled: false  # disabled by default
  *     service-name: aimo-chat
  *   error-handling:
- *     enabled: true
+ *     enabled: false  # disabled by default
  *     max-retries: 3
  *     retry-backoff-ms: 100
  * ```
@@ -172,12 +172,12 @@ data class LoggingInterceptorProperties(
 )
 
 data class TracingInterceptorProperties(
-    var enabled: Boolean = true,
+    var enabled: Boolean = false,
     var serviceName: String = "aimo-chat"
 )
 
 data class ErrorHandlingInterceptorProperties(
-    var enabled: Boolean = true,
+    var enabled: Boolean = false,
     var maxRetries: Int = 3,
     var retryBackoffMs: Long = 100
 )

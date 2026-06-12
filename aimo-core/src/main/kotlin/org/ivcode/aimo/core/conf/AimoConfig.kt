@@ -19,6 +19,7 @@ import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.properties.AimoProperties
 import org.springframework.beans.factory.getBeansWithAnnotation
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
@@ -101,43 +102,50 @@ class AimoConfig {
      }
 
      @Bean
-     fun createDefaultInterceptors(properties: AimoProperties): List<ChatClientInterceptor> {
-         val interceptors = mutableListOf<ChatClientInterceptor>()
-
-         // Logging interceptor
-         if (properties.interceptors.logging.enabled) {
-             val logLevel = when (properties.interceptors.logging.level.uppercase()) {
-                 "DEBUG" -> LoggingInterceptor.LogLevel.DEBUG
-                 "INFO" -> LoggingInterceptor.LogLevel.INFO
-                 "WARN" -> LoggingInterceptor.LogLevel.WARN
-                 "ERROR" -> LoggingInterceptor.LogLevel.ERROR
-                 else -> LoggingInterceptor.LogLevel.INFO
-             }
-             interceptors.add(LoggingInterceptor(logLevel = logLevel, enabled = true))
+     @ConditionalOnProperty(
+         prefix = "aimo.interceptors.logging",
+         name = ["enabled"],
+         havingValue = "true",
+         matchIfMissing = false
+     )
+     fun loggingInterceptor(properties: AimoProperties): ChatClientInterceptor {
+         val logLevel = when (properties.interceptors.logging.level.uppercase()) {
+             "DEBUG" -> LoggingInterceptor.LogLevel.DEBUG
+             "INFO" -> LoggingInterceptor.LogLevel.INFO
+             "WARN" -> LoggingInterceptor.LogLevel.WARN
+             "ERROR" -> LoggingInterceptor.LogLevel.ERROR
+             else -> LoggingInterceptor.LogLevel.INFO
          }
+         return LoggingInterceptor(logLevel = logLevel, enabled = true)
+     }
 
-         // Tracing interceptor
-         if (properties.interceptors.tracing.enabled) {
-             interceptors.add(
-                 TracingInterceptor(
-                     enabled = true,
-                     serviceName = properties.interceptors.tracing.serviceName
-                 )
-             )
-         }
+     @Bean
+     @ConditionalOnProperty(
+         prefix = "aimo.interceptors.tracing",
+         name = ["enabled"],
+         havingValue = "true",
+         matchIfMissing = false
+     )
+     fun tracingInterceptor(properties: AimoProperties): ChatClientInterceptor {
+         return TracingInterceptor(
+             enabled = true,
+             serviceName = properties.interceptors.tracing.serviceName
+         )
+     }
 
-         // Error handling interceptor
-         if (properties.interceptors.errorHandling.enabled) {
-             interceptors.add(
-                 ErrorHandlingInterceptor(
-                     maxRetries = properties.interceptors.errorHandling.maxRetries,
-                     retryBackoffMs = properties.interceptors.errorHandling.retryBackoffMs,
-                     enabled = true
-                 )
-             )
-         }
-
-         return interceptors
+     @Bean
+     @ConditionalOnProperty(
+         prefix = "aimo.interceptors.error-handling",
+         name = ["enabled"],
+         havingValue = "true",
+         matchIfMissing = false
+     )
+     fun errorHandlingInterceptor(properties: AimoProperties): ChatClientInterceptor {
+         return ErrorHandlingInterceptor(
+             maxRetries = properties.interceptors.errorHandling.maxRetries,
+             retryBackoffMs = properties.interceptors.errorHandling.retryBackoffMs,
+             enabled = true
+         )
      }
 
      @Bean
@@ -145,7 +153,7 @@ class AimoConfig {
          chatModelFactories: Map<String, AimoChatModelProviderFactory>,
          tools: List<AimoToolCallback>,
          systemMessages: List<SystemMessageCallback>,
-         defaultInterceptors: List<ChatClientInterceptor>,
+         defaultInterceptors: List<ChatClientInterceptor>, // Spring auto-collects all ChatClientInterceptor beans
      ): ChatClientBuilderFactory {
          return ChatClientBuilderFactoryImpl(
              modelProviderFactories = chatModelFactories,
