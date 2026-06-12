@@ -11,8 +11,9 @@ import org.springframework.validation.annotation.Validated
  * aimo:
  *   data-dir: ./data/conversations
  *   global-user-id: default-user
- *   models:
+ *   model:
  *     # Model configurations (handled by provider-specific properties in adapter modules)
+ *     # e.g., aimo.model.ollama.*, aimo.model.bedrock.*
  *   agents:
  *     # Agent configurations (Phase 2)
  *   guard-rails:
@@ -181,4 +182,3 @@ data class ErrorHandlingInterceptorProperties(
     var maxRetries: Int = 3,
     var retryBackoffMs: Long = 100
 )
-

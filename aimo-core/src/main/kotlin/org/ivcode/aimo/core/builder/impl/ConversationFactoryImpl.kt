@@ -18,26 +18,27 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Interceptors are applied in registration order, with the first registered interceptor
  * being the outermost link (executes first).
  *
+ * This implementation is immutable - withInterceptor() returns a new factory instance
+ * with the additional interceptor, ensuring thread-safety and preventing cross-request leakage.
+ *
  * @property conversationStore The DAO/store for conversation persistence
+ * @property interceptors Immutable list of interceptors for this factory instance
  */
 class ConversationFactoryImpl(
-    private val conversationStore: AimoChatClientDao
+    private val conversationStore: AimoChatClientDao,
+    private val interceptors: List<ConversationInterceptor> = emptyList()
 ) : ConversationFactory {
 
-    private val interceptors = CopyOnWriteArrayList<ConversationInterceptor>()
-
     override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
-        interceptors.add(interceptor)
-        return this
+        return ConversationFactoryImpl(conversationStore, interceptors + interceptor)
     }
     override fun getConversation(chatId: UUID, userId: String): Conversation? {
-        // Fetch the conversation entity from the store
+        // Check if the conversation exists and user has access
         val entity = conversationStore.getChatConversation(chatId, userId)
             ?: return null
 
-        // Create the base conversation with the pre-fetched entity
-        // This avoids a redundant DAO fetch
-        val baseConversation = ConversationImpl(chatId, conversationStore, userId, entity)
+        // Create the base conversation
+        val baseConversation = ConversationImpl(chatId, conversationStore, userId)
 
         // If no interceptors, return base conversation
         if (interceptors.isEmpty()) {

@@ -3,7 +3,6 @@ package org.ivcode.aimo.core.conversation
 import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.dao.ChatConversationEntity
 import org.ivcode.aimo.core.dao.ChatMessageEntity
 import org.ivcode.aimo.core.dao.ChatRequestEntity
 import java.time.Instant
@@ -20,13 +19,11 @@ import java.util.UUID
  * @property chatId The unique identifier for the conversation
  * @property conversationStore The backing storage (DAO)
  * @property userId The user who owns this conversation (used for access control)
- * @property entity Optional pre-fetched conversation entity (avoids redundant DAO fetch on initialization)
  */
 class ConversationImpl(
     override val chatId: UUID,
     private val conversationStore: AimoChatClientDao,
-    private val userId: String,
-    entity: ChatConversationEntity? = null
+    private val userId: String
 ) : Conversation {
 
     override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
