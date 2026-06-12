@@ -321,7 +321,7 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
 
 - **Configuration & Interceptor Integration**:
   - Guard-rails defined in application.yaml under `aimo.guardRails`
-  - Use lightweight model selection (configured in `aimo.models`)
+  - Use lightweight model selection (configured in `aimo.model`)
   - Integrated as interceptors in the builder pipeline
   - Applied automatically when builder chains ChatClient
 
@@ -338,7 +338,7 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
 
 **Design**:
 - Follow the existing `AimoChatModelProviderFactory` pattern used by Ollama and Bedrock
-- Configured under `aimo.models` in application.yaml alongside existing providers
+- Configured under `aimo.model` in application.yaml alongside existing providers
 - Drop-in addition — no core changes required
 
 

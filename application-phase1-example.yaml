@@ -9,7 +9,7 @@ aimo:
   # global-user-id: default-user
   
   # Model configurations
-  models:
+  model:
     # Ollama provider models
     ollama:
       qwen:
