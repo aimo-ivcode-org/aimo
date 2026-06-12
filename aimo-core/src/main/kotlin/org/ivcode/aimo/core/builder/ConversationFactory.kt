@@ -41,9 +41,10 @@ interface ConversationFactory {
      *
      * @param chatId The conversation identifier
      * @param userId The user identifier (for access control and scoping)
-     * @return The conversation instance ready for use (wrapped with interceptors if any were registered)
+     * @return The conversation instance ready for use (wrapped with interceptors if any were registered),
+     *         or null if the conversation is not found or the user does not have access
      */
-    fun getConversation(chatId: UUID, userId: String): Conversation
+    fun getConversation(chatId: UUID, userId: String): Conversation?
 }
 
 

@@ -38,6 +38,7 @@ class TitleController constructor(
     ): ConversationTitle? {
         val user = userProvider.getCurrentUser()
         val conversation = conversationFactory.getConversation(chatId, user.userId)
+            ?: throw NotFoundException("Conversation not found: chatId=$chatId")
         return titleChatController.getTitle(conversation)
     }
 
@@ -65,6 +66,7 @@ class TitleController constructor(
     ) {
         val user = userProvider.getCurrentUser()
         val conversation = conversationFactory.getConversation(chatId, user.userId)
+            ?: throw NotFoundException("Conversation not found: chatId=$chatId")
         titleChatController.setTitle(title, conversation, "USER")
     }
 }

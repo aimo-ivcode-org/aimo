@@ -4,6 +4,7 @@ import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.builder.ChatClientBuilderFactory
 import org.ivcode.aimo.core.builder.ConversationFactory
+import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.server.model.ChatRequest
 import org.ivcode.aimo.server.model.ChatResponse
 import org.springframework.stereotype.Service
@@ -21,6 +22,7 @@ class ChatService (
         // Build conversation with security/audit interceptors (from factory)
         // The factory internally creates ConversationImpl and wraps it with interceptors
         val conversation = conversationFactory.getConversation(chatId, userId)
+            ?: throw NotFoundException("Conversation not found: chatId=$chatId")
 
         // Build chat client with the secure conversation
         val client = chatClientFactory
@@ -28,14 +30,14 @@ class ChatService (
             .build()
 
         // Merge request context with conversation metadata
-        val context: MutableMap<String, Any> = HashMap(context)
-        context.putAll(conversation.getChatMetadata())
+        val mergedContext: MutableMap<String, Any> = HashMap(context)
+        mergedContext.putAll(conversation.getChatMetadata())
 
         if (request.stream) {
-            chatStream(client, request.toAimoChatRequest(context.toMap()), output)
+            chatStream(client, request.toAimoChatRequest(mergedContext.toMap()), output)
         } else {
             // Non-streaming: perform a blocking chat call and write the single response
-            val response = client.chat(request.toAimoChatRequest(context.toMap()))
+            val response = client.chat(request.toAimoChatRequest(mergedContext.toMap()))
             response.toChatResponse().write(output, isNewlineDelimited = true)
         }
     }

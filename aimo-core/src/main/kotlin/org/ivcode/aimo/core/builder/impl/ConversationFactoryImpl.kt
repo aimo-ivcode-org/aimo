@@ -30,10 +30,10 @@ class ConversationFactoryImpl(
         interceptors.add(interceptor)
         return this
     }
-    override fun getConversation(chatId: UUID, userId: String): Conversation {
+    override fun getConversation(chatId: UUID, userId: String): Conversation? {
         // Fetch the conversation entity from the store
         val entity = conversationStore.getChatConversation(chatId, userId)
-            ?: throw IllegalArgumentException("Conversation not found: chatId=$chatId, userId=$userId")
+            ?: return null
 
         // Create the base conversation with the pre-fetched entity
         // This avoids a redundant DAO fetch
