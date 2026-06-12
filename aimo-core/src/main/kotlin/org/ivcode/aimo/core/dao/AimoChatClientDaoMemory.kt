@@ -75,7 +75,7 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         return requests[chatId]?.toList() ?: emptyList()
     }
 
-    override fun getChatRequests(userId: String, chatId: UUID, maxRequestCharacters: Int): List<ChatRequestEntity> {
+    override fun getChatRequests(userId: String, chatId: UUID, maxRequestCharacters: Long): List<ChatRequestEntity> {
         val conversation = conversations[chatId] ?: return emptyList()
         if (!isOwner(conversation, userId)) return emptyList()
 
@@ -89,13 +89,12 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         }
 
         var totalCharacters = 0L
-        val maxCharacters = maxRequestCharacters.toLong()
         val selected = mutableListOf<ChatRequestEntity>()
 
         // Pick newest requests first until adding the next would exceed the budget.
         for (request in chatRequests.asReversed()) {
             val requestCharacters = request.requestCharacters.toLong()
-            if (totalCharacters + requestCharacters > maxCharacters) {
+            if (totalCharacters + requestCharacters > maxRequestCharacters) {
                 break
             }
             selected.add(request)
@@ -175,7 +174,7 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         return requests[chatId]?.toList() ?: emptyList()
     }
 
-    override fun getChatRequestsAdmin(chatId: UUID, maxRequestCharacters: Int): List<ChatRequestEntity> {
+    override fun getChatRequestsAdmin(chatId: UUID, maxRequestCharacters: Long): List<ChatRequestEntity> {
         val conversation = conversations[chatId] ?: return emptyList()
 
         if (maxRequestCharacters <= 0) {
@@ -188,13 +187,12 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         }
 
         var totalCharacters = 0L
-        val maxCharacters = maxRequestCharacters.toLong()
         val selected = mutableListOf<ChatRequestEntity>()
 
         // Pick newest requests first until adding the next would exceed the budget.
         for (request in chatRequests.asReversed()) {
             val requestCharacters = request.requestCharacters.toLong()
-            if (totalCharacters + requestCharacters > maxCharacters) {
+            if (totalCharacters + requestCharacters > maxRequestCharacters) {
                 break
             }
             selected.add(request)

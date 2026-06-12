@@ -31,7 +31,7 @@ class ConversationImpl(
 
     override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
         val entities = if (maxCacheCharacters != null && maxCacheCharacters > 0) {
-            conversationStore.getChatRequests(userId, chatId, maxCacheCharacters.toInt())
+            conversationStore.getChatRequests(userId, chatId, maxCacheCharacters)
         } else {
             conversationStore.getChatRequests(userId, chatId)
         }

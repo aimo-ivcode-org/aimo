@@ -165,7 +165,7 @@ interface AimoChatClientDao {
      *         - userId doesn't own the conversation
      *         - no requests fit within the budget
      */
-    fun getChatRequests(userId: String, chatId: UUID, maxRequestCharacters: Int): List<ChatRequestEntity>
+    fun getChatRequests(userId: String, chatId: UUID, maxRequestCharacters: Long): List<ChatRequestEntity>
 
     /**
      * Get all messages for a conversation.
@@ -284,7 +284,7 @@ interface AimoChatClientDao {
      *         - conversation not found
      *         - no requests fit within the budget
      */
-    fun getChatRequestsAdmin(chatId: UUID, maxRequestCharacters: Int): List<ChatRequestEntity>
+    fun getChatRequestsAdmin(chatId: UUID, maxRequestCharacters: Long): List<ChatRequestEntity>
 
     /**
      * Get all messages for a conversation without authorization checks.
