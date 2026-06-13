@@ -33,8 +33,9 @@ class ConversationFactoryImpl(
     }
     override fun getConversation(chatId: UUID, userId: String): Conversation? {
         // Check if the conversation exists and user has access
-        val entity = conversationStore.getChatConversation(chatId, userId)
-            ?: return null
+        if(conversationStore.getChatConversation(chatId, userId) == null) {
+            return null
+        }
 
         // Create the base conversation
         val baseConversation = ConversationImpl(chatId, conversationStore, userId)
