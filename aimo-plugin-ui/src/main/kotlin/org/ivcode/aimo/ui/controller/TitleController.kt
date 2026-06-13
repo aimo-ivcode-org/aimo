@@ -6,7 +6,6 @@ import org.ivcode.aimo.core.security.AimoUserProvider
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
 import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.ui.chatcontroller.TitleChatController
-import org.ivcode.aimo.ui.extentions.getTitle
 import org.ivcode.aimo.ui.model.ConversationTitle
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

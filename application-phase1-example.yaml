@@ -56,7 +56,7 @@ aimo:
     # Logging interceptor
     logging:
       enabled: true
-      level: INFO  # TRACE, DEBUG, INFO, WARN, ERROR
+      level: INFO  # DEBUG, INFO, WARN, ERROR
     
     # Tracing interceptor (for distributed tracing)
     tracing:

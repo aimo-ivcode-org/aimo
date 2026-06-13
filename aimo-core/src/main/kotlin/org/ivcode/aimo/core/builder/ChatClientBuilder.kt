@@ -17,15 +17,13 @@ import org.ivcode.aimo.core.model.AimoChatModelConfig
  * customization without mutating global state.
  *
  * **Only accepts ChatClientInterceptor**, not ConversationInterceptor.
- *
- * @param T The type being built (typically `AimoChatClient`)
  */
 interface ChatClientBuilder {
     /**
      * Set the conversation for this chat client.
      *
      * The conversation should already be wrapped with security/audit interceptors
-     * via ConversationBuilder before being passed here.
+     * (for example, via ConversationFactory.withInterceptor(...)) before being passed here.
      *
      * @param conversation The pre-built conversation instance
      * @return this builder for chaining

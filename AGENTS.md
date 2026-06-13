@@ -10,7 +10,7 @@
 - `ChatService` merges request metadata + conversation durable metadata into chat context before calling core (`aimo-server/.../service/ChatService.kt`).
 - `AimoChatClientImpl` loop (`aimo-core/.../client/chat/AimoChatClientImpl.kt`): system messages -> fetch history from DAO -> prompt budget -> model call -> optional tool calls -> persist prompt + generated messages.
 - All message history is read from DAO; persistence always goes through `Conversation.addMessages`.
-- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../client/conversation/ConversationImpl.kt`).
+- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../conversation/ConversationImpl.kt`).
 
 ## Project-Specific Conventions
 - Tool/system discovery is reflection-based from `@ChatService` beans (`aimo-core/.../conf/AimoConfig.kt`).

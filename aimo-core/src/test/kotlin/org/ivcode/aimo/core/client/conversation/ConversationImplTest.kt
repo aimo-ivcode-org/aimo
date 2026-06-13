@@ -45,14 +45,13 @@ class ConversationImplTest {
          chatId: UUID,
          userId: String,
      ): Conversation {
-         val entity = dao.getChatConversation(chatId, userId)
-             ?: throw IllegalStateException("Conversation not found")
-         return ConversationImpl(
-             chatId = chatId,
-             conversationStore = dao,
-             userId = userId,
-             entity = entity
-         )
+        dao.getChatConversation(chatId, userId)
+            ?: throw IllegalStateException("Conversation not found")
+        return ConversationImpl(
+            chatId = chatId,
+            conversationStore = dao,
+            userId = userId,
+        )
      }
 }
 
