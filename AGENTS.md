@@ -13,7 +13,7 @@
 - Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../client/conversation/ConversationImpl.kt`).
 
 ## Project-Specific Conventions
-- Tool/system discovery is reflection-based from `@ChatController` beans (`aimo-core/.../conf/AimoConfig.kt`).
+- Tool/system discovery is reflection-based from `@ChatService` beans (`aimo-core/.../conf/AimoConfig.kt`).
 - LLM-callable tools use `@Tool`; parameter docs use `@ToolParam`; a parameter named `context` of type `Map` is auto-injected and excluded from generated JSON schema (`aimo-core/.../controller/ControllerHelpers.kt`, `MethodAimoToolCallback.kt`).
 - System messages can be `@SystemMessage` field/property/method; method signature must be `() -> String?` or `(SystemMessageContext) -> String?`.
 - Context keys are fixed (`chatId`, `requestId`, `conversation-client`) in `aimo-core/.../util/Extensions.kt`; server adds `requestMetadata` (`aimo-server/.../util/ContextExtensions.kt`).

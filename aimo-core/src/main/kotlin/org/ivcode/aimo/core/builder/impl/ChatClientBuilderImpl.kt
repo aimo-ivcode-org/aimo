@@ -21,7 +21,6 @@ import java.util.UUID
  *
  * @property conversation The conversation instance for history storage (optional until build)
  * @property selectedModel The selected model configuration (null means use factory primary)
- * @property selectedAgent The selected agent ID (null means resolve from conversation or use default)
  * @property builderInterceptors Builder-level interceptors registered via withInterceptor()
  * @property factoryDefaultInterceptors Factory-level default interceptors (logging, tracing, error handling)
  * @property toolCallbacks All registered tool callbacks
@@ -39,10 +38,9 @@ class ChatClientBuilderImpl(
 ) : ChatClientBuilder {
 
     private var selectedModel: AimoChatModelConfig? = null
-    private var selectedAgent: String? = null
     private val builderInterceptors = mutableListOf<ChatClientInterceptor>()
 
-    override fun withConversation(conversation: Conversation): ChatClientBuilder {
+    override fun withConversation(conversation: Conversation): ChatClientBuilder<AimoChatClient> {
         this.conversation = conversation
         return this
     }
@@ -53,17 +51,12 @@ class ChatClientBuilderImpl(
         return this
     }
 
-    override fun withModel(config: AimoChatModelConfig): ChatClientBuilder {
+    override fun withModel(config: AimoChatModelConfig): ChatClientBuilder<AimoChatClient> {
         this.selectedModel = config
         return this
     }
 
-    override fun withAgent(agentId: String): ChatClientBuilder {
-        this.selectedAgent = agentId
-        return this
-    }
-
-    override fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder {
+    override fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder<AimoChatClient> {
         builderInterceptors.add(interceptor)
         return this
     }

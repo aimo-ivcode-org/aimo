@@ -11,7 +11,6 @@ import org.ivcode.aimo.core.model.AimoChatModelConfig
  * Enables composition of:
  * - Conversation (wrapped with security/audit interceptors)
  * - Models (LLM selection)
- * - Agents (tool/message scoping, Phase 2)
  * - Interceptors (guard-rails, logging, tracing)
  *
  * The builder defers construction until `build()` is called, allowing per-request
@@ -55,17 +54,6 @@ interface ChatClientBuilder {
     fun withModel(config: AimoChatModelConfig): ChatClientBuilder
 
     /**
-     * Select an agent by ID.
-     *
-     * Agents control tool/message scoping (Phase 2 feature). If not specified, the builder
-     * will attempt to resolve the agent from conversation metadata, or use the default agent.
-     *
-     * @param agentId The agent identifier
-     * @return this builder for chaining
-     */
-    fun withAgent(agentId: String): ChatClientBuilder
-
-    /**
      * Register a chat-level interceptor.
      *
      * Interceptors are applied in registration order. Builder-level interceptors execute
@@ -81,7 +69,6 @@ interface ChatClientBuilder {
      *
      * Resolution logic:
      * - Model: Use withModel() selection, or factory primary model, or throw exception
-     * - Agent: Use withAgent() selection, or read from conversation metadata, or use default
      * - Interceptors: Builder-level (outermost) + factory defaults (innermost)
      *
      * @return The composed chat client instance ready for use
