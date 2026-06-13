@@ -40,7 +40,7 @@ class ChatClientBuilderImpl(
     private var selectedModel: AimoChatModelConfig? = null
     private val builderInterceptors = mutableListOf<ChatClientInterceptor>()
 
-    override fun withConversation(conversation: Conversation): ChatClientBuilder<AimoChatClient> {
+    override fun withConversation(conversation: Conversation): ChatClientBuilder {
         this.conversation = conversation
         return this
     }
@@ -51,12 +51,12 @@ class ChatClientBuilderImpl(
         return this
     }
 
-    override fun withModel(config: AimoChatModelConfig): ChatClientBuilder<AimoChatClient> {
+    override fun withModel(config: AimoChatModelConfig): ChatClientBuilder {
         this.selectedModel = config
         return this
     }
 
-    override fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder<AimoChatClient> {
+    override fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder {
         builderInterceptors.add(interceptor)
         return this
     }
