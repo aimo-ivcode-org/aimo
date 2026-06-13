@@ -85,7 +85,8 @@ class ConversationImpl(
 
 
     override fun writeChatProperty(property: String, value: Any) {
-        conversationStore.upsertConversationMetadata(chatId, userId, mapOf(property to value))
+        val success = conversationStore.upsertConversationMetadata(chatId, userId, mapOf(property to value))
+        check(success) { "Failed to persist conversation metadata for chat $chatId" }
     }
 
     override fun deleteChatProperty(property: String): Boolean {

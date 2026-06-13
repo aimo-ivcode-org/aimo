@@ -102,13 +102,13 @@ class ChatService(
     private val conversationFactory: ConversationFactory,
     private val chatClientBuilderFactory: ChatClientBuilderFactory
 ) {
-    fun chat(chatId: UUID, request: ChatRequest): StreamingResponseBody {
-        // 1. Load or create conversation
-        val conversation = conversationFactory.getConversation(chatId)
+    fun chat(chatId: UUID, request: ChatRequest, userId: String): StreamingResponseBody {
+        // 1. Load conversation
+        val conversation = conversationFactory.getConversation(chatId, userId)
+            ?: throw NotFoundException("Conversation not found: chatId=$chatId")
         
         // 2. Build chat client (with interceptors applied)
         val chatClient = chatClientBuilderFactory.builder(conversation).build()
-        
         // 3. Execute chat with streaming
         return StreamingResponseBody { outputStream ->
             chatClient.chatStream(request.toAimoChatRequest()) { response ->
@@ -204,7 +204,7 @@ Tools are automatically discovered at startup.
 class CustomLoggingInterceptor : ChatClientInterceptor {
     private val logger = LoggerFactory.getLogger(javaClass)
     
-    override fun intercept(chain: Chain, context: MutableMap<String, Any>): AimoChatResponse {
+    override fun intercept(chain: ChatClientInterceptor.Chain, context: MutableMap<String, Any>): AimoChatResponse {
         val chatId = context["chatId"]
         logger.info("Chat starting for: $chatId")
         

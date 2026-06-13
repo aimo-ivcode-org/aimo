@@ -16,8 +16,8 @@
    - Each conversation is independently managed with no global singleton
 
 2. **Builder Pattern**:
-   - `ChatClientBuilder<T>` provides fluent API for runtime composition
-   - Supports model selection, agent binding (Phase 2 ready), and custom interceptors
+   - `ChatClientBuilder` provides fluent API for runtime composition
+   - Supports model selection and custom interceptors
    - Deferred construction - builds only when `build()` is called
    - Context injection for request metadata
 
@@ -44,7 +44,6 @@
    - Comprehensive README with builder pattern examples
    - Configuration guide with examples
    - Programmatic usage guide
-   - Migration guide (MIGRATION-PHASE1.md)
    - Example application documentation
 
 **Example Usage**:
@@ -54,14 +53,15 @@ class ChatService(
     private val conversationFactory: ConversationFactory,
     private val chatClientBuilderFactory: ChatClientBuilderFactory
 ) {
-    fun chat(chatId: UUID, message: String): AimoChatResponse {
-        val conversation = conversationFactory.getConversation(chatId)
+    fun chat(chatId: UUID, userId: String, message: String): AimoChatResponse {
+        val conversation = conversationFactory.getConversation(chatId, userId)
+            ?: throw NotFoundException("Conversation not found: chatId=$chatId")
         val chatClient = chatClientBuilderFactory
             .builder(conversation)
             .withModel("gpt-oss")  // Optional model override
             .build()
-        
-        return chatClient.chat(AimoChatRequest(userMessage = message))
+
+        return chatClient.chat(AimoChatRequest(prompt = message, context = emptyMap()))
     }
 }
 ```

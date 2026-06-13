@@ -61,7 +61,7 @@ class MyChatService(
             .build()
         
         // 4. Execute chat
-        return chatClient.chat(AimoChatRequest(userMessage = message))
+        return chatClient.chat(AimoChatRequest(prompt = message, context = emptyMap()))
     }
 }
 ```
@@ -70,7 +70,7 @@ class MyChatService(
 
 - **`ConversationFactory`**: Creates/loads conversation instances from storage
 - **`ChatClientBuilderFactory`**: Entry point for building chat clients
-- **`ChatClientBuilder`**: Fluent API for composing clients with models, agents, interceptors
+- **`ChatClientBuilder`**: Fluent API for composing clients with models and interceptors
 - **`AimoChatClient`**: The orchestrator that executes chats with tool handling
 - **Interceptors**: Cross-cutting concerns (logging, tracing, error handling, security)
 
@@ -166,7 +166,7 @@ class ChatService(
             ?: throw NotFoundException("Conversation not found")
         val chatClient = chatClientBuilderFactory.builder(conversation).build()
         
-        return chatClient.chat(AimoChatRequest(userMessage = userMessage))
+        return chatClient.chat(AimoChatRequest(prompt = userMessage, context = emptyMap()))
     }
 }
 ```
@@ -186,7 +186,7 @@ val chatClient = chatClientBuilderFactory
 ```kotlin
 // Create a custom interceptor
 class RateLimitInterceptor : ChatClientInterceptor {
-    override fun intercept(chain: Chain, context: MutableMap<String, Any>): AimoChatResponse {
+    override fun intercept(chain: ChatClientInterceptor.Chain, context: MutableMap<String, Any>): AimoChatResponse {
         // Check rate limit...
         return chain.proceed(context)
     }
@@ -209,16 +209,16 @@ val chatClient = chatClientBuilderFactory
 ### Streaming Responses
 
 ```kotlin
-val request = AimoChatRequest(userMessage = "Tell me a story")
+val request = AimoChatRequest(prompt = "Tell me a story", context = emptyMap())
 
 chatClient.chatStream(request) { response ->
     // Called for each chunk
     response.messages.forEach { message ->
-        when (message.role) {
-            MessageRole.ASSISTANT -> print(message.content)
-            MessageRole.TOOL -> println("Tool: ${message.toolCallId}")
+        when (message.type) {
+            AimoChatMessageType.ASSISTANT -> print(message.content)
+            AimoChatMessageType.TOOL -> println("Tool: ${message.toolCallId}")
+            else -> Unit
         }
-    }
 }
 ```
 
