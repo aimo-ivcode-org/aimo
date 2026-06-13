@@ -36,34 +36,34 @@ class ChatClientBuilderImpl(
     private val systemMessages: List<SystemMessageCallback>,
     private val getPrimaryModel: () -> AimoChatModelConfig,
     private val getModelByName: (String) -> AimoChatModelConfig?,
-) : ChatClientBuilder<AimoChatClient> {
+) : ChatClientBuilder {
 
     private var selectedModel: AimoChatModelConfig? = null
     private var selectedAgent: String? = null
     private val builderInterceptors = mutableListOf<ChatClientInterceptor>()
 
-    override fun withConversation(conversation: Conversation): ChatClientBuilder<AimoChatClient> {
+    override fun withConversation(conversation: Conversation): ChatClientBuilder {
         this.conversation = conversation
         return this
     }
 
-    override fun withModel(name: String): ChatClientBuilder<AimoChatClient> {
+    override fun withModel(name: String): ChatClientBuilder {
         this.selectedModel = getModelByName(name)
             ?: throw IllegalArgumentException("Model not found: $name")
         return this
     }
 
-    override fun withModel(config: AimoChatModelConfig): ChatClientBuilder<AimoChatClient> {
+    override fun withModel(config: AimoChatModelConfig): ChatClientBuilder {
         this.selectedModel = config
         return this
     }
 
-    override fun withAgent(agentId: String): ChatClientBuilder<AimoChatClient> {
+    override fun withAgent(agentId: String): ChatClientBuilder {
         this.selectedAgent = agentId
         return this
     }
 
-    override fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder<AimoChatClient> {
+    override fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder {
         builderInterceptors.add(interceptor)
         return this
     }
@@ -72,7 +72,7 @@ class ChatClientBuilderImpl(
         // Resolve model: use selected, or factory primary
         val model = selectedModel ?: getPrimaryModel()
 
-        // Resolve conversation (optional - some use cases might not need history)
+        // Conversation is required (either passed to factory.builder(conversation) or set via withConversation())
         val conv = conversation
             ?: throw IllegalStateException("Conversation is required for ChatClient")
 

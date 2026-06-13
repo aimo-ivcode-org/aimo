@@ -31,6 +31,10 @@ class TracingInterceptor(
             return chain.proceed(context)
         }
 
+        // Snapshot the entire MDC state to restore later
+        // This preserves any outer request logging context (e.g., requestId, userId, operation)
+        val previousMdcState = MDC.getCopyOfContextMap()
+
         // Extract or generate trace ID
         val traceId = context["traceId"] as? String
             ?: UUID.randomUUID().toString().replace("-", "")
@@ -40,10 +44,6 @@ class TracingInterceptor(
 
         // Get parent span ID if available
         val parentSpanId = context["spanId"] as? String
-
-        // Store trace context in MDC
-        val previousTraceId = MDC.get("traceId")
-        val previousSpanId = MDC.get("spanId")
 
         try {
             MDC.put("traceId", traceId)
@@ -80,28 +80,10 @@ class TracingInterceptor(
             MDC.put("error.message", e.message ?: "")
             throw e
         } finally {
-            // Restore previous MDC values
-            if (previousTraceId != null) {
-                MDC.put("traceId", previousTraceId)
-            } else {
-                MDC.remove("traceId")
-            }
-
-            if (previousSpanId != null) {
-                MDC.put("spanId", previousSpanId)
-            } else {
-                MDC.remove("spanId")
-            }
-
-            // Clean up operation-specific MDC entries
-            MDC.remove("parentSpanId")
-            MDC.remove("operation")
-            MDC.remove("service")
-            MDC.remove("chatId")
-            MDC.remove("requestId")
-            MDC.remove("span.status")
-            MDC.remove("error.type")
-            MDC.remove("error.message")
+            // Restore the entire MDC state
+            // This preserves any outer request context that was present before this interceptor ran
+            MDC.clear()
+            previousMdcState?.forEach { (key, value) -> MDC.put(key, value) }
         }
     }
 }

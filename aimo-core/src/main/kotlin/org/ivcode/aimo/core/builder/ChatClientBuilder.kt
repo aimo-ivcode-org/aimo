@@ -21,7 +21,7 @@ import org.ivcode.aimo.core.model.AimoChatModelConfig
  *
  * @param T The type being built (typically `AimoChatClient`)
  */
-interface ChatClientBuilder<T> {
+interface ChatClientBuilder {
     /**
      * Set the conversation for this chat client.
      *
@@ -31,7 +31,7 @@ interface ChatClientBuilder<T> {
      * @param conversation The pre-built conversation instance
      * @return this builder for chaining
      */
-    fun withConversation(conversation: Conversation): ChatClientBuilder<T>
+    fun withConversation(conversation: Conversation): ChatClientBuilder
 
     /**
      * Select a model by name.
@@ -41,7 +41,7 @@ interface ChatClientBuilder<T> {
      * @param name The model name (e.g., "gpt-4", "claude-3", "llama3:8b")
      * @return this builder for chaining
      */
-    fun withModel(name: String): ChatClientBuilder<T>
+    fun withModel(name: String): ChatClientBuilder
 
     /**
      * Use an inline model configuration.
@@ -52,7 +52,7 @@ interface ChatClientBuilder<T> {
      * @param config The model configuration to use
      * @return this builder for chaining
      */
-    fun withModel(config: AimoChatModelConfig): ChatClientBuilder<T>
+    fun withModel(config: AimoChatModelConfig): ChatClientBuilder
 
     /**
      * Select an agent by ID.
@@ -63,7 +63,7 @@ interface ChatClientBuilder<T> {
      * @param agentId The agent identifier
      * @return this builder for chaining
      */
-    fun withAgent(agentId: String): ChatClientBuilder<T>
+    fun withAgent(agentId: String): ChatClientBuilder
 
     /**
      * Register a chat-level interceptor.
@@ -74,7 +74,7 @@ interface ChatClientBuilder<T> {
      * @param interceptor The interceptor to register
      * @return this builder for chaining
      */
-    fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder<T>
+    fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder
 
     /**
      * Build the chat client with all registered components and interceptors applied.
@@ -87,6 +87,6 @@ interface ChatClientBuilder<T> {
      * @return The composed chat client instance ready for use
      * @throws IllegalStateException if required components cannot be resolved
      */
-    fun build(): T
+    fun build(): AimoChatClient
 }
 

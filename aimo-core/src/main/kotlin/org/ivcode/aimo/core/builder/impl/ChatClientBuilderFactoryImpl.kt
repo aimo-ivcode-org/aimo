@@ -1,6 +1,5 @@
 package org.ivcode.aimo.core.builder.impl
 
-import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.builder.ChatClientBuilder
 import org.ivcode.aimo.core.builder.ChatClientBuilderFactory
 import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
@@ -63,7 +62,7 @@ class ChatClientBuilderFactoryImpl(
         resolvePrimaryModel()
     }
 
-    override fun builder(): ChatClientBuilder<AimoChatClient> {
+    override fun builder(): ChatClientBuilder {
         return ChatClientBuilderImpl(
             conversation = null,
             factoryDefaultInterceptors = defaultInterceptors,
@@ -74,7 +73,7 @@ class ChatClientBuilderFactoryImpl(
         )
     }
 
-    override fun builder(conversation: Conversation): ChatClientBuilder<AimoChatClient> {
+    override fun builder(conversation: Conversation): ChatClientBuilder {
         return ChatClientBuilderImpl(
             conversation = conversation,
             factoryDefaultInterceptors = defaultInterceptors,

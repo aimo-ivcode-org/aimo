@@ -21,15 +21,18 @@ interface ChatClientBuilderFactory {
     /**
      * Create a chat client builder with default settings.
      *
-     * The builder starts with no conversation or model selection. Caller must either:
-     * - Call `withConversation()` to set a conversation, OR
-     * - Accept that no conversation history will be used
+     * The builder starts with no conversation or model selection. Caller MUST:
+     * - Either pass a conversation to this factory's `builder(conversation)` overload, OR
+     * - Call `withConversation()` on the returned builder before calling `build()`
+     *
+     * Conversation is required; build() will throw IllegalStateException if not provided.
      *
      * Model resolution: Uses factory primary model if `withModel()` not called.
      *
      * @return A builder for composing a chat client
+     * @throws IllegalStateException from build() if no conversation is set
      */
-    fun builder(): ChatClientBuilder<AimoChatClient>
+    fun builder(): ChatClientBuilder
 
     /**
      * Create a chat client builder with a pre-bound conversation.
@@ -58,7 +61,7 @@ interface ChatClientBuilderFactory {
      * @param conversation The conversation to use for history storage
      * @return A builder for composing a chat client
      */
-    fun builder(conversation: Conversation): ChatClientBuilder<AimoChatClient>
+    fun builder(conversation: Conversation): ChatClientBuilder
 
     /**
      * Get the list of all available model names.
