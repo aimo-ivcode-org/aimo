@@ -320,7 +320,7 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
   - Response formatting or enhancement
 
 - **Configuration & Interceptor Integration**:
-  - Guard-rails defined in application.yaml under `aimo.guardRails`
+  - Guard-rails defined in application.yaml under `aimo.guard-rails`
   - Use lightweight model selection (configured in `aimo.model`)
   - Integrated as interceptors in the builder pipeline
   - Applied automatically when builder chains ChatClient
