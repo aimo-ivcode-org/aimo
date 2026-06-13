@@ -31,23 +31,23 @@ class ConversationFactoryImpl(
     override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
         return ConversationFactoryImpl(conversationStore, interceptors + interceptor)
     }
-    override fun getConversation(chatId: UUID, userId: String): Conversation? {
-        // Check if the conversation exists and user has access
-        if(conversationStore.getChatConversation(chatId, userId) == null) {
-            return null
-        }
+     override fun getConversation(chatId: UUID, userId: String): Conversation? {
+         // Check if the conversation exists and user has access
+         if(conversationStore.getChatConversation(chatId, userId) == null) {
+             return null
+         }
 
-        // Create the base conversation
-        val baseConversation = ConversationImpl(chatId, conversationStore, userId)
+         // Create the base conversation
+         val baseConversation = ConversationImpl(chatId, conversationStore, userId)
 
-        // If no interceptors, return base conversation
-        if (interceptors.isEmpty()) {
-            return baseConversation
-        }
+         // If no interceptors, return base conversation
+         if (interceptors.isEmpty()) {
+             return baseConversation
+         }
 
-        // Wrap with all registered interceptors
-        return InterceptedConversation(baseConversation, interceptors)
-    }
+         // Wrap with all registered interceptors, passing userId for interceptor context
+         return InterceptedConversation(baseConversation, interceptors, userId)
+     }
 }
 
 /**
@@ -58,20 +58,22 @@ class ConversationFactoryImpl(
  */
 private class InterceptedConversation(
     private val delegate: Conversation,
-    private val interceptors: List<ConversationInterceptor>
+    private val interceptors: List<ConversationInterceptor>,
+    private val userId: String
 ) : Conversation {
 
     override val chatId: UUID
         get() = delegate.chatId
 
-    override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
-        val context = mutableMapOf<String, Any>(
-            "operation" to "getMessages",
-            "chatId" to chatId
-        )
-        if (maxCacheCharacters != null) {
-            context["maxCacheCharacters"] = maxCacheCharacters
-        }
+     override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
+         val context = mutableMapOf<String, Any>(
+             "operation" to "getMessages",
+             "chatId" to chatId,
+             "userId" to userId
+         )
+         if (maxCacheCharacters != null) {
+             context["maxCacheCharacters"] = maxCacheCharacters
+         }
 
         val chain = buildChain(interceptors, 0) { ctx ->
             val max = ctx["maxCacheCharacters"] as? Long
@@ -82,16 +84,17 @@ private class InterceptedConversation(
         return chain.proceed(context) as? List<AimoChatMessage>
     }
 
-    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
-        val context = mutableMapOf<String, Any>(
-            "operation" to "addMessages",
-            "chatId" to chatId,
-            "requestId" to requestId,
-            "messages" to messages
-        )
-        if (maxCacheCharacters != null) {
-            context["maxCacheCharacters"] = maxCacheCharacters
-        }
+     override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
+         val context = mutableMapOf<String, Any>(
+             "operation" to "addMessages",
+             "chatId" to chatId,
+             "userId" to userId,
+             "requestId" to requestId,
+             "messages" to messages
+         )
+         if (maxCacheCharacters != null) {
+             context["maxCacheCharacters"] = maxCacheCharacters
+         }
 
         val chain = buildChain(interceptors, 0) { ctx ->
             val rid = ctx["requestId"] as UUID
@@ -104,11 +107,12 @@ private class InterceptedConversation(
         chain.proceed(context)
     }
 
-    override fun getChatMetadata(): Map<String, Any> {
-        val context = mutableMapOf<String, Any>(
-            "operation" to "getChatMetadata",
-            "chatId" to chatId
-        )
+     override fun getChatMetadata(): Map<String, Any> {
+         val context = mutableMapOf<String, Any>(
+             "operation" to "getChatMetadata",
+             "chatId" to chatId,
+             "userId" to userId
+         )
 
         val chain = buildChain(interceptors, 0) { _ ->
             delegate.getChatMetadata()
@@ -118,12 +122,13 @@ private class InterceptedConversation(
         return chain.proceed(context) as Map<String, Any>
     }
 
-    override fun getChatProperty(property: String): Any? {
-        val context = mutableMapOf<String, Any>(
-            "operation" to "getChatProperty",
-            "chatId" to chatId,
-            "property" to property
-        )
+     override fun getChatProperty(property: String): Any? {
+         val context = mutableMapOf<String, Any>(
+             "operation" to "getChatProperty",
+             "chatId" to chatId,
+             "userId" to userId,
+             "property" to property
+         )
 
         val chain = buildChain(interceptors, 0) { ctx ->
             val prop = ctx["property"] as String
@@ -134,13 +139,14 @@ private class InterceptedConversation(
         return chain.proceed(context)
     }
 
-    override fun writeChatProperty(property: String, value: Any) {
-        val context = mutableMapOf<String, Any>(
-            "operation" to "writeChatProperty",
-            "chatId" to chatId,
-            "property" to property,
-            "value" to value
-        )
+     override fun writeChatProperty(property: String, value: Any) {
+         val context = mutableMapOf<String, Any>(
+             "operation" to "writeChatProperty",
+             "chatId" to chatId,
+             "userId" to userId,
+             "property" to property,
+             "value" to value
+         )
 
         val chain = buildChain(interceptors, 0) { ctx ->
             val prop = ctx["property"] as String
@@ -151,12 +157,13 @@ private class InterceptedConversation(
         chain.proceed(context)
     }
 
-    override fun deleteChatProperty(property: String): Boolean {
-        val context = mutableMapOf<String, Any>(
-            "operation" to "deleteChatProperty",
-            "chatId" to chatId,
-            "property" to property
-        )
+     override fun deleteChatProperty(property: String): Boolean {
+         val context = mutableMapOf<String, Any>(
+             "operation" to "deleteChatProperty",
+             "chatId" to chatId,
+             "userId" to userId,
+             "property" to property
+         )
 
         val chain = buildChain(interceptors, 0) { ctx ->
             val prop = ctx["property"] as String
