@@ -87,8 +87,8 @@ aimo:
   # Conversation storage directory
   data-dir: ./data/conversations
   
-  # Global user ID for single-user mode
-  global-user-id: default-user
+  # Single-user mode: default userId is "global" (GlobalUserProvider). To customize it, provide your own AimoUserProvider bean.
+  global-user-id: global
   
   # Model configuration (provider-specific)
   model:

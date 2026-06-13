@@ -34,9 +34,9 @@ data class AimoProperties(
     /**
      * Global user ID for single-user mode.
      * When set, all conversations are owned by this user.
-     * Default: "default-user"
+     * Default: "global" (matches GlobalUserProvider default).
      */
-    var globalUserId: String? = "default-user",
+    var globalUserId: String? = "global",
 
     /**
      * Agent configurations (Phase 2 feature).

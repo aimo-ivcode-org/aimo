@@ -80,7 +80,7 @@ internal fun org.ivcode.aimo.core.dao.ChatMessageEntity.toAimoChatMessage() = Ai
     toolName = toolName,
     toolCallId = toolCallId,
     toolCalls = toolCalls,
-    done = null
+    done = true
 )
 
 internal fun AimoUsage.toChatUsage() = ChatUsage(

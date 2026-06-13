@@ -50,8 +50,8 @@ class ErrorHandlingInterceptor(
                     throw mapException(e, context)
                 }
 
-                // Calculate backoff delay with exponential increase
-                val backoffDelay = retryBackoffMs * (1 shl (attempt - 1)) // 2^(attempt-1)
+                // Calculate backoff delay with exponential increase (clamped to avoid overflow for large maxRetries)
+                val backoffDelay = retryBackoffMs * (1L shl (attempt - 1).coerceAtMost(62))
                 
                 logger.warn(
                     "Retryable exception on attempt $attempt/$maxRetries, " +
