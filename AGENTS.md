@@ -3,17 +3,17 @@
 ## Big Picture
 - `aimo` is a multi-module Gradle workspace: core orchestration (`aimo-core`), transport (`aimo-server`), model adapters (`aimo-model-ollama`, `aimo-model-bedrock`), UI plugin (`aimo-plugin-ui`), React UI (`aimo-ui`), runnable apps in `examples/*`.
 - Runtime composition happens in example apps (`examples/simple-ollama`, `examples/simple-bedrock`): they wire `aimo-server` + `aimo-plugin-ui` + one model provider + DAO bean (`AimoChatClientDaoMemory`).
-- Core seam: `AimoChatModelProviderFactory` -> `AimoChatModel` -> `AimoChatEngine` (`aimo-core/src/main/kotlin/org/ivcode/aimo/core/model/AimoChatEngine.kt`). Keep provider-specific logic in adapter modules.
+- Core seam: `AimoChatModelProviderFactory` -> `AimoChatModelConfig` -> `AimoChatEngine` (`aimo-core/src/main/kotlin/org/ivcode/aimo/core/model/AimoChatEngine.kt`). Keep provider-specific logic in adapter modules.
 
 ## Request/Data Flow (important)
 - HTTP entrypoint is `POST /aimo-api/chat/{chatId}` (`aimo-server/.../controller/ChatController.kt`), streamed as NDJSON via `StreamingResponseBody`.
 - `ChatService` merges request metadata + conversation durable metadata into chat context before calling core (`aimo-server/.../service/ChatService.kt`).
 - `AimoChatClientImpl` loop (`aimo-core/.../client/chat/AimoChatClientImpl.kt`): system messages -> fetch history from DAO -> prompt budget -> model call -> optional tool calls -> persist prompt + generated messages.
-- All message history is read from DAO; persistence always goes through `AimoConversationClient.addMessages`.
-- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../client/conversation/AimoConversationClientImpl.kt`).
+- All message history is read from DAO; persistence always goes through `Conversation.addMessages`.
+- Durable metadata lives in DAO (`writeChatProperty`/`deleteChatProperty`) (`aimo-core/.../conversation/ConversationImpl.kt`).
 
 ## Project-Specific Conventions
-- Tool/system discovery is reflection-based from `@ChatController` beans (`aimo-core/.../conf/AimoConfig.kt`).
+- Tool/system discovery is reflection-based from `@ChatService` beans (`aimo-core/.../conf/AimoConfig.kt`).
 - LLM-callable tools use `@Tool`; parameter docs use `@ToolParam`; a parameter named `context` of type `Map` is auto-injected and excluded from generated JSON schema (`aimo-core/.../controller/ControllerHelpers.kt`, `MethodAimoToolCallback.kt`).
 - System messages can be `@SystemMessage` field/property/method; method signature must be `() -> String?` or `(SystemMessageContext) -> String?`.
 - Context keys are fixed (`chatId`, `requestId`, `conversation-client`) in `aimo-core/.../util/Extensions.kt`; server adds `requestMetadata` (`aimo-server/.../util/ContextExtensions.kt`).

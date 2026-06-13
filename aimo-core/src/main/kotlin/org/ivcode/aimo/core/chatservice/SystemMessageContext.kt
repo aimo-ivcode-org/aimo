@@ -1,5 +1,6 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 class SystemMessageContext (
     val context: Map<String, Any>
 )
+

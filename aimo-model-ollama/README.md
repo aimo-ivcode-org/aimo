@@ -1,6 +1,6 @@
 # aimo-model-ollama
 
-Ollama model integration for Aimo. Binds one or more named Ollama models from application properties and exposes them as `AimoChatModel` Spring beans.
+Ollama model integration for Aimo. Binds one or more named Ollama models from application properties and exposes them as `AimoChatModelConfig` Spring beans.
 
 ---
 

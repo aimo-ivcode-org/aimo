@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -268,4 +268,5 @@ class ControllerHelpersTest {
         var channels: List<String> = emptyList()
     }
 }
+
 

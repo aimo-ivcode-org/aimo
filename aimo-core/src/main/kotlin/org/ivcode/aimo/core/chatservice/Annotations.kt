@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import org.springframework.stereotype.Component
 import kotlin.annotation.AnnotationTarget.FIELD
@@ -7,10 +7,17 @@ import kotlin.annotation.AnnotationTarget.PROPERTY
 import kotlin.annotation.AnnotationTarget.VALUE_PARAMETER
 import kotlin.annotation.Target
 
+/**
+ * Marks a Spring bean as a chat service that provides tools and system messages
+ * to the chat client.
+ *
+ * Chat services are discovered at startup via reflection and their annotated
+ * methods/fields are registered as LLM-callable tools and system messages.
+ */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)
 @Component
-annotation class ChatController
+annotation class ChatService
 
 @Retention(AnnotationRetention.RUNTIME)
 @Target(FUNCTION, FIELD, PROPERTY)
@@ -42,3 +49,5 @@ annotation class Tool(
 annotation class ToolParam(
     val description: String = "",
 )
+
+

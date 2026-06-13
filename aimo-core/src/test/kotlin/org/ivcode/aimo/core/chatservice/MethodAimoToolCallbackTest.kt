@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import org.ivcode.aimo.core.model.AimoToolDefinition
 import kotlin.test.Test
@@ -118,7 +118,7 @@ class MethodAimoToolCallbackTest {
         }
 
         assertEquals(
-            "Method notATool on org.ivcode.aimo.core.controller.MethodAimoToolCallbackTest\$TestToolController must be annotated with @Tool",
+            "Method notATool on org.ivcode.aimo.core.chatservice.MethodAimoToolCallbackTest\$TestToolController must be annotated with @Tool",
             error.message,
         )
     }
@@ -187,4 +187,5 @@ class MethodAimoToolCallbackTest {
         val message: String,
     )
 }
+
 

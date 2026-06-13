@@ -14,12 +14,14 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 
 | Module | Purpose |
 | --- | --- |
-| `aimo-core` | Core abstractions and runtime (`Aimo`, conversations, chat clients, model-facing prompt flow, tool/system-message annotations). |
+| `aimo-core` | Core abstractions and runtime (conversations, chat clients, builders, model-facing prompt flow, tool/system-message annotations). |
 | `aimo-model-ollama` | Ollama-backed Aimo model integration. |
+| `aimo-model-bedrock` | AWS Bedrock model integration. |
 | `aimo-server` | REST API layer for conversations, chat streaming, and history. |
 | `aimo-plugin-ui` | UI-specific server plugin (title endpoints + title tool controller). |
 | `aimo-ui` | React + Vite frontend packaged into resources for server distribution. |
 | `examples/simple-ollama` | Runnable Spring Boot app that composes server + UI plugin + Ollama model module. |
+| `examples/simple-bedrock` | Runnable Spring Boot app that composes server + UI plugin + Bedrock model module. |
 
 ## Tech stack
 
@@ -35,6 +37,232 @@ Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring 
 3. `aimo-core` manages conversations, history, tool callbacks, and model prompt orchestration.
 4. `aimo-model-ollama` provides the `ChatModel` implementation used by `aimo-core`.
 5. `aimo-ui` consumes the API and `aimo-plugin-ui` adds title-specific behavior.
+
+### Builder Pattern (Phase 1 Architecture)
+
+Aimo uses a **builder pattern** for flexible runtime composition:
+
+```kotlin
+// 1. Inject the factories
+@Service
+class MyChatService(
+    private val conversationFactory: ConversationFactory,
+    private val chatClientBuilderFactory: ChatClientBuilderFactory
+) {
+    fun handleRequest(chatId: UUID, message: String, userId: String): AimoChatResponse {
+        // 2. Get or create conversation
+        val conversation = conversationFactory.getConversation(chatId, userId)
+            ?: throw NotFoundException("Conversation not found")
+        
+        // 3. Build chat client with optional customization
+        val chatClient = chatClientBuilderFactory
+            .builder(conversation)
+            .withModel("gpt-oss")  // optional: override model
+            .build()
+        
+        // 4. Execute chat
+        return chatClient.chat(AimoChatRequest(prompt = message, context = emptyMap()))
+    }
+}
+```
+
+**Key components:**
+
+- **`ConversationFactory`**: Creates/loads conversation instances from storage
+- **`ChatClientBuilderFactory`**: Entry point for building chat clients
+- **`ChatClientBuilder`**: Fluent API for composing clients with models and interceptors
+- **`AimoChatClient`**: The orchestrator that executes chats with tool handling
+- **Interceptors**: Cross-cutting concerns (logging, tracing, error handling, security)
+
+See the [Integration Guide](#programmatic-usage) below for detailed examples.
+
+## Configuration
+
+Aimo is configured via `application.yml` under the `aimo.*` prefix.
+
+### Basic Configuration
+
+```yaml
+aimo:
+  # Conversation storage directory
+  data-dir: ./data/conversations
+  
+  # Single-user mode: default userId is "global" (GlobalUserProvider). To customize it, provide your own AimoUserProvider bean.
+  global-user-id: global
+  
+  # Model configuration (provider-specific)
+  model:
+    ollama:
+      gpt-oss:
+        base-url: http://localhost:11434
+        primary: true  # This model will be used by default
+        context:
+          size: 1000
+          excludeThinking: true
+        options:
+          model: gpt-oss:20b
+          temperature: 0.7
+```
+
+### Interceptor Configuration
+
+Interceptors provide cross-cutting concerns. All are **disabled by default**.
+
+```yaml
+aimo:
+  interceptors:
+    # Request/response logging
+    logging:
+      enabled: true
+      level: DEBUG  # DEBUG, INFO, WARN, ERROR
+    
+    # Distributed tracing
+    tracing:
+      enabled: false
+      service-name: aimo-chat
+    
+    # Automatic retry on transient errors
+    error-handling:
+      enabled: false
+      max-retries: 3
+      retry-backoff-ms: 100
+```
+
+### Multiple Models
+
+You can configure multiple models and select at runtime:
+
+```yaml
+aimo:
+  model:
+    ollama:
+      gpt-oss:
+        base-url: http://localhost:11434
+        primary: true  # Default model
+        options:
+          model: gpt-oss:20b
+      
+      llama-small:
+        base-url: http://localhost:11434
+        options:
+          model: llama3:8b
+          temperature: 0.5
+```
+
+**Exactly one model must be marked `primary: true`** or you must have only one model configured.
+
+## Programmatic Usage
+
+### Basic Chat Client
+
+```kotlin
+@Service
+class ChatService(
+    private val conversationFactory: ConversationFactory,
+    private val chatClientBuilderFactory: ChatClientBuilderFactory
+) {
+    fun chat(chatId: UUID, userMessage: String, userId: String): AimoChatResponse {
+        val conversation = conversationFactory.getConversation(chatId, userId)
+            ?: throw NotFoundException("Conversation not found")
+        val chatClient = chatClientBuilderFactory.builder(conversation).build()
+        
+        return chatClient.chat(AimoChatRequest(prompt = userMessage, context = emptyMap()))
+    }
+}
+```
+
+### Model Selection
+
+```kotlin
+// Use a specific model by name
+val chatClient = chatClientBuilderFactory
+    .builder(conversation)
+    .withModel("llama-small")  // Override the primary model
+    .build()
+```
+
+### Adding Custom Interceptors
+
+```kotlin
+// Create a custom interceptor
+class RateLimitInterceptor : ChatClientInterceptor {
+    override fun intercept(chain: ChatClientInterceptor.Chain, context: MutableMap<String, Any>): AimoChatResponse {
+        // Check rate limit...
+        return chain.proceed(context)
+    }
+}
+
+// Register as a Spring @Bean to apply globally
+@Configuration
+class MyConfig {
+    @Bean
+    fun rateLimitInterceptor() = RateLimitInterceptor()
+}
+
+// Or apply to a specific client
+val chatClient = chatClientBuilderFactory
+    .builder(conversation)
+    .withInterceptor(RateLimitInterceptor())
+    .build()
+```
+
+### Streaming Responses
+
+```kotlin
+val request = AimoChatRequest(prompt = "Tell me a story", context = emptyMap())
+
+chatClient.chatStream(request) { response ->
+    // Called for each chunk
+    response.messages.forEach { message ->
+        when (message.type) {
+            AimoChatMessageType.ASSISTANT -> print(message.content)
+            AimoChatMessageType.TOOL -> println("Tool: ${message.toolCallId}")
+            else -> Unit
+        }
+}
+```
+
+### Creating Tools
+
+Define tools using the `@ChatService` annotation:
+
+```kotlin
+@ChatService
+class CalculatorService {
+    
+    @Tool(description = "Add two numbers")
+    fun add(
+        @ToolParam("First number") a: Int,
+        @ToolParam("Second number") b: Int
+    ): Int = a + b
+    
+    @Tool(description = "Multiply two numbers")
+    fun multiply(a: Int, b: Int): Int = a * b
+}
+```
+
+Tools are automatically discovered and registered at startup. The LLM can call these during conversations.
+
+### System Messages
+
+Inject context into every conversation:
+
+```kotlin
+@ChatService
+class SecurityService {
+    
+    @SystemMessage
+    fun securityPolicy(): String {
+        return """
+            You are a helpful assistant for Acme Corp.
+            Never share confidential information.
+            Always be professional and respectful.
+        """.trimIndent()
+    }
+}
+```
+
+System messages are automatically prepended to every chat request.
 
 ## Prerequisites
 

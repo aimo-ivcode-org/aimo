@@ -1,7 +1,7 @@
 package org.ivcode.aimo.ui.chatcontroller
 
-import org.ivcode.aimo.core.controller.ChatController
-import org.ivcode.aimo.core.controller.Tool
+import org.ivcode.aimo.core.chatservice.ChatService
+import org.ivcode.aimo.core.chatservice.Tool
 import org.ivcode.aimo.server.util.getRequestMetadata
 import org.ivcode.aimo.ui.model.TimeResponse
 import java.time.Instant
@@ -13,7 +13,7 @@ import java.time.temporal.ChronoUnit
 
 private const val HEADER_X_TIMEZONE_OFFSET = "x-timezone-offset"
 
-@ChatController
+@ChatService
 class TimeChatController {
 
     @Tool(

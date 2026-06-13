@@ -5,11 +5,11 @@ import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoConversationClient
 import org.ivcode.aimo.core.AimoUsage
-import org.ivcode.aimo.core.controller.SystemMessageCallback
-import org.ivcode.aimo.core.controller.SystemMessageContext
-import org.ivcode.aimo.core.model.AimoChatModel
+import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.chatservice.SystemMessageCallback
+import org.ivcode.aimo.core.chatservice.SystemMessageContext
+ import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.model.AimoToolDefinition
@@ -31,9 +31,9 @@ import java.util.UUID
  * - **Message persistence**: Delegating all persistence to the conversation client
  *
  * ### Architecture
- * - Delegates cache and history management to [AimoConversationClient] (single owner)
- * - Reads messages via [conversation.getMessages]
- * - Persists new messages via [conversation.addMessages]
+ * - Delegates cache and history management to [Conversation] (single owner)
+ * - Reads messages via conversation.getMessages
+ * - Persists new messages via conversation.addMessages
  * - Does not directly manage the session cache or DAO
  *
  * ### Tool Handling
@@ -60,8 +60,8 @@ import java.util.UUID
  */
 internal class AimoChatClientImpl (
     override val chatId: UUID,
-    private val conversation: AimoConversationClient,
-    private val model: AimoChatModel,
+    private val conversation: Conversation,
+    private val model: AimoChatModelConfig,
     tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
 ) : AimoChatClient {

@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import java.lang.reflect.Method
 import java.lang.reflect.InaccessibleObjectException
@@ -32,3 +32,4 @@ class MethodSystemMessageCallback (
         }
     }
 }
+

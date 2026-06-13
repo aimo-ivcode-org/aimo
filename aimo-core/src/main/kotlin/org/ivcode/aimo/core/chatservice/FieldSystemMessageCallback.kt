@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.controller
+package org.ivcode.aimo.core.chatservice
 
 import java.lang.reflect.Field
 
@@ -11,3 +11,4 @@ class FieldSystemMessageCallback(
         return field.get(instance)?.toString()
     }
 }
+
