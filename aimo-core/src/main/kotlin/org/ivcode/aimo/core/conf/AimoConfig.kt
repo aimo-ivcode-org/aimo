@@ -61,39 +61,6 @@ class AimoConfig {
     }
 
 
-    @Bean
-    fun createPrimaryAimoChatModel(chatModelFactories: Map<String, AimoChatModelProviderFactory>): AimoChatModelConfig {
-        val factories: List<AimoChatModelProviderFactory> = chatModelFactories.values.toList()
-
-        val providerPrimaries: List<AimoChatModelConfig> = factories.mapNotNull { factory: AimoChatModelProviderFactory ->
-            factory.getPrimaryName()?.let { primaryName ->
-                requireNotNull(factory.getModel(primaryName)) {
-                    "Chat model factory '${factory.provider}' reported primary model '$primaryName' but could not create it."
-                }
-            }
-        }
-        require(providerPrimaries.size <= 1) {
-            "Only one Aimo chat model can be marked primary=true. Found: ${providerPrimaries.map { it.name }}"
-        }
-        providerPrimaries.firstOrNull()?.let { return it }
-
-        val allModels: List<AimoChatModelConfig> = factories.flatMap { factory: AimoChatModelProviderFactory ->
-            factory.getNames().map { name: String ->
-                requireNotNull(factory.getModel(name)) {
-                    "Chat model factory '${factory.provider}' reported model '$name' but could not create it."
-                }
-            }
-        }
-        require(allModels.isNotEmpty()) { "No Aimo chat models configured." }
-
-        if (allModels.size == 1) return allModels.first()
-
-        error(
-            "Multiple Aimo chat models are configured (${allModels.map { it.name }}) " +
-                "but none is marked primary=true."
-        )
-    }
-
      @Bean
      fun createConversationFactory(
          conversationStore: AimoChatClientDao,

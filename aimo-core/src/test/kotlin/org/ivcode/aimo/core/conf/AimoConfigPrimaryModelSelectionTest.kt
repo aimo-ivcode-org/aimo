@@ -14,14 +14,12 @@ import kotlin.test.assertTrue
 
 class AimoConfigPrimaryModelSelectionTest {
 
-    private val config = AimoConfig()
-
     @Test
     fun `single model does not require primary`() {
         val only = model("only", isPrimary = false)
         val factories = mapOf("ollama" to factory("ollama", listOf(only)))
 
-        val selected = config.createPrimaryAimoChatModel(factories)
+        val selected = selectPrimaryModel(factories)
 
         assertEquals("only", selected.name)
     }
@@ -32,7 +30,7 @@ class AimoConfigPrimaryModelSelectionTest {
         val smart = model("smart", isPrimary = true)
         val factories = mapOf("ollama" to factory("ollama", listOf(fast, smart)))
 
-        val selected = config.createPrimaryAimoChatModel(factories)
+        val selected = selectPrimaryModel(factories)
 
         assertEquals("smart", selected.name)
     }
@@ -45,7 +43,7 @@ class AimoConfigPrimaryModelSelectionTest {
         )
 
         val ex = assertFailsWith<IllegalStateException> {
-            config.createPrimaryAimoChatModel(factories)
+            selectPrimaryModel(factories)
         }
 
         assertTrue(ex.message!!.contains("none is marked primary=true"))
@@ -59,10 +57,48 @@ class AimoConfigPrimaryModelSelectionTest {
         )
 
         val ex = assertFailsWith<IllegalArgumentException> {
-            config.createPrimaryAimoChatModel(factories)
+            selectPrimaryModel(factories)
         }
 
         assertTrue(ex.message!!.contains("Only one Aimo chat model can be marked primary=true"))
+    }
+
+    /**
+     * Selects a primary model from the given factories.
+     * Used to test primary model selection logic (extracted from AimoConfig).
+     */
+    private fun selectPrimaryModel(
+        chatModelFactories: Map<String, AimoChatModelProviderFactory>
+    ): AimoChatModelConfig {
+        val factories: List<AimoChatModelProviderFactory> = chatModelFactories.values.toList()
+
+        val providerPrimaries: List<AimoChatModelConfig> = factories.mapNotNull { factory: AimoChatModelProviderFactory ->
+            factory.getPrimaryName()?.let { primaryName ->
+                requireNotNull(factory.getModel(primaryName)) {
+                    "Chat model factory '${factory.provider}' reported primary model '$primaryName' but could not create it."
+                }
+            }
+        }
+        require(providerPrimaries.size <= 1) {
+            "Only one Aimo chat model can be marked primary=true. Found: ${providerPrimaries.map { it.name }}"
+        }
+        providerPrimaries.firstOrNull()?.let { return it }
+
+        val allModels: List<AimoChatModelConfig> = factories.flatMap { factory: AimoChatModelProviderFactory ->
+            factory.getNames().map { name: String ->
+                requireNotNull(factory.getModel(name)) {
+                    "Chat model factory '${factory.provider}' reported model '$name' but could not create it."
+                }
+            }
+        }
+        require(allModels.isNotEmpty()) { "No Aimo chat models configured." }
+
+        if (allModels.size == 1) return allModels.first()
+
+        error(
+            "Multiple Aimo chat models are configured (${allModels.map { it.name }}) " +
+                "but none is marked primary=true."
+        )
     }
 
     private fun factory(providerName: String, models: List<AimoChatModelConfig>): AimoChatModelProviderFactory {
