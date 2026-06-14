@@ -57,6 +57,7 @@ import java.util.UUID
  * @property conversation The conversation client (manages cache, persistence, and message fetching)
  * @property model The chat model that generates responses
  * @property systemMessages Callbacks that generate system-level prompts
+ * @property chatScopeId The chat scope ID for this client (affects which system messages apply)
  */
 internal class AimoChatClientImpl (
     override val chatId: UUID,
@@ -64,6 +65,7 @@ internal class AimoChatClientImpl (
     private val model: AimoChatModelConfig,
     tools: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
+    private val chatScopeId: String? = null,
 ) : AimoChatClient {
 
     // Map tool callbacks by name for O(1) lookup during tool invocation
@@ -428,13 +430,14 @@ internal class AimoChatClientImpl (
      *
      * @param requestId The unique ID for this request
      * @param request The user's chat request
-     * @return SystemMessageContext with merged request context
+     * @return SystemMessageContext with merged request context and chat scope ID
      */
     private fun createSystemMessageContext(requestId: UUID, request: AimoChatRequest) = SystemMessageContext(
-        createContextMap (
+        context = createContextMap (
             requestId = requestId,
             requestContext = request.context,
-        )
+        ),
+        chatScopeId = chatScopeId
     )
 
     /**

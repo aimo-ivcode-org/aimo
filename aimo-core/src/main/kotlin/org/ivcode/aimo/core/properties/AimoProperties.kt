@@ -39,10 +39,10 @@ data class AimoProperties(
     var globalUserId: String? = "global",
 
     /**
-     * Agent configurations (Phase 2 feature).
-     * Maps agent ID → agent configuration.
+     * ChatScope configurations (Phase 2 feature).
+     * Maps scope ID → scope configuration.
      */
-    var agents: Map<String, AimoAgentProperties> = emptyMap(),
+    var scope: Map<String, AimoChatScopeProperties> = emptyMap(),
 
     /**
      * Guard-rail configurations (Phase 7 feature).
@@ -57,52 +57,80 @@ data class AimoProperties(
 )
 
 /**
- * Agent configuration properties (Phase 2 feature).
+ * ChatScope configuration properties (Phase 2 feature).
+ *
+ * Semantics:
+ * - A ChatService without scope restrictions is available to all scopes
+ * - A ChatService with @ChatService(scope=["admin"]) is only in admin scope
+ * - Empty tool-refs: this scope has NO tools (no default inheritance)
+ * - Non-empty tool-refs: this scope includes only those tools (subject to annotation scopes)
+ *
+ * System Messages:
+ *  * - system-messages: a Map<String, String> of custom system messages defined inline for this scope
+ *                    Keys are identifiers, values are the prompt text
+ *  * - These inline messages are always included in the scope
+ *  * - system-message-refs: references to pre-defined @SystemMessage beans by name
+ *
+ * The built-in 'global' scope always exists and includes all tools/system messages.
  *
  * Structure:
  * ```yaml
- * aimo.agents:
- *   default:
- *     name: "Default Agent"
- *     description: "General-purpose assistant"
- *     system-message: "You are a helpful assistant."
- *     tools: ["*"]  # All tools
- *   calculator:
- *     name: "Calculator"
- *     description: "Math-focused agent"
- *     system-message: "You are a math expert."
- *     tools: ["calculate", "convert_units"]
+ * aimo.scope:
+ *   research:
+ *     display-name: "Research Assistant"
+ *     description: "Research and analysis tools"
+ *     tool-refs: ["search", "summarize"]
+ *     system-messages:
+ *       research_guide: |
+ *         You are a research expert specializing in data analysis.
+ *         Focus on accuracy and citations.
+ *     system-message-refs: ["research_prompt", "data_analysis"]
+ *   public:
+ *     display-name: "Public Assistant"
+ *     description: "General purpose"
+ *     tool-refs: ["help"]
+ *     system-messages:
+ *       public_guide: "You are a helpful assistant for the public."
  * ```
  */
-data class AimoAgentProperties(
+data class AimoChatScopeProperties(
     /**
-     * Human-readable agent name.
+     * Human-readable scope name for display.
      */
-    var name: String = "",
+    var displayName: String = "",
 
     /**
-     * Agent description.
+     * Scope description explaining its purpose.
      */
     var description: String = "",
 
-    /**
-     * System message for this agent.
-     */
-    var systemMessage: String? = null,
+     /**
+      * Tool name references (exact match, no wildcards).
+      * Empty list: this scope has NO tools.
+      * Non-empty: scope includes only these tool names (must also match annotation scopes).
+      */
+     var toolRefs: List<String> = emptyList(),
 
     /**
-     * Tool scoping: list of tool names available to this agent.
-     * Special value "*" means all tools.
-     * Empty list means no tools.
+     * System messages defined inline for this scope.
+     * Map of message ID → prompt text.
+     * These are custom messages created specifically for this scope.
+     * Example:
+     *   research_guide: "You are a research expert..."
+     *   code_style: "Follow PEP 8 standards..."
      */
-    var tools: List<String> = listOf("*"),
+    var systemMessages: Map<String, String> = emptyMap(),
 
-    /**
-     * System message scoping: list of system message names available to this agent.
-     * Special value "*" means all system messages.
-     * Empty list means no system messages (except agent's own systemMessage).
-     */
-    var systemMessages: List<String> = listOf("*")
+      /**
+       * System message references to pre-defined @SystemMessage beans by name.
+       * References pre-defined @SystemMessage beans from ChatService classes by their name property.
+       * Empty list: only inline system-messages are used.
+       * Non-empty: include pre-defined system messages with these names.
+       *
+       * Names come from @SystemMessage(name="...") or auto-generated from method/field name.
+       * Example: ["research_guide", "code_analysis"]
+       */
+      var systemMessageRefs: List<String> = emptyList()
 )
 
 /**

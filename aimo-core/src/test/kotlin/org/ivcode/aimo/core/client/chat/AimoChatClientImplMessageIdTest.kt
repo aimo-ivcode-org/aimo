@@ -85,7 +85,7 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
             systemMessages = emptyList(),
         )
 
@@ -200,7 +200,7 @@ class AimoChatClientImplMessageIdTest {
     }
 
     @Test
-    fun `chat persists tool message again when same tool call id appears in a later assistant turn`() {
+    fun `chat persists multiple tool calls in same turn when de-duped by same argument`() {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatConversation("user1").chatId
         val client = AimoChatClientImpl(
@@ -216,7 +216,7 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
             systemMessages = emptyList(),
         )
 
@@ -250,7 +250,7 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
             systemMessages = emptyList(),
         )
 
@@ -387,7 +387,7 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper),
+            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
             systemMessages = emptyList(),
         )
 

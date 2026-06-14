@@ -7,6 +7,7 @@ import org.ivcode.aimo.core.builder.ChatClientBuilder
 import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
 import org.ivcode.aimo.core.client.chat.AimoChatClientImpl
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
@@ -21,10 +22,12 @@ import java.util.UUID
  *
  * @property conversation The conversation instance for history storage (optional until build)
  * @property selectedModel The selected model configuration (null means use factory primary)
+ * @property selectedChatScopeId The selected chat scope (null means read from conversation metadata or use global)
  * @property builderInterceptors Builder-level interceptors registered via withInterceptor()
  * @property factoryDefaultInterceptors Factory-level default interceptors (logging, tracing, error handling)
  * @property toolCallbacks All registered tool callbacks
  * @property systemMessages All registered system message callbacks
+ * @property chatScopeProvider Provider for resolving chat scopes
  * @property getPrimaryModel Lambda to resolve primary model from factory
  * @property getModelByName Lambda to resolve model by name from factory
  */
@@ -33,11 +36,13 @@ class ChatClientBuilderImpl(
     private val factoryDefaultInterceptors: List<ChatClientInterceptor>,
     private val toolCallbacks: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
+    private val chatScopeProvider: ChatScopeProvider,
     private val getPrimaryModel: () -> AimoChatModelConfig,
     private val getModelByName: (String) -> AimoChatModelConfig?,
 ) : ChatClientBuilder {
 
     private var selectedModel: AimoChatModelConfig? = null
+    private var selectedChatScopeId: String? = null
     private val builderInterceptors = mutableListOf<ChatClientInterceptor>()
 
     override fun withConversation(conversation: Conversation): ChatClientBuilder {
@@ -61,6 +66,11 @@ class ChatClientBuilderImpl(
         return this
     }
 
+    override fun withChatScope(chatScopeId: String): ChatClientBuilder {
+        this.selectedChatScopeId = chatScopeId
+        return this
+    }
+
     override fun build(): AimoChatClient {
         // Resolve model: use selected, or factory primary
         val model = selectedModel ?: getPrimaryModel()
@@ -69,13 +79,31 @@ class ChatClientBuilderImpl(
         val conv = conversation
             ?: throw IllegalStateException("Conversation is required for ChatClient")
 
-        // Create base AimoChatClient
+        // Resolve chat scope: use explicit selection, or conversation metadata, or global
+        val scopeId = selectedChatScopeId
+            ?: conv.getChatProperty("aimo.chatScopeId") as? String
+            ?: "global"
+
+        val scope = chatScopeProvider.getScope(scopeId, emptyMap())
+            ?: throw IllegalStateException("ChatScope not found or not accessible: $scopeId")
+
+        // Filter tools and system messages by scope
+        val scopedTools = toolCallbacks.filter { tool ->
+            scope.toolNames.contains(tool.toolDefinition.name)
+        }
+
+        val scopedSystemMessages = systemMessages.filterIndexed { index, _ ->
+            scope.systemMessageNames.contains(index.toString())
+        }
+
+        // Create base AimoChatClient with filtered tools/system messages and scope ID
         val baseChatClient: AimoChatClient = AimoChatClientImpl(
             chatId = conv.chatId,
             conversation = conv,
             model = model,
-            tools = toolCallbacks,
-            systemMessages = systemMessages,
+            tools = scopedTools,
+            systemMessages = scopedSystemMessages,
+            chatScopeId = scopeId
         )
 
         // If no interceptors, return base client

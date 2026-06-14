@@ -1,0 +1,63 @@
+aimo:
+  data-dir: ./data/conversations
+  global-user-id: global
+
+  # ChatScope definitions (Phase 2 feature)
+  # The built-in 'global' scope is always available with all tools.
+  # Define additional scopes here to restrict tools and define custom system messages.
+  #
+  # Semantics:
+  # - If a ChatService has no @ChatService(scope=[...]), it's available to all scopes
+  # - If a ChatService has @ChatService(scope=["admin"]), it's only in admin scope
+  # - If a scope's tool-refs is empty, that scope has NO tools
+  # - If a scope's tool-refs is non-empty, it includes only those tool names (filtered by annotation scopes)
+  # - system-messages: inline system message definitions for this scope (Map<id, prompt>)
+  # - system-message-refs: references to pre-defined @SystemMessage beans by name
+
+  scope:
+    research:
+      display-name: "Research Assistant"
+      description: "Research and analysis capabilities"
+      tool-refs: ["search", "summarize", "web_fetch"]
+      system-messages:
+        research_guide: |
+          You are a research expert specializing in data analysis and academic research.
+          Focus on accuracy, citations, and evidence-based reasoning.
+          Always distinguish between established facts and speculative analysis.
+
+    public:
+      display-name: "Public Assistant"
+      description: "General purpose assistant for public use"
+      tool-refs: ["help", "explain"]
+      system-messages:
+        public_guide: |
+          You are a helpful, friendly assistant available to the public.
+          Keep responses clear, accessible, and appropriate for a general audience.
+          Avoid technical jargon unless explaining it.
+      system-message-refs: ["research_guide"]  # Reference system message by name from @SystemMessage annotation
+
+    # admin scope omitted - use global scope with all tools for administrators
+    # or define explicitly with desired tools and system messages
+
+  model:
+    ollama:
+      gpt-oss:
+        base-url: http://localhost:11434
+        primary: true
+        options:
+          model: gpt-oss:20b
+          temperature: 0.7
+
+  interceptors:
+    logging:
+      enabled: true
+      level: INFO
+    tracing:
+      enabled: false
+    error-handling:
+      enabled: false
+
+
+
+
+

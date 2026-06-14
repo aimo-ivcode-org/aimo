@@ -24,6 +24,9 @@ private const val TITLE_TOOL_NAME = "set_title"
  * Source semantics:
  * - `USER`: title was set by a user action outside the model tool call.
  * - `ASSISTANT`: title was set by the LLM through the `setTitle` tool.
+ *
+ * Scope: Available to all scopes (empty scope = inherit all).
+ * To restrict to specific scopes, use: @ChatService(scope=["admin", "research"])
  */
 @ChatService
 class TitleChatController(
@@ -32,6 +35,9 @@ class TitleChatController(
 
     /**
      * System instructions that guide when and how the model should update a chat title.
+     *
+     * Scope: Available to all scopes.
+     * To restrict to specific scopes: @SystemMessage(scope=["admin"])
      */
     @SystemMessage
     fun titleUpdateInstructions(): String  =
@@ -48,6 +54,9 @@ class TitleChatController(
     /**
      * Tool entrypoint used by the LLM to set a conversation title.
      * Returns a [TitleResponse] where `source` is `ASSISTANT`.
+     *
+     * Scope: Available to all scopes.
+     * To restrict to specific scopes: @Tool(..., scope=["admin"])
      */
     @Tool(name = TITLE_TOOL_NAME, description = "Set the chat title with source=ASSISTANT. Returns TitleResponse JSON: { title: string, source: \"USER\" | \"ASSISTANT\" } (USER = user-set, ASSISTANT = LLM-set).")
     fun setTitle(

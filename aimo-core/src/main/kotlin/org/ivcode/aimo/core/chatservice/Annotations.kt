@@ -13,15 +13,43 @@ import kotlin.annotation.Target
  *
  * Chat services are discovered at startup via reflection and their annotated
  * methods/fields are registered as LLM-callable tools and system messages.
+ *
+ * @property scope List of chat scope IDs this service is available in.
+ *                 Empty array means available to all scopes (default, backwards compatible).
+ *                 Example: scope = ["admin", "research"]
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)
 @Component
-annotation class ChatService
+annotation class ChatService(
+    val scope: Array<String> = []
+)
 
+/**
+ * Marks a field, property, or method as providing a system message for the chat.
+ *
+ * @property scope List of chat scope IDs this system message is available in.
+ *                 Empty array means available to all scopes (default, backwards compatible).
+ */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(FUNCTION, FIELD, PROPERTY)
-annotation class SystemMessage
+annotation class SystemMessage(
+    /**
+     * Optional explicit name for stable reference to this system message.
+     * If empty, a name will be auto-generated from the method/field/property name.
+     * Names must be unique within the application (fail-fast validation at startup).
+     * Example: name = "research_guide"
+     */
+    val name: String = "",
+
+    /**
+     * List of chat scope IDs this system message is available in.
+     * Empty array means available to all scopes (default, backwards compatible).
+     * If the parent @ChatService specifies scopes, this must be a subset (fail-fast validation).
+     * Example: scope = ["admin", "research"]
+     */
+    val scope: Array<String> = []
+)
 
 /**
  * Marks a method as an LLM-callable tool.
@@ -30,12 +58,16 @@ annotation class SystemMessage
  *                Defaults to the method name when blank.
  * @property description Human-readable description sent to the model so it knows
  *                        when and how to call this tool.
+ * @property scope List of chat scope IDs this tool is available in.
+ *                 Empty array means available to all scopes (default, backwards compatible).
+ *                 Example: scope = ["admin", "code-review"]
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(FUNCTION)
 annotation class Tool(
     val name: String = "",
     val description: String = "",
+    val scope: Array<String> = []
 )
 
 /**

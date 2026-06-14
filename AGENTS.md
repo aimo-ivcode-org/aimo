@@ -19,6 +19,18 @@
 - Context keys are fixed (`chatId`, `requestId`, `conversation-client`) in `aimo-core/.../util/Extensions.kt`; server adds `requestMetadata` (`aimo-server/.../util/ContextExtensions.kt`).
 - Title behavior is strict: assistant cannot overwrite a USER-set title (`aimo-plugin-ui/.../chatcontroller/TitleChatController.kt`).
 
+## Chat Scopes (Phase 2)
+- **Scope concept**: ChatScopes define which tools and system messages are available in a conversation. Every instance has a built-in `"global"` scope with all tools.
+- **Scope definition**: Use `@ChatService(scope=["admin", "research"])` on class and `@Tool(scope=[...])` / `@SystemMessage(scope=[...])` on members to restrict visibility.
+- **Empty scope semantics**: Empty `scope = []` on tool/message means "available to all scopes"; empty on `@ChatService` means parent scope has no restrictions.
+- **Scope validation**: At startup, scopes on tools/messages are validated as subsets of parent `@ChatService` scope; fail-fast if invalid.
+- **Named system messages**: System messages get stable names via `@SystemMessage(name="...")` or auto-generated from method/field name. YAML `system-message-refs` reference by name.
+- **Inline system messages**: Scopes can define custom system messages in YAML under `system-messages: {id: "text"}`. These are always included in the scope.
+- **Runtime resolution**: Builder resolves scope from explicit `withChatScope()` → conversation metadata (`aimo.chatScopeId`) → default `"global"`.
+- **Scope filtering**: At build time, `ChatClientBuilderImpl` filters tools and system messages to only those in the selected scope.
+- **Durable scope**: Scope selection can be persisted in conversation via `Conversation.setSelectedChatScope(id)` (`aimo-core/.../conversation/ConversationExtensions.kt`).
+- **Configuration**: Scopes are pre-defined in `application.yml` under `aimo.scope.*`; each scope lists `tool-refs` and `system-message-refs` (`aimo-core/.../properties/AimoProperties.kt`).
+
 ## Integration Points
 - API prefix constant is `API_CONTROLLER_CONTEXT = "aimo-api"` (`aimo-server/.../consts/AimoServerConsts.kt`).
 - Frontend clients are hand-maintained wrappers at `aimo-ui/src/api/aimo-client` and `aimo-ui/src/api/aimo-ui-client`; default base URL is hardcoded to `http://localhost:8080`.

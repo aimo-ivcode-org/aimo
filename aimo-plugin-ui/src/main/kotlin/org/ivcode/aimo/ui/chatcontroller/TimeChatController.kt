@@ -13,12 +13,19 @@ import java.time.temporal.ChronoUnit
 
 private const val HEADER_X_TIMEZONE_OFFSET = "x-timezone-offset"
 
+/**
+ * Provides time-related tools for chat.
+ *
+ * Scope: Available to all scopes (empty scope = inherit all).
+ * To restrict to specific scopes: @ChatService(scope=["admin", "research"])
+ */
 @ChatService
 class TimeChatController {
 
     @Tool(
         name ="current_time",
         description = "Returns current server time and, when x-timezone-offset is provided, inferred user-local time"
+        // Scope: Available to all scopes. To restrict: scope=["admin"]
     )
     fun currentTime(context: Map<String, Any>): TimeResponse {
         val now = Instant.now().truncatedTo(ChronoUnit.SECONDS)

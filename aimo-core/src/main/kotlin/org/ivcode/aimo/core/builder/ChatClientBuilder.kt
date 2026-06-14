@@ -63,11 +63,25 @@ interface ChatClientBuilder {
     fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder
 
     /**
+     * Select a chat scope by ID.
+     *
+     * At build() time, only tools and system messages belonging to this scope
+     * will be passed to AimoChatClientImpl. If not set, the scope is read from
+     * conversation metadata, or defaults to the global scope.
+     *
+     * @param chatScopeId The scope ID (e.g., "admin", "research", "global")
+     * @return this builder for chaining
+     */
+    fun withChatScope(chatScopeId: String): ChatClientBuilder
+
+    /**
      * Build the chat client with all registered components and interceptors applied.
      *
      * Resolution logic:
+     * - ChatScope: Use withChatScope() selection, or conversation metadata, or global scope
      * - Model: Use withModel() selection, or factory primary model, or throw exception
      * - Interceptors: Builder-level (outermost) + factory defaults (innermost)
+     * - Tools/SystemMessages: Filtered by selected scope at build time
      *
      * @return The composed chat client instance ready for use
      * @throws IllegalStateException if required components cannot be resolved

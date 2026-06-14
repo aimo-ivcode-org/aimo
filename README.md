@@ -264,6 +264,110 @@ class SecurityService {
 
 System messages are automatically prepended to every chat request.
 
+## Chat Scopes (Phase 2)
+
+**Chat Scopes** define which tools and system messages are available in a conversation—the autonomous decision-making capabilities. Each scope is a named configuration that restricts tool access and defines custom system messages.
+
+### What are Chat Scopes?
+
+- **Limit tool visibility**: Different roles/users see different tools
+- **Custom instructions per scope**: Define specialized system messages for each scope
+- **Scope inheritance**: Tools and system messages can be restricted to specific scopes
+- **Inline + pre-defined messages**: Combine YAML-defined prompts with code-defined system messages
+
+### Example Scope Configuration
+
+```yaml
+aimo:
+  scope:
+    # Research assistant with research-specific tools
+    research:
+      display-name: "Research Assistant"
+      description: "Research and analysis capabilities"
+      tool-refs: ["search", "summarize", "web_fetch"]  # Only these tools available
+      system-messages:
+        research_guide: |
+          You are a research expert specializing in data analysis and academic research.
+          Focus on accuracy, citations, and evidence-based reasoning.
+      system-message-refs: ["research_prompt"]  # References @SystemMessage(name="research_prompt")
+    
+    # Public assistant with limited tools
+    public:
+      display-name: "Public Assistant"
+      description: "General purpose for public users"
+      tool-refs: ["help", "explain"]  # Limited toolset
+      system-messages:
+        public_guide: |
+          You are a helpful assistant available to the public.
+          Keep responses clear and avoid technical jargon.
+```
+
+**Built-in global scope**: Always available with all tools and system messages.
+
+### Defining Scoped Tools and System Messages
+
+Use `@ChatService` to declare scope restrictions:
+
+```kotlin
+@ChatService(scope = ["research", "admin"])  // Available only in these scopes
+class ResearchService {
+    
+    @Tool(description = "Search research papers")
+    fun searchPapers(@ToolParam("Query") query: String): String {
+        // implementation
+    }
+    
+    @SystemMessage(name = "research_prompt")
+    fun researchPrompt(): String = "Focus on academic sources..."
+}
+
+@ChatService  // Empty scope = available to all scopes
+class GeneralService {
+    
+    @Tool(description = "Get help")
+    fun getHelp(): String = "How can I help?"
+}
+```
+
+### Using Scopes at Runtime
+
+Select a scope when building a chat client:
+
+```kotlin
+val chatClient = chatClientBuilderFactory
+    .builder(conversation)
+    .withChatScope("research")  // Restrict to research scope
+    .build()
+```
+
+Or persist scope in conversation metadata:
+
+```kotlin
+conversation.setSelectedChatScope("research")
+
+// Later, builder automatically uses saved scope
+val chatClient = chatClientBuilderFactory
+    .builder(conversation)
+    .build()  // Uses "research" scope from conversation
+```
+
+### Scope Rules
+
+1. **Empty scope** on `@Tool` or `@SystemMessage` = available to **all scopes**
+2. **Non-empty scope** must be a subset of parent `@ChatService` scope (fail-fast validation at startup)
+3. **Tool/System message names** must be unique across the application
+4. **YAML references** (`tool-refs`, `system-message-refs`) must match actual tool/message names
+
+### How Scopes Work
+
+1. **At startup**: All tools/system messages are discovered and categorized by scope
+2. **On build**: ChatClientBuilder filters tools/messages based on selected scope
+3. **Scope resolution order**:
+   - Explicit scope via `withChatScope()`
+   - Conversation metadata (`aimo.chatScopeId`)
+   - Default: `"global"` scope (all tools/messages)
+
+
 ## Prerequisites
 
 - JDK 21
