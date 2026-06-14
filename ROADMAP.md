@@ -116,94 +116,100 @@ class CalculatorService {
 }
 ```
 
-### Phase 2: Agents
-**Goal**: Define agents as scoped collections of tools with customizable system messages
+### Phase 2: ChatScopes
+**Goal**: Define ChatScopes as scoped collections of tools with customizable system messages
 
 **Status**: Ready to implement. Phase 1 and 1.5 provide the foundation.
 
 **⚠️ Current Tool Discovery**:
 Tools are currently discovered **globally at startup** via reflection in `AimoConfig.createControllerEntities()`. All `@ChatService` beans are scanned, and ALL their tools are registered. This means there is no filtering — every tool is available to every request today.
 
-Agent scoping must **filter at runtime**, not at startup. The full tool registry is still built at startup, but only the agent's allowed tools are passed to `AimoChatClientImpl` when building a prompt.
+ChatScope filtering must happen **at runtime**, not at startup. The full tool registry is still built at startup, but only the scope's allowed tools are passed to `AimoChatClientImpl` when building a prompt.
 
 **⚠️ `SystemMessageContext` Enhancement Needed**:
-`SystemMessageContext` currently only contains `context: Map<String, Any>` with no `agentId`. Adding `agentId` as a field is required for system message selection by agent.
+`SystemMessageContext` currently only contains `context: Map<String, Any>` with no `chatScopeId`. Adding `chatScopeId` as a field is required for system message selection by scope.
 
 **⚠️ Annotation Enhancement Needed**:
-The `agents` property must be added to `@ChatService`, `@Tool`, and `@SystemMessage` annotations. If no `agents` property is set on an annotation, the component is available to all agents (backwards compatible).
+The `scope` property must be added to `@ChatService`, `@Tool`, and `@SystemMessage` annotations. If no `scope` property is set on an annotation, the component is available to all scopes (backwards compatible).
 
 **Definition**:
-- Agents are named configurations that bind a subset of tools to a specific system message
-- Each agent can override default behavior (model selection, parameters, etc.)
+- ChatScopes define the autonomous decision-making capabilities available in a conversation
+- ChatScopes are named configurations that bind a subset of tools to specific system messages
+- Every aimo instance has a built-in **global scope** that includes all available tools
+- Predefined scopes can restrict tools and system messages as needed
 
-**Agent Model**:
+**ChatScope Model**:
 ```
-Agent
-  ├── id (unique identifier)
+ChatScope
+  ├── id (unique identifier, e.g. "global", "admin", "research")
   ├── displayName (user-facing name)
-  ├── description (what this agent does)
-  ├── systemMessage (custom system prompt)
-  ├── tools (list of available tools for this agent)
-  └── config (agent-specific settings)
+  ├── description (what this scope provides)
+  ├── toolNames (set of tool names available in this scope)
+  └── systemMessageNames (set of system message callback names available)
 ```
 
-**Agent Provider Architecture**:
-- **Agent Provider**: Central service for retrieving and creating agents
-  - Loads predefined agents from application.yaml (under `aimo.agents`)
-  - Supports runtime agent creation without registration
+**ChatScope Provider Architecture**:
+- **ChatScopeProvider**: Central service for retrieving and creating chat scopes
+  - Loads predefined scopes from application.yaml (under `aimo.scope`)
+  - Always provides a built-in global scope (all tools + neutral system message)
+  - Supports runtime scope creation without registration
   - Accepts generic interceptors for filtering/access control
   - Initialized by BuilderFactory
 
-- **Interceptors on Agent Provider**: Filter agents based on context
+- **Interceptors on ChatScopeProvider**: Filter scopes based on context
   - Security module provides interceptors that filter by user permissions
   - Applied only if security interceptors are registered (optional)
   - Use the same interceptor interface as ChatClient interceptors
   - Part of broader interceptor framework
 
-**Agent Sources**:
-1. **Predefined Agents**: Programmatically or via configuration file
-   - Stored in agent registry
+**ChatScope Sources**:
+1. **Global Scope**: Built-in scope always available
+   - Includes all tools and system messages
+   - Used as default when no scope is explicitly selected
+   
+2. **Predefined Scopes**: Programmatically or via configuration file
+   - Stored in scope provider
    - Managed through configuration
    
-2. **Runtime Agents**: Created on-the-fly at runtime
+3. **Runtime Scopes**: Created on-the-fly at runtime
    - No registration required
    - Defined by specifying tools and system message
-   - Useful for dynamic agent creation
+   - Useful for dynamic scope creation
 
 **Definition Methods**:
-1. **Programmatically**: Code-based agent registration
-   - Beans/configuration classes define agents
-   - Full control over agent setup
+1. **Programmatically**: Code-based scope registration
+   - Beans/configuration classes define scopes
+   - Full control over scope setup
 
 2. **Application Configuration**: YAML-based definitions
-   - Configured in `aimo.agents` section of application.yaml
+   - Configured in `aimo.scope` section of application.yaml
    - Easy updates without redeployment
 
-**Agent Registry**:
-- Central registry that stores predefined agent definitions
-- Query available agents
-- Look up agent by ID
+**ChatScope Registry**:
+- Central provider stores predefined scope definitions
+- Query available scopes
+- Look up scope by ID
 
 **User Interaction**:
-- Users select an agent when creating a conversation
-- Selected agent determines which tools are available
-- Selected agent's system message applies to the conversation
-- Agent selection can be changed at conversation level
-- Interceptors filter available agents based on permissions (if security enabled)
+- Users select a chat scope when creating a conversation
+- Selected scope determines which tools are available
+- Selected scope's system messages apply to the conversation
+- Scope selection can be changed at conversation level
+- Interceptors filter available scopes based on permissions (if security enabled)
 
 **Annotation-Based Scoping**:
-- `@ChatService(agents = ["admin", "public"])`: Scope service to specific agents
-- `@Tool(agents = ["admin", "retrieval"])`: Scope tool to specific agents
-- `@SystemMessage(agents = ["admin"])`: Scope system message to specific agents
-- If no agents specified, the component is available to all agents (default)
+- `@ChatService(scope = ["admin", "public"])`: Scope service to specific scopes
+- `@Tool(scope = ["admin", "retrieval"])`: Scope tool to specific scopes
+- `@SystemMessage(scope = ["admin"])`: Scope system message to specific scopes
+- If no scope specified, the component is available to all scopes (default)
 
-**⚠️ DAO Storage for Agent Binding**:
-The conversation's `agentId` will be stored in conversation metadata (the `AimoConversationInfo.metadata` / `Map<String, Any>` that already exists in the DAO). No schema changes are needed for this — it uses the existing `writeChatProperty`/`readChatProperty` mechanism.
+**⚠️ DAO Storage for Scope Binding**:
+The conversation's `chatScopeId` will be stored in conversation metadata (the `AimoConversationInfo.metadata` / `Map<String, Any>` that already exists in the DAO). No schema changes are needed for this — it uses the existing `writeChatProperty`/`readChatProperty` mechanism.
 
 ### Phase 3: Spring Security
 **Goal**: Provide optional Spring Security integration via interceptors
 - Spring Security module provides pre-built interceptors
-- Interceptors hook into ChatClient and Agent Provider to enforce security
+- Interceptors hook into ChatClient and ChatScopeProvider to enforce security
 - Users register the interceptors via the builder — no special-purpose wiring needed
 - Uses standard Spring Security annotations (`@Secured`, `@PreAuthorize`) on tools
 
@@ -234,14 +240,14 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
 **Features**:
 - Type-safe client for communicating with Aimo backend
 - Handle ChatClient requests and streaming responses
-- Support for agent/model selection
+- Support for scope/model selection
 - Message history management
 - Reusable across different JVM applications and tools
-- **Critical for Phase 5**: Enables remote server communication for agent forwarding
+- **Critical for Phase 5**: Enables remote server communication for scope forwarding
 - Published on Maven Central for easy consumption
 
 **Usage Contexts**:
-- Remote Agent Forwarding: Tools use client to call other Aimo instances
+- Remote Scope Forwarding: Tools use client to call other Aimo instances
 - Standalone JVM Applications: Integrate Aimo into non-UI JVM services
 - Sample applications and tools
 
@@ -251,18 +257,18 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
 - Kotlin/Java types for all Aimo concepts
 - Example usage in sample applications
 
-### Phase 5: Agent Forwarding
+### Phase 5: Chat Client Forwarding
 **Dependencies**: Requires Phase 4 (Kotlin/Java Aimo Client) for remote server communication
-**Goal**: Support streaming tool output to other agents or chat clients (in-JVM and remote)
+**Goal**: Support streaming tool output to other chat clients or scopes (in-JVM and remote)
 
 **Definition**:
-- Tools can internally call other agents or chat clients
+- Tools can internally call other chat clients or scopes
 - Response streams are forwarded through the tool output
-- Enables agent-to-agent communication and nested chat flows
+- Enables scope-to-scope communication and nested chat flows
 
 **Forwarding Modes**:
 1. **In-JVM Forwarding**: 
-   - Tools call other agents/chat clients within the same JVM
+   - Tools call other chat clients/scopes within the same JVM
    - Direct API invocation via builders
    - No network overhead
    
@@ -273,14 +279,14 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
    - Client library provides type-safe remote access
 
 **Use Cases**:
-- Tool calls another agent to handle sub-tasks
+- Tool calls another scope to handle sub-tasks
 - Tool streams external chat responses back to the main conversation
-- Nested agent chains where one agent's output feeds another
-- Distributed agent networks across multiple Aimo instances
+- Nested scope chains where one scope's output feeds another
+- Distributed scope networks across multiple Aimo instances
 
 **Implementation**:
-- Tools can instantiate and invoke chat clients or agents at runtime
-- Support for both local and remote agent invocation
+- Tools can instantiate and invoke chat clients or scopes at runtime
+- Support for both local and remote scope invocation
 - Response streaming is passed through tool output
 - Tool execution includes async/stream support for long-running operations
 
@@ -362,7 +368,7 @@ There are already hand-maintained TypeScript API wrappers in `aimo-ui/src/api/ai
 **Features**:
 - Type-safe client for communicating with Aimo backend
 - Handle ChatClient requests and streaming responses
-- Support for agent/model selection
+- Support for scope/model selection
 - Message history management
 - Reusable across different UI implementations
 - Published on npm for easy consumption
@@ -378,14 +384,14 @@ There are already hand-maintained TypeScript API wrappers in `aimo-ui/src/api/ai
 - TypeScript types for all Aimo concepts
 - Example usage in debugging tool and custom UIs
 
-### Phase 1: Agent & Model Selection
-**Goal**: UI components for users to select agents and models
+### Phase 1: ChatScope & Model Selection
+**Goal**: UI components for users to select chat scopes and models
 
-**Agent Selector**:
-- Dropdown/modal showing available agents
-- Display agent name and description
-- Select an agent when creating a conversation
-- Agent selection influences which tools and system message are used
+**ChatScope Selector**:
+- Dropdown/modal showing available chat scopes
+- Display scope name and description
+- Select a scope when creating a conversation
+- Scope selection influences which tools and system messages are used
 
 **Model Selector**:
 - Dropdown to choose a provider/LLM + configuration combination
@@ -399,28 +405,28 @@ There are already hand-maintained TypeScript API wrappers in `aimo-ui/src/api/ai
 ### Phase 3: Model Comparison
 **Goal**: Compare responses from multiple models side-by-side
 
-### Phase 4: Agent Debugging Tool
-**Goal**: Comprehensive debugging interface for agents and ChatClient behavior
+### Phase 4: ChatScope Debugging Tool
+**Goal**: Comprehensive debugging interface for chat scopes and ChatClient behavior
 
 **Foundation**:
 - Built using TypeScript Aimo Client (Phase 0)
 - Runs alongside or as part of the main UI
 
 **Key Features**:
-- **Agent Execution Trace**: Track agent execution flow and decisions
+- **Scope Execution Trace**: Track scope execution flow and decisions
 - **Tool Call Inspector**: View tool calls, parameters, and results
 - **Message History Debugging**: Inspect which messages are included in context
-- **System Message Display**: Show active system message for the current agent
+- **System Message Display**: Show active system messages for the current scope
 - **Model Configuration Display**: Show which model configuration is active
 - **Request/Response Inspector**: View raw ChatClient requests and responses
 - **Guard-Rail Monitoring**: Display guard-rail validations and transformations
 
 **Primary Use Cases**:
-- Debug agent behavior during development
+- Debug scope behavior during development
 - Understand how tool calls and responses flow through the system
-- Test different agent configurations and models
+- Test different scope configurations and models
 - Verify context inclusion and message filtering
 - Monitor guard-rail behavior in real-time
-- Troubleshoot agent forwarding (in-JVM and remote)
+- Troubleshoot scope forwarding (in-JVM and remote)
 
 
