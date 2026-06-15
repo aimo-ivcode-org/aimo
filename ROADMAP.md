@@ -129,47 +129,77 @@ class CalculatorService {
    - `@SystemMessage(scope = [...])` restricts system messages to scopes
    - Empty scope arrays mean "available to all scopes" (backwards compatible)
 
-2. **Named System Messages** (replacing index-based approach):
-   - `@SystemMessage(name = "custom_name")` provides stable name
-   - Auto-generated names from method/field names if not explicit
+2. **Named System Messages** (stable references, not index-based):
+   - `@SystemMessage(name = "custom_name")` provides explicit stable name
+   - Auto-generated names from method/field names if not explicit (e.g., `methodName()` → `"methodName"`)
    - Registry built at startup with fail-fast duplicate detection
-   - YAML references use meaningful names, not fragile indices
+   - YAML references use meaningful names: `system-message-refs: ["power_user_capabilities"]`
+   - Example system messages in test suite:
+     - `global_context`, `power_user_capabilities` (GlobalTools)
+     - `public_scope_intro` (PublicTools)
+     - `admin_scope_warning` (AdminTools)
+     - `research_scope_intro` (ResearchTools)
+     - `multi_scope_intro` (MixedTools)
 
 3. **Inline System Messages** (YAML-defined per scope):
    - `aimo.scope.{scopeId}.system-messages: {id: "text"}` for scope-specific prompts
-   - Merged with pre-defined `@SystemMessage` beans
-   - Full flexibility for custom prompts without code changes
+   - Full message text defined directly in YAML without separate bean
+   - Merged at runtime with pre-defined `@SystemMessage` beans
+   - Example: `power_user_inline: "You are a power user with elevated privileges..."`
+   - Full flexibility for custom prompts without code changes or recompilation
 
 4. **Scope Inheritance & Validation**:
    - Parent `@ChatService.scope` defines scope bounds
-   - Child `@Tool` and `@SystemMessage` scopes must be subsets
-   - Intersection validation with fail-fast errors
-   - Comprehensive test coverage (15 new unit tests)
+   - Child `@Tool` and `@SystemMessage` scopes must be subsets of parent
+   - Intersection validation with fail-fast errors at startup
+   - `inherit-global: true/false` controls whether global (unrestricted) tools/messages are included
+   - Comprehensive test coverage (15 unit tests in `aimo-core`)
 
 5. **Runtime Scope Selection**:
    - Builder method: `withChatScope(scopeId)` for explicit selection
    - Conversation metadata storage via `setSelectedChatScope(scopeId)`
-   - Fallback chain: explicit → conversation metadata → global scope
-   - Scope filtering happens at ChatClient build time
+   - Fallback chain: explicit scope → conversation metadata → global scope
+   - Scope filtering happens at ChatClient build time (not runtime)
+   - Different conversations can have different scopes independently
 
-6. **Configuration**:
+6. **Scope Configuration in YAML**:
    - Scopes pre-defined in `application.yml` under `aimo.scope.*`
-   - Each scope lists `tool-refs` and `system-message-refs`
-   - Global scope always available with all tools
-   - Full YAML documentation with examples
+   - Each scope lists tools via `tool-refs: ["toolName1", "toolName2"]`
+   - Each scope lists system messages via `system-message-refs: ["messageName1"]`
+   - Inline system messages via `system-messages: {msgId: "text"}`
+   - Global scope always available with all unrestricted tools and messages
+   - Full YAML documentation with working examples
+
+7. **Use Cases Demonstrated**:
+   - **Case 1 - Isolated Scope**: `restricted` scope with `inherit-global: false` excludes all global tools
+   - **Case 2 - Cherry-Picked Scope**: `power_user` scope with `inherit-global: true` combines:
+     - Global tools (help, status)
+     - Explicitly referenced tools from multiple scopes (add, multiply from public; deleteConversation from admin; searchPapers from research)
+     - Named system message references
+     - Inline system messages
 
 **Breaking Changes**:
 - ⚠️ `tool-filter` → `tool-refs` (in YAML scope definitions)
 - ⚠️ `system-message-filter` → `system-message-refs` (in YAML scope definitions)
-- ⚠️ System message refs now use names instead of indices
+- ⚠️ System message indexing removed; all references now use stable names
 - API remains backwards compatible (new features are additive)
 
-**Test Coverage**: 15 new comprehensive unit tests in ChatScopeTest and InlineSystemMessageCallbackTest
+**Test Coverage**: 
+- 15 comprehensive unit tests located in `aimo-core/src/test/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeDemoTest.kt`
+- Tests verify tool filtering, system message scoping, named references, inline messages, and inheritance patterns
+- Isolated test configuration (no model provider dependency) allows fast, focused testing of scope logic
+- All tests passing
+
+**Files Changed**:
+- Core implementation in `aimo-core/src/main/kotlin/org/ivcode/aimo/core/conf/AimoConfig.kt`
+- Test agents in `aimo-core/src/test/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeDemoAgents.kt`
+- Test configuration in `aimo-core/src/test/kotlin/org/ivcode/aimo/core/chatscope/TestChatScopeConfig.kt`
+- Test YAML in `aimo-core/src/test/resources/application-scope-demo.yml`
 
 For detailed ChatScope documentation and examples, see:
 - **README.md**: "Chat Scopes (Phase 2)" section with examples
 - **AGENTS.md**: "Chat Scopes (Phase 2)" technical section
-- **COMPLETION_REPORT.md**: Full implementation details
+- **aimo-core tests**: 15 integration tests demonstrating all features
 
 
 ### Phase 3: Spring Security
