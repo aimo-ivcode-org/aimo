@@ -4,8 +4,6 @@ import org.ivcode.aimo.core.builder.ChatClientBuilder
 import org.ivcode.aimo.core.builder.ChatClientBuilderFactory
 import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
 import org.ivcode.aimo.core.conversation.Conversation
-import org.ivcode.aimo.core.chatscope.ChatScope
-import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback
@@ -15,19 +13,17 @@ import org.ivcode.aimo.core.chatservice.SystemMessageCallback
  * Factory for creating chat client builders.
  *
  * This factory is initialized once at application startup from properties and provider factories.
- * It acts as a singleton registry for models, tools, system messages, chat scopes, and default interceptors.
+ * It acts as a singleton registry for models, tools, system messages, and default interceptors.
  *
  * @property modelProviderFactories Map of provider name → factory for creating models
  * @property toolCallbacks All registered tool callbacks from @ChatService beans
  * @property systemMessages All registered system message callbacks from @ChatService beans
- * @property chatScopeProvider Provider for retrieving available chat scopes
  * @property defaultInterceptors Default interceptors applied to all chat clients (logging, tracing, error handling)
  */
 class ChatClientBuilderFactoryImpl(
     private val modelProviderFactories: Map<String, AimoChatModelProviderFactory>,
     private val toolCallbacks: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
-    private val chatScopeProvider: ChatScopeProvider,
     private val defaultInterceptors: List<ChatClientInterceptor> = emptyList(),
 ) : ChatClientBuilderFactory {
 
@@ -103,22 +99,6 @@ class ChatClientBuilderFactoryImpl(
         return factory.getModel(name)
     }
 
-    override fun getAgent(agentId: String): Any? {
-        // Deprecated - use getChatScope instead
-        return getChatScope(agentId, emptyMap())
-    }
-
-    override fun getChatScopes(context: Map<String, Any>): List<ChatScope> {
-        return chatScopeProvider.getScopes(context)
-    }
-
-    override fun getChatScope(id: String, context: Map<String, Any>): ChatScope? {
-        return chatScopeProvider.getScope(id, context)
-    }
-
-    override fun getGlobalChatScope(): ChatScope {
-        return chatScopeProvider.getGlobalScope()
-    }
 
     /**
      * Resolves the primary model from all registered providers.

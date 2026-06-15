@@ -135,8 +135,6 @@ class AimoConfig {
             allTools = tools,
             allSystemMessages = systemMessages,
             predefinedScopes = predefinedScopes,
-            toolScopeMap = toolScopeMap,
-            systemMessageScopeMap = systemMessageScopeMap,
             interceptors = emptyList() // Phase 3 adds security interceptors
         )
     }
@@ -278,14 +276,12 @@ class AimoConfig {
           chatModelFactories: Map<String, AimoChatModelProviderFactory>,
           tools: List<AimoToolCallback>,
           systemMessages: List<SystemMessageCallback>,
-          chatScopeProvider: ChatScopeProvider,
           defaultInterceptors: List<ChatClientInterceptor>, // Spring auto-collects all ChatClientInterceptor beans
       ): ChatClientBuilderFactory {
           return ChatClientBuilderFactoryImpl(
               modelProviderFactories = chatModelFactories,
               toolCallbacks = tools,
               systemMessages = systemMessages,
-              chatScopeProvider = chatScopeProvider,
               defaultInterceptors = defaultInterceptors,
           )
       }

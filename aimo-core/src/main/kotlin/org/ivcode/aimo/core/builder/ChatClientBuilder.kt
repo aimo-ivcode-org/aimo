@@ -63,20 +63,16 @@ interface ChatClientBuilder {
      */
     fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder
 
-     /**
-      * Select a chat scope for this client.
-      *
-      * At build() time, only tools and system messages belonging to this scope
-      * will be passed to AimoChatClientImpl. If not set, the scope is read from
-      * conversation metadata, or defaults to the global scope.
-      *
-      * The scope should be obtained from ChatScopeProvider.getScope(), usually by
-      * calling ChatClientBuilderFactory.getChatScope() or related methods.
-      *
-      * @param scope The chat scope to use
-      * @return this builder for chaining
-      */
-     fun withChatScope(scope: ChatScope): ChatClientBuilder
+      /**
+       * Select a chat scope for this client.
+       *
+       * If not set, defaults to the global scope (which includes all tools and system messages).
+       * The scope should be obtained from ChatClientBuilderFactory methods like getChatScope().
+       *
+       * @param scope The chat scope to use, or null to use the global scope
+       * @return this builder for chaining
+       */
+      fun withChatScope(scope: ChatScope?): ChatClientBuilder
 
     /**
      * Build the chat client with all registered components and interceptors applied.

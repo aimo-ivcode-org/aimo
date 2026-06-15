@@ -22,7 +22,7 @@ import java.util.UUID
  *
  * @property conversation The conversation instance for history storage (optional until build)
  * @property selectedModel The selected model configuration (null means use factory primary)
- * @property selectedChatScope The selected chat scope (null means read from conversation metadata or use global)
+ * @property selectedChatScope The selected chat scope (null means use global scope with all tools/messages)
  * @property builderInterceptors Builder-level interceptors registered via withInterceptor()
  * @property factoryDefaultInterceptors Factory-level default interceptors (logging, tracing, error handling)
  * @property toolCallbacks All registered tool callbacks
@@ -64,7 +64,7 @@ class ChatClientBuilderImpl(
         return this
     }
 
-    override fun withChatScope(scope: ChatScope): ChatClientBuilder {
+    override fun withChatScope(scope: ChatScope?): ChatClientBuilder {
         this.selectedChatScope = scope
         return this
     }
@@ -77,14 +77,8 @@ class ChatClientBuilderImpl(
         val conv = conversation
             ?: throw IllegalStateException("Conversation is required for ChatClient")
 
-        // Resolve chat scope: use explicit selection, or conversation metadata, or global
-        // Note: If scope is not explicitly set, it must be resolved externally by the caller
-        // using ChatScopeProvider.getScope() and passed via withChatScope()
-        val scope = selectedChatScope
-            ?: throw IllegalStateException(
-                "ChatScope must be explicitly set via withChatScope(). " +
-                "Use ChatClientBuilderFactory.getChatScope() to obtain a ChatScope."
-            )
+        // Resolve chat scope: use explicit selection, or create global scope (all tools + all system messages)
+        val scope = selectedChatScope ?: createGlobalScope()
 
         // Filter tools and system messages by scope
         val scopedTools = toolCallbacks.filter { tool ->
@@ -113,6 +107,20 @@ class ChatClientBuilderImpl(
 
         // Wrap with interceptors
         return InterceptedChatClient(baseChatClient, allInterceptors)
+    }
+
+    private fun createGlobalScope(): ChatScope {
+        // Global scope includes all tools and all system messages
+        val toolNames = toolCallbacks.map { it.toolDefinition.name }.toSet()
+        val systemMessageNames = systemMessages.indices.map { it.toString() }.toSet()
+
+        return ChatScope(
+            id = "global",
+            displayName = "Global",
+            description = "Built-in scope with all tools and system messages",
+            toolNames = toolNames,
+            systemMessageNames = systemMessageNames
+        )
     }
 }
 

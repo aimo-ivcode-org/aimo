@@ -2,7 +2,6 @@ package org.ivcode.aimo.core.builder
 
 import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.conversation.Conversation
-import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 
 /**
@@ -11,10 +10,9 @@ import org.ivcode.aimo.core.model.AimoChatModelConfig
  * This factory is initialized once at application startup from `application.yaml` properties.
  * It acts as a singleton registry for:
  * - Models (from model provider factories)
- * - ChatScopes (from `aimo.scope` properties, Phase 2)
- * - Guard-rails (from `aimo.guardRails` properties, Phase 7)
  * - Default interceptors (logging, tracing, error handling)
  *
+ * Chat scope selection is handled by external code using ChatClientBuilder.withChatScope().
  * Users should inject both `ChatClientBuilderFactory` (for creating chat clients)
  * and `ConversationFactory` (for creating conversations) separately.
  */
@@ -78,47 +76,13 @@ interface ChatClientBuilderFactory {
      */
     fun getPrimaryModel(): AimoChatModelConfig
 
-    /**
-     * Look up a model by name.
-     *
-     * @param name The model name
-     * @return The model configuration, or null if not found
-     */
-    fun getModel(name: String): AimoChatModelConfig?
-
-    /**
-     * Look up an agent by ID (Phase 2 feature).
-     *
-     * @param agentId The agent identifier
-     * @return The agent configuration, or null if not found
-     */
-    fun getAgent(agentId: String): Any? // TODO: Return proper Agent type in Phase 2
-
-    /**
-     * Get all available chat scopes.
-     *
-     * @param context Optional context for interceptor filtering (e.g., user permissions)
-     * @return List of scopes available to the caller
-     */
-    fun getChatScopes(context: Map<String, Any> = emptyMap()): List<ChatScope>
-
-    /**
-     * Get a specific chat scope by ID.
-     *
-     * @param id The scope ID to retrieve
-     * @param context Optional context for interceptor filtering
-     * @return ChatScope if found and accessible, null otherwise
-     */
-    fun getChatScope(id: String, context: Map<String, Any> = emptyMap()): ChatScope?
-
-    /**
-     * Get the built-in global scope.
-     *
-     * The global scope is always available and includes all tools and system messages.
-     *
-     * @return The global scope (never null)
-     */
-    fun getGlobalChatScope(): ChatScope
+     /**
+      * Look up a model by name.
+      *
+      * @param name The model name
+      * @return The model configuration, or null if not found
+      */
+     fun getModel(name: String): AimoChatModelConfig?
 }
 
 
