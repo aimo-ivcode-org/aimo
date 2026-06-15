@@ -59,31 +59,39 @@ data class AimoProperties(
 /**
  * ChatScope configuration properties (Phase 2 feature).
  *
- * Annotation-Based Discovery:
- * - Tools and system messages are discovered from @ChatService annotations
- * - A ChatService without scope restrictions is available to all scopes
- * - A ChatService with @ChatService(scope=["admin"]) is only in admin scope
- * - Scopes are auto-created for each unique scope ID found in annotations
+ * Scopes Auto-Discovered from Annotations:
+ * - All @ChatService(scope=[...]) annotations are discovered automatically
+ * - Each unique scope ID creates a ChatScope automatically
  *
- * YAML Configuration (Metadata Only):
- * - display-name: Human-readable scope name for display
+ * Config-Based Scope Customization:
+ * - displayName: Human-readable scope name for display
  * - description: Scope description explaining its purpose
- * - system-messages: Custom inline system messages for this scope (YAML-defined prompts)
+ * - inheritGlobal: Whether to include tools without scope restrictions (default: true)
+ *                  If false, only tools explicitly in toolRefs are included (plus annotations)
+ * - toolRefs: Explicitly include specific tools in this scope
+ * - systemMessages: Custom inline system messages for this scope (YAML-defined prompts)
+ * - systemMessageRefs: Include pre-defined @SystemMessage beans by name in this scope
+ *
+ * Semantics:
+ * - Tools without scope restrictions (@ChatService with no scope arg) are "global" tools
+ * - inheritGlobal=true (default): scope includes global tools + annotation-scoped tools + toolRefs
+ * - inheritGlobal=false: scope includes ONLY annotation-scoped tools + toolRefs (no global tools)
  *
  * Example:
  * ```yaml
  * aimo.scope:
+ *   restricted_admin:
+ *     display-name: "Restricted Admin"
+ *     inherit-global: false  # Don't include global tools
+ *     tool-refs: ["delete_user", "ban_ip"]  # Only these admin tools
+ *     system-messages:
+ *       admin_warning: "You have admin-only access. Be careful."
+ *
  *   research:
  *     display-name: "Research Assistant"
- *     description: "Research and analysis tools"
- *     system-messages:
- *       research_guide: |
- *         You are a research expert specializing in data analysis.
- *         Focus on accuracy and citations.
+ *     inherit-global: true   # Include global tools (help, status, etc)
+ *     tool-refs: ["search", "analyze"]  # Plus these research tools
  * ```
- *
- * Note: Tools and system messages are defined in code via annotations.
- * Scope membership is auto-discovered - no tool-refs or system-message-refs needed.
  */
 data class AimoChatScopeProperties(
     /**
@@ -97,6 +105,21 @@ data class AimoChatScopeProperties(
     var description: String = "",
 
     /**
+     * Whether to include "global" tools (tools with no scope restriction).
+     * true (default): Scope includes both global tools and scoped tools
+     * false: Scope includes ONLY tools explicitly declared for it (via annotations or toolRefs)
+     */
+    var inheritGlobal: Boolean = true,
+
+    /**
+     * Tool name references to explicitly include in this scope.
+     * These are in addition to tools discovered through annotations.
+     * Empty list: no tool-refs specified (uses all annotation-discovered tools + global if inheritGlobal=true)
+     * Non-empty: explicitly include these tool names in the scope
+     */
+    var toolRefs: List<String> = emptyList(),
+
+    /**
      * System messages defined inline for this scope.
      * Map of message ID → prompt text.
      * These are custom messages created specifically for this scope.
@@ -104,7 +127,18 @@ data class AimoChatScopeProperties(
      *   research_guide: "You are a research expert..."
      *   code_style: "Follow PEP 8 standards..."
      */
-    var systemMessages: Map<String, String> = emptyMap()
+    var systemMessages: Map<String, String> = emptyMap(),
+
+    /**
+     * System message references to pre-defined @SystemMessage beans by name.
+     * References pre-defined @SystemMessage beans from ChatService classes by their name property.
+     * Empty list: only inline system-messages are used.
+     * Non-empty: include pre-defined system messages with these names.
+     *
+     * Names come from @SystemMessage(name="...") or auto-generated from method/field name.
+     * Example: ["research_guide", "code_analysis"]
+     */
+    var systemMessageRefs: List<String> = emptyList()
 )
 
 /**

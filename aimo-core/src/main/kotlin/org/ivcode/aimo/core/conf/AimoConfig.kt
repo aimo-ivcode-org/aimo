@@ -163,58 +163,110 @@ class AimoConfig {
             callbackToName[scoped.callback] = scoped.name
         }
 
-        // AUTO-DISCOVER SCOPES FROM ANNOTATIONS
-        // Collect all scope IDs mentioned in tool and system message annotations
-        val discoveredScopeIds = mutableSetOf<String>()
-        discoveredScopeIds.addAll(toolScopeMap.values.flatten())
-        discoveredScopeIds.addAll(systemMessageScopeMap.values.flatten())
+        // AUTO-DISCOVER SCOPES FROM ANNOTATIONS AND YAML
+        // Collect all scope IDs from two sources:
+        // 1. Annotation-based: mentioned in @ChatService(scope=[...])
+        val discoveredAnnotationScopes = mutableSetOf<String>()
+        discoveredAnnotationScopes.addAll(toolScopeMap.values.flatten())
+        discoveredAnnotationScopes.addAll(systemMessageScopeMap.values.flatten())
 
-        // Always include global scope
-        discoveredScopeIds.add("global")
+        // 2. YAML-based: defined in application.yml aimo.scope.*
+        val yamlDefinedScopes = scopeConfigs.keys
 
-        // Merge discovered scopes with YAML config scopes
-        // YAML config (if provided) can override display-name, description, and provide inline system messages
-        val allScopes = discoveredScopeIds.associateWith { scopeId ->
-            scopeConfigs[scopeId] ?: AimoChatScopeProperties(
+        // Combine both sources
+        val allScopeIds = discoveredAnnotationScopes + yamlDefinedScopes + "global"
+
+        // Create ChatScope for each discovered/configured scope
+        return allScopeIds.associateWith { scopeId ->
+            val config = scopeConfigs[scopeId] ?: AimoChatScopeProperties(
                 displayName = scopeId.replaceFirstChar { it.uppercase() },
                 description = "Scope: $scopeId",
-                systemMessages = emptyMap()
+                inheritGlobal = true,
+                toolRefs = emptyList(),
+                systemMessages = emptyMap(),
+                systemMessageRefs = emptyList()
             )
-        }
 
-        return allScopes.mapValues { (id, config) ->
-            // For annotation-based scopes: include tools that declare this scope
-            val scopedTools = allTools.filter { tool ->
-                val toolScopes = toolScopeMap[tool.toolDefinition.name] ?: emptySet()
-                // Tool is in this scope if:
-                // 1. Tool has no scope restriction (empty set = all scopes)
-                // 2. Tool explicitly declares this scope
-                toolScopes.isEmpty() || toolScopes.contains(id)
+            // Collect tools for this scope
+            val scopedTools = mutableListOf<AimoToolCallback>()
+
+            // 1. Add global tools if inheritGlobal is true
+            if (config.inheritGlobal) {
+                scopedTools.addAll(allTools.filter { tool ->
+                    val toolScopes = toolScopeMap[tool.toolDefinition.name] ?: emptySet()
+                    // Global tool: no scope restriction
+                    toolScopes.isEmpty()
+                })
             }
 
-            // For annotation-based system messages: include messages that declare this scope
-            val filteredPreDefinedSystemMessages = allSystemMessages.filter { msg ->
+            // 2. Add tools that explicitly declare this scope (from annotations)
+            scopedTools.addAll(allTools.filter { tool ->
+                val toolScopes = toolScopeMap[tool.toolDefinition.name] ?: emptySet()
+                // Tool declared for this specific scope
+                toolScopes.contains(scopeId)
+            })
+
+            // 3. Add tools explicitly referenced in config (toolRefs)
+            scopedTools.addAll(allTools.filter { tool ->
+                val toolName = tool.toolDefinition.name
+                if (!config.toolRefs.contains(toolName)) return@filter false
+                // Must also satisfy annotation scope restriction
+                val toolScopes = toolScopeMap[toolName] ?: emptySet()
+                toolScopes.isEmpty() || toolScopes.contains(scopeId)
+            })
+
+            // Remove duplicates by tool name
+            val uniqueTools = scopedTools
+                .distinctBy { it.toolDefinition.name }
+                .toMutableList()
+
+            // Collect system messages for this scope
+            val systemMessagesForScope = mutableListOf<SystemMessageCallback>()
+
+            // 1. Add global system messages if inheritGlobal is true
+            if (config.inheritGlobal) {
+                systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
+                    val msgName = callbackToName[msg] ?: return@filter false
+                    val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
+                    // Global message: no scope restriction
+                    msgScopes.isEmpty()
+                })
+            }
+
+            // 2. Add messages that explicitly declare this scope (from annotations)
+            systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
                 val msgName = callbackToName[msg] ?: return@filter false
                 val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
-                // Message is in this scope if:
-                // 1. Message has no scope restriction (empty set = all scopes)
-                // 2. Message explicitly declares this scope
-                msgScopes.isEmpty() || msgScopes.contains(id)
-            }
+                // Message declared for this specific scope
+                msgScopes.contains(scopeId)
+            })
+
+            // 3. Add messages explicitly referenced in config (systemMessageRefs)
+            systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
+                val msgName = callbackToName[msg] ?: return@filter false
+                if (!config.systemMessageRefs.contains(msgName)) return@filter false
+                // Must also satisfy annotation scope restriction
+                val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
+                msgScopes.isEmpty() || msgScopes.contains(scopeId)
+            })
+
+            // Remove duplicates by name
+            val uniqueSystemMessages = systemMessagesForScope
+                .distinctBy { callbackToName[it] }
 
             // Create inline system message callbacks from YAML system-messages field
             val inlineSystemMessages = config.systemMessages.map { (msgId, msgText) ->
                 InlineSystemMessageCallback(msgId, msgText)
             }
 
-            // Combine filtered pre-defined and inline system messages
-            val allScopedSystemMessages = filteredPreDefinedSystemMessages + inlineSystemMessages
+            // Combine all system messages
+            val allScopedSystemMessages = uniqueSystemMessages + inlineSystemMessages
 
             ChatScope(
-                id = id,
+                id = scopeId,
                 displayName = config.displayName,
                 description = config.description,
-                tools = scopedTools,
+                tools = uniqueTools,
                 systemMessages = allScopedSystemMessages
             )
         }
