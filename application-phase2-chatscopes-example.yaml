@@ -2,23 +2,29 @@ aimo:
   data-dir: ./data/conversations
   global-user-id: global
 
-  # ChatScope definitions (Phase 2 feature)
-  # The built-in 'global' scope is always available with all tools.
-  # Define additional scopes here to restrict tools and define custom system messages.
+  # ChatScope Configuration (Phase 2 feature) - ANNOTATION BASED
   #
-  # Semantics:
-  # - If a ChatService has no @ChatService(scope=[...]), it's available to all scopes
-  # - If a ChatService has @ChatService(scope=["admin"]), it's only in admin scope
-  # - If a scope's tool-refs is empty, that scope has NO tools
-  # - If a scope's tool-refs is non-empty, it includes only those tool names (filtered by annotation scopes)
-  # - system-messages: inline system message definitions for this scope (Map<id, prompt>)
-  # - system-message-refs: references to pre-defined @SystemMessage beans by name
+  # IMPORTANT: Scopes are AUTO-DISCOVERED from @ChatService annotations.
+  # Tools and system messages are defined in code, not YAML.
+  #
+  # Example code patterns:
+  #   @ChatService(scope = ["admin"])
+  #   class AdminTools { @Tool fun delete() {...} }
+  #
+  #   @ChatService  // No scope = available in all scopes
+  #   class GlobalTools { @Tool fun help() {...} }
+  #
+  # YAML Configuration is for METADATA ONLY:
+  # - display-name: Human-readable scope name
+  # - description: Scope description
+  # - system-messages: Custom inline system messages for this scope (Map<id, prompt>)
+  #
+  # The built-in 'global' scope is always available with all tools.
 
   scope:
     research:
       display-name: "Research Assistant"
       description: "Research and analysis capabilities"
-      tool-refs: ["search", "summarize", "web_fetch"]
       system-messages:
         research_guide: |
           You are a research expert specializing in data analysis and academic research.
@@ -28,16 +34,15 @@ aimo:
     public:
       display-name: "Public Assistant"
       description: "General purpose assistant for public use"
-      tool-refs: ["help", "explain"]
       system-messages:
         public_guide: |
           You are a helpful, friendly assistant available to the public.
           Keep responses clear, accessible, and appropriate for a general audience.
           Avoid technical jargon unless explaining it.
-      system-message-refs: ["research_guide"]  # Reference system message by name from @SystemMessage annotation
 
-    # admin scope omitted - use global scope with all tools for administrators
-    # or define explicitly with desired tools and system messages
+    admin:
+      display-name: "Admin Tools"
+      description: "Administrative operations (restricted access)"
 
   model:
     ollama:

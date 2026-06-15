@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: simple-scope-demo
+
+server:
+  port: 8080
+
+aimo:
+  # Conversation storage directory
+  data-dir: ./data/conversations
+
+  # Single-user mode
+  global-user-id: demo-user
+
+  # Ollama model configuration
+  model:
+    ollama:
+      demo-model:
+        base-url: http://localhost:11434
+        primary: true
+        options:
+          model: mistral  # or whatever model you have in Ollama
+          temperature: 0.7
+
+  # Interceptors (optional)
+  interceptors:
+    logging:
+      enabled: false
+    tracing:
+      enabled: false
+    error-handling:
+      enabled: false
+
+logging:
+  level:
+    org.ivcode.aimo: DEBUG
+    org.springframework: INFO
+
+
+
+

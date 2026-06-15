@@ -59,39 +59,31 @@ data class AimoProperties(
 /**
  * ChatScope configuration properties (Phase 2 feature).
  *
- * Semantics:
+ * Annotation-Based Discovery:
+ * - Tools and system messages are discovered from @ChatService annotations
  * - A ChatService without scope restrictions is available to all scopes
  * - A ChatService with @ChatService(scope=["admin"]) is only in admin scope
- * - Empty tool-refs: this scope has NO tools (no default inheritance)
- * - Non-empty tool-refs: this scope includes only those tools (subject to annotation scopes)
+ * - Scopes are auto-created for each unique scope ID found in annotations
  *
- * System Messages:
- *  * - system-messages: a Map<String, String> of custom system messages defined inline for this scope
- *                    Keys are identifiers, values are the prompt text
- *  * - These inline messages are always included in the scope
- *  * - system-message-refs: references to pre-defined @SystemMessage beans by name
+ * YAML Configuration (Metadata Only):
+ * - display-name: Human-readable scope name for display
+ * - description: Scope description explaining its purpose
+ * - system-messages: Custom inline system messages for this scope (YAML-defined prompts)
  *
- * The built-in 'global' scope always exists and includes all tools/system messages.
- *
- * Structure:
+ * Example:
  * ```yaml
  * aimo.scope:
  *   research:
  *     display-name: "Research Assistant"
  *     description: "Research and analysis tools"
- *     tool-refs: ["search", "summarize"]
  *     system-messages:
  *       research_guide: |
  *         You are a research expert specializing in data analysis.
  *         Focus on accuracy and citations.
- *     system-message-refs: ["research_prompt", "data_analysis"]
- *   public:
- *     display-name: "Public Assistant"
- *     description: "General purpose"
- *     tool-refs: ["help"]
- *     system-messages:
- *       public_guide: "You are a helpful assistant for the public."
  * ```
+ *
+ * Note: Tools and system messages are defined in code via annotations.
+ * Scope membership is auto-discovered - no tool-refs or system-message-refs needed.
  */
 data class AimoChatScopeProperties(
     /**
@@ -104,13 +96,6 @@ data class AimoChatScopeProperties(
      */
     var description: String = "",
 
-     /**
-      * Tool name references (exact match, no wildcards).
-      * Empty list: this scope has NO tools.
-      * Non-empty: scope includes only these tool names (must also match annotation scopes).
-      */
-     var toolRefs: List<String> = emptyList(),
-
     /**
      * System messages defined inline for this scope.
      * Map of message ID → prompt text.
@@ -119,18 +104,7 @@ data class AimoChatScopeProperties(
      *   research_guide: "You are a research expert..."
      *   code_style: "Follow PEP 8 standards..."
      */
-    var systemMessages: Map<String, String> = emptyMap(),
-
-      /**
-       * System message references to pre-defined @SystemMessage beans by name.
-       * References pre-defined @SystemMessage beans from ChatService classes by their name property.
-       * Empty list: only inline system-messages are used.
-       * Non-empty: include pre-defined system messages with these names.
-       *
-       * Names come from @SystemMessage(name="...") or auto-generated from method/field name.
-       * Example: ["research_guide", "code_analysis"]
-       */
-      var systemMessageRefs: List<String> = emptyList()
+    var systemMessages: Map<String, String> = emptyMap()
 )
 
 /**

@@ -163,37 +163,43 @@ class AimoConfig {
             callbackToName[scoped.callback] = scoped.name
         }
 
-        return scopeConfigs.mapValues { (id, config) ->
-            // Filter tools by name references
-            val scopedTools = if (config.toolRefs.isEmpty()) {
-                emptyList<AimoToolCallback>()
-            } else {
-                allTools.filter { tool ->
-                    val toolName = tool.toolDefinition.name
+        // AUTO-DISCOVER SCOPES FROM ANNOTATIONS
+        // Collect all scope IDs mentioned in tool and system message annotations
+        val discoveredScopeIds = mutableSetOf<String>()
+        discoveredScopeIds.addAll(toolScopeMap.values.flatten())
+        discoveredScopeIds.addAll(systemMessageScopeMap.values.flatten())
 
-                    // Must be in the YAML tool-refs
-                    if (!config.toolRefs.contains(toolName)) return@filter false
+        // Always include global scope
+        discoveredScopeIds.add("global")
 
-                    // Must satisfy annotation scope restriction
-                    val toolScopes = toolScopeMap[toolName] ?: emptySet()
-                    toolScopes.isEmpty() || toolScopes.contains(id)
-                }
+        // Merge discovered scopes with YAML config scopes
+        // YAML config (if provided) can override display-name, description, and provide inline system messages
+        val allScopes = discoveredScopeIds.associateWith { scopeId ->
+            scopeConfigs[scopeId] ?: AimoChatScopeProperties(
+                displayName = scopeId.replaceFirstChar { it.uppercase() },
+                description = "Scope: $scopeId",
+                systemMessages = emptyMap()
+            )
+        }
+
+        return allScopes.mapValues { (id, config) ->
+            // For annotation-based scopes: include tools that declare this scope
+            val scopedTools = allTools.filter { tool ->
+                val toolScopes = toolScopeMap[tool.toolDefinition.name] ?: emptySet()
+                // Tool is in this scope if:
+                // 1. Tool has no scope restriction (empty set = all scopes)
+                // 2. Tool explicitly declares this scope
+                toolScopes.isEmpty() || toolScopes.contains(id)
             }
 
-            // Filter pre-defined system messages by name references
-            val filteredPreDefinedSystemMessages = if (config.systemMessageRefs.isEmpty()) {
-                emptyList<SystemMessageCallback>()
-            } else {
-                allSystemMessages.filter { msg ->
-                    val msgName = callbackToName[msg] ?: return@filter false
-
-                    // Must be referenced in the YAML system-message-refs
-                    if (!config.systemMessageRefs.contains(msgName)) return@filter false
-
-                    // Must satisfy annotation scope restriction
-                    val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
-                    msgScopes.isEmpty() || msgScopes.contains(id)
-                }
+            // For annotation-based system messages: include messages that declare this scope
+            val filteredPreDefinedSystemMessages = allSystemMessages.filter { msg ->
+                val msgName = callbackToName[msg] ?: return@filter false
+                val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
+                // Message is in this scope if:
+                // 1. Message has no scope restriction (empty set = all scopes)
+                // 2. Message explicitly declares this scope
+                msgScopes.isEmpty() || msgScopes.contains(id)
             }
 
             // Create inline system message callbacks from YAML system-messages field
