@@ -74,7 +74,6 @@ class ChatClientBuilderFactoryImpl(
             factoryDefaultInterceptors = defaultInterceptors,
             toolCallbacks = toolCallbacks,
             systemMessages = systemMessages,
-            chatScopeProvider = chatScopeProvider,
             getPrimaryModel = { _primaryModel },
             getModelByName = { name -> getModel(name) },
         )
@@ -86,7 +85,6 @@ class ChatClientBuilderFactoryImpl(
             factoryDefaultInterceptors = defaultInterceptors,
             toolCallbacks = toolCallbacks,
             systemMessages = systemMessages,
-            chatScopeProvider = chatScopeProvider,
             getPrimaryModel = { _primaryModel },
             getModelByName = { name -> getModel(name) },
         )

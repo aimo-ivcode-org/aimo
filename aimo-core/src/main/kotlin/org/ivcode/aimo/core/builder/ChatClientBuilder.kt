@@ -3,6 +3,7 @@ package org.ivcode.aimo.core.builder
 import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 
 /**
@@ -62,17 +63,20 @@ interface ChatClientBuilder {
      */
     fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder
 
-    /**
-     * Select a chat scope by ID.
-     *
-     * At build() time, only tools and system messages belonging to this scope
-     * will be passed to AimoChatClientImpl. If not set, the scope is read from
-     * conversation metadata, or defaults to the global scope.
-     *
-     * @param chatScopeId The scope ID (e.g., "admin", "research", "global")
-     * @return this builder for chaining
-     */
-    fun withChatScope(chatScopeId: String): ChatClientBuilder
+     /**
+      * Select a chat scope for this client.
+      *
+      * At build() time, only tools and system messages belonging to this scope
+      * will be passed to AimoChatClientImpl. If not set, the scope is read from
+      * conversation metadata, or defaults to the global scope.
+      *
+      * The scope should be obtained from ChatScopeProvider.getScope(), usually by
+      * calling ChatClientBuilderFactory.getChatScope() or related methods.
+      *
+      * @param scope The chat scope to use
+      * @return this builder for chaining
+      */
+     fun withChatScope(scope: ChatScope): ChatClientBuilder
 
     /**
      * Build the chat client with all registered components and interceptors applied.
