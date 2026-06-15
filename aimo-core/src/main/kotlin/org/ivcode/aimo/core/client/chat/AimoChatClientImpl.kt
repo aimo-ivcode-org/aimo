@@ -7,9 +7,10 @@ import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageContext
- import org.ivcode.aimo.core.model.AimoChatModelConfig
+import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.model.AimoToolDefinition
@@ -45,7 +46,7 @@ import java.util.UUID
  *
  * ### Message Flow
  * 1. Input: [AimoChatRequest] with user prompt
- * 2. System messages are prepared via callbacks
+ * 2. System messages are prepared via callbacks (from chat scope)
  * 3. History is fetched (from cache or lazy-loaded from DAO)
  * 4. Prompt budgeter filters history to fit context window
  * 5. Model is called with the resulting prompt
@@ -56,23 +57,23 @@ import java.util.UUID
  * @property chatId The conversation ID that this chat client serves
  * @property conversation The conversation client (manages cache, persistence, and message fetching)
  * @property model The chat model that generates responses
- * @property systemMessages Callbacks that generate system-level prompts
- * @property chatScopeId The chat scope ID for this client (affects which system messages apply)
+ * @property chatScope The chat scope defining available tools and system messages
  */
 internal class AimoChatClientImpl (
     override val chatId: UUID,
     private val conversation: Conversation,
     private val model: AimoChatModelConfig,
-    tools: List<AimoToolCallback>,
-    private val systemMessages: List<SystemMessageCallback>,
-    private val chatScopeId: String? = null,
+    private val chatScope: ChatScope,
 ) : AimoChatClient {
 
     // Map tool callbacks by name for O(1) lookup during tool invocation
-    private val toolCallbacks: Map<String, AimoToolCallback> = tools.associateBy { it.toolDefinition.name }
+    private val toolCallbacks: Map<String, AimoToolCallback> = chatScope.tools.associateBy { it.toolDefinition.name }
 
     // Tool definitions sent to the model (extracted from callbacks)
-    private val toolDefinitions: List<AimoToolDefinition> = toolCallbacks.values.map { it.toolDefinition }
+    private val toolDefinitions: List<AimoToolDefinition> = chatScope.tools.map { it.toolDefinition }
+
+    // System messages from the scope
+    private val systemMessages: List<SystemMessageCallback> = chatScope.systemMessages
 
     // Prompt budgeter selected based on model configuration
     // Responsible for filtering history to fit the model's context window
@@ -430,14 +431,14 @@ internal class AimoChatClientImpl (
      *
      * @param requestId The unique ID for this request
      * @param request The user's chat request
-     * @return SystemMessageContext with merged request context and chat scope ID
+     * @return SystemMessageContext with merged request context
      */
     private fun createSystemMessageContext(requestId: UUID, request: AimoChatRequest) = SystemMessageContext(
         context = createContextMap (
             requestId = requestId,
             requestContext = request.context,
         ),
-        chatScopeId = chatScopeId
+        chatScopeId = chatScope.id
     )
 
     /**

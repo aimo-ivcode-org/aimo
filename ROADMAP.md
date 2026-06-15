@@ -116,120 +116,105 @@ class CalculatorService {
 }
 ```
 
-### Phase 2: ChatScopes
+### Phase 2: ChatScopes ✅ **COMPLETE**
 **Goal**: Define ChatScopes as scoped collections of tools with customizable system messages
 
-**Status**: Ready to implement. Phase 1 and 1.5 provide the foundation.
+**Status**: Phase 2 is **100% complete** with all objectives achieved.
 
-**⚠️ Current Tool Discovery**:
-Tools are currently discovered **globally at startup** via reflection in `AimoConfig.createControllerEntities()`. All `@ChatService` beans are scanned, and ALL their tools are registered. This means there is no filtering — every tool is available to every request today.
+**What Was Implemented**:
 
-ChatScope filtering must happen **at runtime**, not at startup. The full tool registry is still built at startup, but only the scope's allowed tools are passed to `AimoChatClientImpl` when building a prompt.
+1. **Scope-Based Tool & System Message Filtering**:
+   - `@ChatService(scope = [...])` scopes an entire service to specific scopes
+   - `@Tool(scope = [...])` restricts individual tools to scopes (with parent validation)
+   - `@SystemMessage(scope = [...])` restricts system messages to scopes
+   - Empty scope arrays mean "available to all scopes" (backwards compatible)
 
-**⚠️ `SystemMessageContext` Enhancement Needed**:
-`SystemMessageContext` currently only contains `context: Map<String, Any>` with no `chatScopeId`. Adding `chatScopeId` as a field is required for system message selection by scope.
+2. **Named System Messages** (replacing index-based approach):
+   - `@SystemMessage(name = "custom_name")` provides stable name
+   - Auto-generated names from method/field names if not explicit
+   - Registry built at startup with fail-fast duplicate detection
+   - YAML references use meaningful names, not fragile indices
 
-**⚠️ Annotation Enhancement Needed**:
-The `scope` property must be added to `@ChatService`, `@Tool`, and `@SystemMessage` annotations. If no `scope` property is set on an annotation, the component is available to all scopes (backwards compatible).
+3. **Inline System Messages** (YAML-defined per scope):
+   - `aimo.scope.{scopeId}.system-messages: {id: "text"}` for scope-specific prompts
+   - Merged with pre-defined `@SystemMessage` beans
+   - Full flexibility for custom prompts without code changes
 
-**Definition**:
-- ChatScopes define the autonomous decision-making capabilities available in a conversation
-- ChatScopes are named configurations that bind a subset of tools to specific system messages
-- Every aimo instance has a built-in **global scope** that includes all available tools
-- Predefined scopes can restrict tools and system messages as needed
+4. **Scope Inheritance & Validation**:
+   - Parent `@ChatService.scope` defines scope bounds
+   - Child `@Tool` and `@SystemMessage` scopes must be subsets
+   - Intersection validation with fail-fast errors
+   - Comprehensive test coverage (15 new unit tests)
 
-**ChatScope Model**:
-```
-ChatScope
-  ├── id (unique identifier, e.g. "global", "admin", "research")
-  ├── displayName (user-facing name)
-  ├── description (what this scope provides)
-  ├── toolNames (set of tool names available in this scope)
-  └── systemMessageNames (set of system message callback names available)
-```
+5. **Runtime Scope Selection**:
+   - Builder method: `withChatScope(scopeId)` for explicit selection
+   - Conversation metadata storage via `setSelectedChatScope(scopeId)`
+   - Fallback chain: explicit → conversation metadata → global scope
+   - Scope filtering happens at ChatClient build time
 
-**ChatScope Provider Architecture**:
-- **ChatScopeProvider**: Central service for retrieving and creating chat scopes
-  - Loads predefined scopes from application.yaml (under `aimo.scope`)
-  - Always provides a built-in global scope (all tools + neutral system message)
-  - Supports runtime scope creation without registration
-  - Accepts generic interceptors for filtering/access control
-  - Initialized by BuilderFactory
+6. **Configuration**:
+   - Scopes pre-defined in `application.yml` under `aimo.scope.*`
+   - Each scope lists `tool-refs` and `system-message-refs`
+   - Global scope always available with all tools
+   - Full YAML documentation with examples
 
-- **Interceptors on ChatScopeProvider**: Filter scopes based on context
-  - Security module provides interceptors that filter by user permissions
-  - Applied only if security interceptors are registered (optional)
-  - Use the same interceptor interface as ChatClient interceptors
-  - Part of broader interceptor framework
+**Breaking Changes**:
+- ⚠️ `tool-filter` → `tool-refs` (in YAML scope definitions)
+- ⚠️ `system-message-filter` → `system-message-refs` (in YAML scope definitions)
+- ⚠️ System message refs now use names instead of indices
+- API remains backwards compatible (new features are additive)
 
-**ChatScope Sources**:
-1. **Global Scope**: Built-in scope always available
-   - Includes all tools and system messages
-   - Used as default when no scope is explicitly selected
-   
-2. **Predefined Scopes**: Programmatically or via configuration file
-   - Stored in scope provider
-   - Managed through configuration
-   
-3. **Runtime Scopes**: Created on-the-fly at runtime
-   - No registration required
-   - Defined by specifying tools and system message
-   - Useful for dynamic scope creation
+**Test Coverage**: 15 new comprehensive unit tests in ChatScopeTest and InlineSystemMessageCallbackTest
 
-**Definition Methods**:
-1. **Programmatically**: Code-based scope registration
-   - Beans/configuration classes define scopes
-   - Full control over scope setup
+For detailed ChatScope documentation and examples, see:
+- **README.md**: "Chat Scopes (Phase 2)" section with examples
+- **AGENTS.md**: "Chat Scopes (Phase 2)" technical section
+- **COMPLETION_REPORT.md**: Full implementation details
 
-2. **Application Configuration**: YAML-based definitions
-   - Configured in `aimo.scope` section of application.yaml
-   - Easy updates without redeployment
-
-**ChatScope Registry**:
-- Central provider stores predefined scope definitions
-- Query available scopes
-- Look up scope by ID
-
-**User Interaction**:
-- Users select a chat scope when creating a conversation
-- Selected scope determines which tools are available
-- Selected scope's system messages apply to the conversation
-- Scope selection can be changed at conversation level
-- Interceptors filter available scopes based on permissions (if security enabled)
-
-**Annotation-Based Scoping**:
-- `@ChatService(scope = ["admin", "public"])`: Scope service to specific scopes
-- `@Tool(scope = ["admin", "retrieval"])`: Scope tool to specific scopes
-- `@SystemMessage(scope = ["admin"])`: Scope system message to specific scopes
-- If no scope specified, the component is available to all scopes (default)
-
-**⚠️ DAO Storage for Scope Binding**:
-The conversation's `chatScopeId` will be stored in conversation metadata (the `AimoConversationInfo.metadata` / `Map<String, Any>` that already exists in the DAO). No schema changes are needed for this — it uses the existing `writeChatProperty`/`readChatProperty` mechanism.
 
 ### Phase 3: Spring Security
 **Goal**: Provide optional Spring Security integration via interceptors
+
+**Status**: Ready to implement. Phase 2 provides the scope foundation.
+
+**Overview**:
 - Spring Security module provides pre-built interceptors
 - Interceptors hook into ChatClient and ChatScopeProvider to enforce security
 - Users register the interceptors via the builder — no special-purpose wiring needed
 - Uses standard Spring Security annotations (`@Secured`, `@PreAuthorize`) on tools
 
-**⚠️ Existing User Concept in Codebase**:
-The current codebase already has a user/security concept:
-- `AimoUserProvider` interface (`aimo-core/.../security/`) — provides the current user from execution context
-- `AimoUser` data class — holds `userId` and `metadata`
-- `GlobalUserProvider` — default implementation, always returns "global" user (single-user mode)
-- `AimoSecurityConfig` — registers `GlobalUserProvider` as default via `@ConditionalOnMissingBean`
+**Key Features**:
+1. **Tool Security**: Declare access control via annotations
+   ```kotlin
+   @Tool(description = "Admin operation")
+   @PreAuthorize("hasRole('ADMIN')")
+   fun adminOperation(): String { ... }
+   ```
 
-This existing mechanism handles user scoping (all DAO operations are scoped by `userId`). The decision is **pending** on whether to:
-1. Remove this custom user concept and rely entirely on Spring Security
-2. Bridge it to Spring Security (Spring Security principal populates `AimoUserProvider`)
+2. **Scope Access Control**: Filter available scopes by user permissions
+   - ChatScopeProvider interceptor filters scopes based on authentication
+   - Only scopes accessible to current user are available
 
-This decision must be made before implementing Phase 3.
+3. **Integration with Builder**:
+   ```kotlin
+   chatClientBuilderFactory
+       .builder(conversation)
+       .withSecurityContext(securityContext)  // Optional
+       .build()
+   ```
 
-**User Concept**:
-- Conversation API defines user context
-- Decision pending: Remove existing user concept or integrate with Spring Security
-- To be determined in Phase 3 implementation
+**⚠️ User Concept Decision**:
+The codebase has existing user/security infrastructure:
+- `AimoUserProvider` - provides current user from context
+- `AimoUser` - holds userId and metadata  
+- `GlobalUserProvider` - default (single-user mode)
+- `AimoSecurityConfig` - registers default
+
+**Decision Pending**: Before Phase 3 implementation, clarify strategy:
+1. Remove custom user concept and rely entirely on Spring Security
+2. Bridge custom user concept to Spring Security (Spring principal → AimoUserProvider)
+
+This decision affects DAO access control and user scoping approach.
 
 ### Phase 4: Reusable Kotlin/Java Aimo Client
 **Goal**: Extract and publish a standalone, reusable Kotlin/Java client for Aimo

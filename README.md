@@ -6,6 +6,17 @@
 > 
 > See the [Roadmap](./ROADMAP.md) for planned changes and current direction.
 
+## 📊 Project Status
+
+**Current Phase**: ✅ **Phase 2 (ChatScopes)** is **COMPLETE**
+
+For detailed status, phase progress, and next steps, see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
+
+| Completed | Current | Next |
+|-----------|---------|------|
+| ✅ Phase 1: Configuration | ✅ Phase 2: ChatScopes | 📋 Phase 3: Spring Security |
+| ✅ Phase 1.5: Rename @ChatController | ✅ Phase 2: Tests (15 tests) | |
+
 Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring project for building AI chat applications with conversation memory, tool-calling controllers, an Ollama-backed model adapter, and a React UI.
 
 ## What this repository contains

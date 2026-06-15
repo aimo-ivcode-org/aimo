@@ -77,26 +77,15 @@ class ChatClientBuilderImpl(
         val conv = conversation
             ?: throw IllegalStateException("Conversation is required for ChatClient")
 
-        // Resolve chat scope: use explicit selection, or create global scope (all tools + all system messages)
+        // Resolve chat scope: use explicit selection, or create global scope
         val scope = selectedChatScope ?: createGlobalScope()
 
-        // Filter tools and system messages by scope
-        val scopedTools = toolCallbacks.filter { tool ->
-            scope.toolNames.contains(tool.toolDefinition.name)
-        }
-
-        val scopedSystemMessages = systemMessages.filterIndexed { index, _ ->
-            scope.systemMessageNames.contains(index.toString())
-        }
-
-        // Create base AimoChatClient with filtered tools/system messages and scope ID
+        // Create base AimoChatClient - scope already has filtered tools/system messages
         val baseChatClient: AimoChatClient = AimoChatClientImpl(
             chatId = conv.chatId,
             conversation = conv,
             model = model,
-            tools = scopedTools,
-            systemMessages = scopedSystemMessages,
-            chatScopeId = scope.id
+            chatScope = scope
         )
 
         // If no interceptors, return base client
@@ -110,16 +99,16 @@ class ChatClientBuilderImpl(
     }
 
     private fun createGlobalScope(): ChatScope {
-        // Global scope includes all tools and all system messages
-        val toolNames = toolCallbacks.map { it.toolDefinition.name }.toSet()
-        val systemMessageNames = systemMessages.indices.map { it.toString() }.toSet()
+        // Global scope includes only unrestricted tools and system messages
+        val globalTools = toolCallbacks
+        val globalSystemMessages = systemMessages
 
         return ChatScope(
             id = "global",
             displayName = "Global",
-            description = "Built-in scope with all tools and system messages",
-            toolNames = toolNames,
-            systemMessageNames = systemMessageNames
+            description = "Default scope with all unrestricted tools and system messages",
+            tools = globalTools,
+            systemMessages = globalSystemMessages
         )
     }
 }

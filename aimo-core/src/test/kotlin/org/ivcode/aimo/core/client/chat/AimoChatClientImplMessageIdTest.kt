@@ -8,6 +8,7 @@ import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.AimoUsage
+import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatservice.Tool
 import org.ivcode.aimo.core.chatservice.toAimoToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
@@ -39,8 +40,7 @@ class AimoChatClientImplMessageIdTest {
             chatId = chatId,
             conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(simpleResponse())),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         client.chat(AimoChatRequest(prompt = "first request", context = emptyMap()))
@@ -58,8 +58,7 @@ class AimoChatClientImplMessageIdTest {
             chatId = chatId,
             conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(simpleResponse()), contextSize = 0),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         client.chat(AimoChatRequest(prompt = "first request", context = emptyMap()))
@@ -85,8 +84,13 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
-            systemMessages = emptyList(),
+            chatScope = ChatScope(
+                id = "test",
+                displayName = "Test",
+                description = "Test scope",
+                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                systemMessages = emptyList(),
+            ),
         )
 
         val response = client.chat(AimoChatRequest(prompt = "use the tool", context = emptyMap()))
@@ -107,8 +111,7 @@ class AimoChatClientImplMessageIdTest {
             chatId = chatId,
             conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(responseWithThinking("I thought about it", "the answer")), contextSize = 4000),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         client.chat(AimoChatRequest(prompt = "think about it", context = emptyMap()))
@@ -127,8 +130,7 @@ class AimoChatClientImplMessageIdTest {
             chatId = chatId,
             conversation = TestSessionClient(chatId, dao),
             model = testModel(engine = FixedResponseEngine(simpleResponse(content = "")), contextSize = 4000),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         val response = client.chat(AimoChatRequest(prompt = "empty", context = emptyMap()))
@@ -154,8 +156,7 @@ class AimoChatClientImplMessageIdTest {
                 )),
                 contextSize = 4000,
             ),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         client.chatStream(AimoChatRequest(prompt = "think about it", context = emptyMap())) {}
@@ -182,8 +183,7 @@ class AimoChatClientImplMessageIdTest {
                 contextSize = 4000,
                 excludeThinking = true,
             ),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         client.chatStream(AimoChatRequest(prompt = "first", context = emptyMap())) {}
@@ -216,8 +216,13 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
-            systemMessages = emptyList(),
+            chatScope = ChatScope(
+                id = "test",
+                displayName = "Test",
+                description = "Test scope",
+                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                systemMessages = emptyList(),
+            ),
         )
 
         client.chat(AimoChatRequest(prompt = "use the tool", context = emptyMap()))
@@ -250,8 +255,13 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
-            systemMessages = emptyList(),
+            chatScope = ChatScope(
+                id = "test",
+                displayName = "Test",
+                description = "Test scope",
+                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                systemMessages = emptyList(),
+            ),
         )
 
         client.chat(AimoChatRequest(prompt = "use the tool", context = emptyMap()))
@@ -276,8 +286,7 @@ class AimoChatClientImplMessageIdTest {
                 )),
                 contextSize = 4000,
             ),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         val callbackResponses = mutableListOf<AimoChatResponse>()
@@ -309,8 +318,7 @@ class AimoChatClientImplMessageIdTest {
                 )),
                 contextSize = 4000,
             ),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         val callbackResponses = mutableListOf<AimoChatResponse>()
@@ -355,8 +363,7 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = emptyList(),
-            systemMessages = emptyList(),
+            chatScope = testScope(),
         )
 
         val returnedResponse = client.chatStream(AimoChatRequest(prompt = "stream", context = emptyMap())) { _ -> }
@@ -387,8 +394,13 @@ class AimoChatClientImplMessageIdTest {
                 ),
                 contextSize = 4000,
             ),
-            tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
-            systemMessages = emptyList(),
+            chatScope = ChatScope(
+                id = "test",
+                displayName = "Test",
+                description = "Test scope",
+                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                systemMessages = emptyList(),
+            ),
         )
 
         val response = client.chat(AimoChatRequest(prompt = "use unknown tool", context = emptyMap()))
@@ -417,6 +429,20 @@ class AimoChatClientImplMessageIdTest {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    private fun testScope(tools: List<String> = emptyList()): ChatScope {
+        val tools = when (tools.size) {
+            0 -> emptyList()
+            else -> toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback }
+        }
+        return ChatScope(
+            id = "test",
+            displayName = "Test",
+            description = "Test scope",
+            tools = tools,
+            systemMessages = emptyList(),
+        )
+    }
 
     private fun testModel(
         engine: AimoChatEngine,

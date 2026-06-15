@@ -117,10 +117,18 @@ class AimoConfig {
         scopedSystemMessages: List<ScopedSystemMessageCallbackWithName>,
         tools: List<AimoToolCallback>,
         systemMessages: List<SystemMessageCallback>,
-        toolScopeMap: Map<String, Set<String>>,
-        systemMessageScopeMap: Map<String, Set<String>>,
         properties: AimoProperties
     ): ChatScopeProvider {
+        // Build tool scope map locally from scopedTools
+        val toolScopeMap = scopedTools.associate { scoped ->
+            scoped.callback.toolDefinition.name to scoped.scopes
+        }
+
+        // Build system message scope map locally from scopedSystemMessages
+        val systemMessageScopeMap = scopedSystemMessages.associate { scoped ->
+            scoped.name to scoped.scopes
+        }
+
         // Build predefined scopes from YAML configuration
         val predefinedScopes = buildPredefinedScopes(
             scopeConfigs = properties.scope,
@@ -135,6 +143,8 @@ class AimoConfig {
             allTools = tools,
             allSystemMessages = systemMessages,
             predefinedScopes = predefinedScopes,
+            toolScopeMap = toolScopeMap,
+            systemMessageScopeMap = systemMessageScopeMap,
             interceptors = emptyList() // Phase 3 adds security interceptors
         )
     }
@@ -198,8 +208,8 @@ class AimoConfig {
                 id = id,
                 displayName = config.displayName,
                 description = config.description,
-                toolNames = scopedTools.map { it.toolDefinition.name }.toSet(),
-                systemMessageNames = allScopedSystemMessages.indices.map { it.toString() }.toSet()
+                tools = scopedTools,
+                systemMessages = allScopedSystemMessages
             )
         }
     }
