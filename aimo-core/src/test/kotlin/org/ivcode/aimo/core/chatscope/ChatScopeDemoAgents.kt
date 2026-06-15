@@ -1,54 +1,37 @@
-package org.ivcode.aimo.examples.scope_demo
+package org.ivcode.aimo.core.chatscope
 
 import org.ivcode.aimo.core.chatservice.ChatService
+import org.ivcode.aimo.core.chatservice.SystemMessage
 import org.ivcode.aimo.core.chatservice.Tool
 import org.ivcode.aimo.core.chatservice.ToolParam
-import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.dao.AimoChatClientDaoFile
-import org.ivcode.aimo.core.security.AimoUserProvider
-import org.ivcode.aimo.core.security.GlobalUserProvider
-import org.springframework.boot.autoconfigure.SpringBootApplication
-import org.springframework.boot.runApplication
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import tools.jackson.databind.ObjectMapper
-import java.io.File
 
-@SpringBootApplication
-class Application
-
-fun main(args: Array<String>) {
-    runApplication<Application>(*args)
-}
-
-@Configuration
-class ScopeDemoConfig {
-
-    @Bean
-    fun createAimoDao(
-        @Value("\${aimo.data-dir:./data}") dataDirPath: String,
-        objectMapper: ObjectMapper
-    ): AimoChatClientDao {
-        val dataDir = File(dataDirPath)
-        return AimoChatClientDaoFile(dataDir, objectMapper)
-    }
-
-    @Bean
-    fun aimoUserProvider(
-        @Value("\${aimo.global-user-id:global}") globalUserId: String
-    ): AimoUserProvider {
-        return GlobalUserProvider(globalUserId)
-    }
-}
+/**
+ * Test agent definitions for ChatScope integration testing.
+ * These agents demonstrate scope restrictions and system messages.
+ */
 
 /**
  * GLOBAL SCOPE: Tools available everywhere
  * These tools have no scope restriction (empty scope array = all scopes)
- * They appear in: public, admin, research, and the global scope
  */
 @ChatService
-class GlobalTools {
+class GlobalToolsTest {
+
+    @SystemMessage(name = "global_context")
+    fun globalContext(): String = """
+        You are an AI assistant with access to a variety of tools organized by scope.
+        The current scope determines which tools you can use.
+        Always inform the user about scope limitations if they ask for unavailable tools.
+    """.trimIndent()
+
+    @SystemMessage(name = "power_user_capabilities")
+    fun powerUserCapabilities(): String = """
+        POWER USER MODE - You have elevated access
+        You can combine tools from multiple scopes (public, admin, research).
+        Use administrative and research tools with appropriate caution.
+        Always validate user intent before executing sensitive operations.
+    """.trimIndent()
 
     @Tool(description = "Get help about available tools")
     fun getHelp(): String = """
@@ -64,16 +47,21 @@ class GlobalTools {
         ✓ Online
         ✓ All tools operational
         ✓ No errors
-        Scopes: public, admin, research (+ global)
     """.trimIndent()
 }
 
 /**
  * PUBLIC SCOPE: General-purpose tools available to everyone
- * Tools: calculator, greet
  */
 @ChatService(scope = ["public"])
-class PublicTools {
+class PublicToolsTest {
+
+    @SystemMessage(name = "public_scope_intro")
+    fun publicIntro(): String = """
+        PUBLIC SCOPE - General Purpose Tools
+        You have access to basic arithmetic and greeting tools.
+        Use these for general computations and friendly interactions.
+    """.trimIndent()
 
     @Tool(description = "Add two numbers")
     fun add(
@@ -93,10 +81,17 @@ class PublicTools {
 
 /**
  * ADMIN SCOPE: Administrative tools (stricter scope)
- * Tools: delete_conversation, ban_user
  */
 @ChatService(scope = ["admin"])
-class AdminTools {
+class AdminToolsTest {
+
+    @SystemMessage(name = "admin_scope_warning")
+    fun adminWarning(): String = """
+        ⚠️ ADMIN SCOPE - Restricted Actions
+        You have access to sensitive administrative operations.
+        Always confirm with the user before executing deletion or ban operations.
+        Log all administrative actions performed.
+    """.trimIndent()
 
     @Tool(description = "Delete a conversation (admin only)")
     fun deleteConversation(
@@ -112,10 +107,17 @@ class AdminTools {
 
 /**
  * RESEARCH SCOPE: Research-specific tools
- * Tools: search_papers, analyze_data
  */
 @ChatService(scope = ["research"])
-class ResearchTools {
+class ResearchToolsTest {
+
+    @SystemMessage(name = "research_scope_intro")
+    fun researchIntro(): String = """
+        RESEARCH SCOPE - Academic and Data Analysis Tools
+        You have access to paper searching and data analysis capabilities.
+        Help researchers find relevant academic papers and analyze research data.
+        Always provide citations and methodological recommendations.
+    """.trimIndent()
 
     @Tool(description = "Search academic papers by topic")
     fun searchPapers(
@@ -125,8 +127,6 @@ class ResearchTools {
         1. "A Study on ChatScopes" - 2026
         2. "Scope Management in AI" - 2025
         3. "Multi-Tenant Tool Isolation" - 2025
-        4. "Annotation-Based Filtering" - 2024
-        5. "Conversational AI Architecture" - 2024
     """.trimIndent()
 
     @Tool(description = "Analyze research data")
@@ -137,12 +137,16 @@ class ResearchTools {
 
 /**
  * MULTI-SCOPE SERVICE: Mixed scope availability
- * - public_help: available to all scopes (empty scope array)
- * - admin_help: only in admin scope
- * - research_help: only in research scope
  */
 @ChatService(scope = ["public", "admin", "research"])
-class MixedTools {
+class MixedToolsTest {
+
+    @SystemMessage(name = "multi_scope_intro")
+    fun multiScopeIntro(): String = """
+        MULTI-SCOPE SERVICE
+        This service provides scope-specific guidance for different user types.
+        Help users understand what tools are available in their current scope.
+    """.trimIndent()
 
     @Tool(description = "Get general help (available in all scopes)")
     fun publicHelp(): String = """
@@ -165,5 +169,4 @@ class MixedTools {
         - Use analyzeData to analyze research data
     """.trimIndent()
 }
-
 
