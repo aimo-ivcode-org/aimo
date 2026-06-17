@@ -111,13 +111,13 @@ class TestChatScopeConfig {
             scopedSystemMessages = scopedSystemMessages
         )
 
-        return ChatScopeProviderImpl(
-            allTools = tools,
-            allSystemMessages = systemMessages,
-            predefinedScopes = predefinedScopes,
-            toolScopeMap = toolScopeMap,
-            systemMessageScopeMap = systemMessageScopeMap
-        )
+         return ChatScopeProviderImpl(
+             allTools = tools,
+             allSystemMessages = scopedSystemMessages,
+             predefinedScopes = predefinedScopes,
+             toolScopeMap = toolScopeMap,
+             systemMessageScopeMap = systemMessageScopeMap
+         )
     }
 
     private fun buildPredefinedScopesForTest(
@@ -156,14 +156,11 @@ class TestChatScopeConfig {
                 toolScopes.contains(scopeId)
             })
 
-            // 3. Add tools explicitly referenced in config (toolRefs)
-            scopedTools.addAll(allTools.filter { tool ->
-                val toolName = tool.toolDefinition.name
-                if (!config.toolRefs.contains(toolName)) return@filter false
-                // Must also satisfy annotation scope restriction
-                val toolScopes = toolScopeMap[toolName] ?: emptySet()
-                toolScopes.isEmpty() || toolScopes.contains(scopeId)
-            })
+             // 3. Add tools explicitly referenced in config (toolRefs)
+             // tool-refs act as an override: explicitly include these tools regardless of their scope restrictions
+             scopedTools.addAll(allTools.filter { tool ->
+                 config.toolRefs.contains(tool.toolDefinition.name)
+             })
 
             // Remove duplicates by tool name
             val uniqueTools = scopedTools
@@ -191,14 +188,12 @@ class TestChatScopeConfig {
                 msgScopes.contains(scopeId)
             })
 
-            // 3. Add messages explicitly referenced in config (systemMessageRefs)
-            systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
-                val msgName = callbackToName[msg] ?: return@filter false
-                if (!config.systemMessageRefs.contains(msgName)) return@filter false
-                // Must also satisfy annotation scope restriction
-                val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
-                msgScopes.isEmpty() || msgScopes.contains(scopeId)
-            })
+             // 3. Add messages explicitly referenced in config (systemMessageRefs)
+             // system-message-refs act as an override: explicitly include these messages regardless of their scope restrictions
+             systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
+                 val msgName = callbackToName[msg] ?: return@filter false
+                 config.systemMessageRefs.contains(msgName)
+             })
 
             // Remove duplicates by name
             val uniqueSystemMessages = systemMessagesForScope

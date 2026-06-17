@@ -8,6 +8,7 @@ import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
 import org.ivcode.aimo.core.client.chat.AimoChatClientImpl
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.chatscope.ChatScope
+import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
@@ -22,11 +23,12 @@ import java.util.UUID
  *
  * @property conversation The conversation instance for history storage (optional until build)
  * @property selectedModel The selected model configuration (null means use factory primary)
- * @property selectedChatScope The selected chat scope (null means use global scope with all tools/messages)
+ * @property selectedChatScope The selected chat scope (null means use global scope from provider)
  * @property builderInterceptors Builder-level interceptors registered via withInterceptor()
  * @property factoryDefaultInterceptors Factory-level default interceptors (logging, tracing, error handling)
  * @property toolCallbacks All registered tool callbacks
  * @property systemMessages All registered system message callbacks
+ * @property chatScopeProvider Provider for retrieving scopes with filtered tools/system messages
  * @property getPrimaryModel Lambda to resolve primary model from factory
  * @property getModelByName Lambda to resolve model by name from factory
  */
@@ -35,6 +37,7 @@ class ChatClientBuilderImpl(
     private val factoryDefaultInterceptors: List<ChatClientInterceptor>,
     private val toolCallbacks: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
+    private val chatScopeProvider: ChatScopeProvider,
     private val getPrimaryModel: () -> AimoChatModelConfig,
     private val getModelByName: (String) -> AimoChatModelConfig?,
 ) : ChatClientBuilder {
@@ -98,19 +101,11 @@ class ChatClientBuilderImpl(
         return InterceptedChatClient(baseChatClient, allInterceptors)
     }
 
-    private fun createGlobalScope(): ChatScope {
-        // Global scope includes only unrestricted tools and system messages
-        val globalTools = toolCallbacks
-        val globalSystemMessages = systemMessages
-
-        return ChatScope(
-            id = "global",
-            displayName = "Global",
-            description = "Default scope with all unrestricted tools and system messages",
-            tools = globalTools,
-            systemMessages = globalSystemMessages
-        )
-    }
+     private fun createGlobalScope(): ChatScope {
+         // Get the pre-built global scope from ChatScopeProvider
+         // This scope includes only unrestricted tools and system messages (those with empty scope set)
+         return chatScopeProvider.getGlobalScope()
+     }
 }
 
 
