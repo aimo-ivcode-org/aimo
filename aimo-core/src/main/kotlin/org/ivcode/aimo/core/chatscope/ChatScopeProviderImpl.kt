@@ -13,9 +13,7 @@ import org.ivcode.aimo.core.chatservice.SystemMessageCallback
  * @property allTools All registered tools globally
  * @property allSystemMessages All registered system messages globally
  * @property predefinedScopes Map of scope ID → ChatScope for configured scopes
- * @property toolScopeMap Map of tool name → set of scope IDs it's restricted to
- * @property systemMessageScopeMap Map of system message index (as string) → set of scope IDs it's restricted to
- * @property interceptors Interceptors to apply during scope retrieval (empty by default)
+ * @property systemMessageScopeMap Map of system message name → set of scope IDs it's restricted to
  */
 class ChatScopeProviderImpl(
     private val allTools: List<AimoToolCallback>,

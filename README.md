@@ -10,7 +10,7 @@
 
 **Current Phase**: ✅ **Phase 2 (ChatScopes)** is **COMPLETE**
 
-For detailed status, phase progress, and next steps, see [PROJECT_STATUS.md](./PROJECT_STATUS.md).
+For detailed status, phase progress, and next steps, see [ROADMAP.md](./ROADMAP.md).
 
 | Completed | Current | Next |
 |-----------|---------|------|
@@ -345,9 +345,10 @@ class GeneralService {
 Select a scope when building a chat client:
 
 ```kotlin
+val scope = chatScopeProvider.getScope("research") ?: chatScopeProvider.getGlobalScope()
 val chatClient = chatClientBuilderFactory
     .builder(conversation)
-    .withChatScope("research")  // Restrict to research scope
+    .withChatScope(scope)
     .build()
 ```
 
@@ -356,11 +357,13 @@ Or persist scope in conversation metadata:
 ```kotlin
 conversation.setSelectedChatScope("research")
 
-// Later, builder automatically uses saved scope
+// Later, resolve saved scope id and apply it explicitly
+val scopeId = conversation.getSelectedChatScope() ?: "global"
+val scope = chatScopeProvider.getScope(scopeId) ?: chatScopeProvider.getGlobalScope()
 val chatClient = chatClientBuilderFactory
     .builder(conversation)
-    .build()  // Uses "research" scope from conversation
-```
+    .withChatScope(scope)
+    .build()
 
 ### Scope Rules
 

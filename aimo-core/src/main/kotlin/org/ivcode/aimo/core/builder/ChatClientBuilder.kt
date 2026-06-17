@@ -66,9 +66,8 @@ interface ChatClientBuilder {
       /**
        * Select a chat scope for this client.
        *
-       * If not set, defaults to the global scope (which includes all tools and system messages).
-       * The scope should be obtained from ChatClientBuilderFactory methods like getChatScope().
-       *
+       * If not set, defaults to the global scope.
+       * The scope should be obtained from a `ChatScopeProvider` (or constructed explicitly in tests).
        * @param scope The chat scope to use, or null to use the global scope
        * @return this builder for chaining
        */

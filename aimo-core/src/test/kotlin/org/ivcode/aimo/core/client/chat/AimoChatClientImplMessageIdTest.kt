@@ -430,16 +430,12 @@ class AimoChatClientImplMessageIdTest {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private fun testScope(tools: List<String> = emptyList()): ChatScope {
-        val tools = when (tools.size) {
-            0 -> emptyList()
-            else -> toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback }
-        }
+    private fun testScope(): ChatScope {
         return ChatScope(
             id = "test",
             displayName = "Test",
             description = "Test scope",
-            tools = tools,
+            tools = emptyList(),
             systemMessages = emptyList(),
         )
     }
