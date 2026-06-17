@@ -139,16 +139,15 @@ class AimoConfig {
              scopedSystemMessages = scopedSystemMessages
          )
 
-         return ChatScopeProviderImpl(
-             allTools = tools,
-             allSystemMessages = scopedSystemMessages,
-             predefinedScopes = predefinedScopes,
-             toolScopeMap = toolScopeMap,
-             systemMessageScopeMap = systemMessageScopeMap,
-             interceptors = emptyList() // Phase 3 adds security interceptors
-         )
-     }
-    }
+          return ChatScopeProviderImpl(
+              allTools = tools,
+              allSystemMessages = scopedSystemMessages,
+              predefinedScopes = predefinedScopes,
+              toolScopeMap = toolScopeMap,
+              systemMessageScopeMap = systemMessageScopeMap,
+              interceptors = emptyList() // Phase 3 adds security interceptors
+          )
+      }
 
     private fun buildPredefinedScopes(
         scopeConfigs: Map<String, AimoChatScopeProperties>,
