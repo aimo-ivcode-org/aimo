@@ -179,6 +179,8 @@ class ChatScopeDemoTest {
             val toolRefs = listOf("add", "multiply", "deleteConversation", "searchPapers")
             val toolRefsCount = toolNames.count { it in toolRefs }
 
+            assertTrue(hasGlobalTools, "power_user scope should include global tools when inherit-global=true")
+            assertTrue(toolRefsCount == toolRefs.size, "power_user scope should include all configured tool-refs (expected=${toolRefs.size}, actual=$toolRefsCount)")
             println("Has global tools: $hasGlobalTools (tools: ${toolNames.filter { it in globalTools }})")
             println("Cherry-picked tool-refs included: $toolRefsCount of ${toolRefs.size} (tools: ${toolNames.filter { it in toolRefs }})")
             println("✓ USE CASE 2: Cherry-picked scope successfully combines tools from multiple sources!")
