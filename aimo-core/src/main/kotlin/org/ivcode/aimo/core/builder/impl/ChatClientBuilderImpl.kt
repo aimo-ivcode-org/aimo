@@ -26,8 +26,6 @@ import java.util.UUID
  * @property selectedChatScope The selected chat scope (null means use global scope from provider)
  * @property builderInterceptors Builder-level interceptors registered via withInterceptor()
  * @property factoryDefaultInterceptors Factory-level default interceptors (logging, tracing, error handling)
- * @property toolCallbacks All registered tool callbacks
- * @property systemMessages All registered system message callbacks
  * @property chatScopeProvider Provider for retrieving scopes with filtered tools/system messages
  * @property getPrimaryModel Lambda to resolve primary model from factory
  * @property getModelByName Lambda to resolve model by name from factory
@@ -35,8 +33,6 @@ import java.util.UUID
 class ChatClientBuilderImpl(
     private var conversation: Conversation? = null,
     private val factoryDefaultInterceptors: List<ChatClientInterceptor>,
-    private val toolCallbacks: List<AimoToolCallback>,
-    private val systemMessages: List<SystemMessageCallback>,
     private val chatScopeProvider: ChatScopeProvider,
     private val getPrimaryModel: () -> AimoChatModelConfig,
     private val getModelByName: (String) -> AimoChatModelConfig?,
