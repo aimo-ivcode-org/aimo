@@ -368,7 +368,7 @@ val chatClient = chatClientBuilderFactory
 
 ### Scope Rules
 
-1. **Empty scope** on `@Tool` or `@SystemMessage` = available to **all scopes**
+1. **Empty scope** on `@Tool` or `@SystemMessage` = inherits parent `@ChatService(scope=...)` when parent is scoped; available to all scopes only when parent has no scope restriction
 2. **Non-empty scope** must be a subset of parent `@ChatService` scope (fail-fast validation at startup)
 3. **Tool/System message names** must be unique across the application
 4. **YAML references** (`tool-refs`, `system-message-refs`) must match actual tool/message names

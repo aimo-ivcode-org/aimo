@@ -127,7 +127,7 @@ class CalculatorService {
    - `@ChatService(scope = [...])` scopes an entire service to specific scopes
    - `@Tool(scope = [...])` restricts individual tools to scopes (with parent validation)
    - `@SystemMessage(scope = [...])` restricts system messages to scopes
-   - Empty scope arrays mean "available to all scopes" (backwards compatible)
+   - Empty scope arrays inherit the parent `@ChatService` scope when the parent is scoped; available to all scopes only when parent has no scope restriction
 
 2. **Named System Messages** (stable references, not index-based):
    - `@SystemMessage(name = "custom_name")` provides explicit stable name

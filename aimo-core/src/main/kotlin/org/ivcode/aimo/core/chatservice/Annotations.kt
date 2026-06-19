@@ -29,7 +29,9 @@ annotation class ChatService(
  * Marks a field, property, or method as providing a system message for the chat.
  *
  * @property scope List of chat scope IDs this system message is available in.
- *                 Empty array means available to all scopes (default, backwards compatible).
+ *                 Empty array inherits the parent @ChatService scope; if the parent has no scope restrictions, this becomes available to all scopes.
+ *                 If the parent @ChatService specifies scopes, this must be a subset (fail-fast validation).
+ *                 Example: scope = ["admin", "research"]
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(FUNCTION, FIELD, PROPERTY)
@@ -44,7 +46,7 @@ annotation class SystemMessage(
 
     /**
      * List of chat scope IDs this system message is available in.
-     * Empty array means available to all scopes (default, backwards compatible).
+     * Empty array inherits the parent @ChatService scope; if the parent has no scope restrictions, this becomes available to all scopes.
      * If the parent @ChatService specifies scopes, this must be a subset (fail-fast validation).
      * Example: scope = ["admin", "research"]
      */
@@ -81,5 +83,3 @@ annotation class Tool(
 annotation class ToolParam(
     val description: String = "",
 )
-
-
