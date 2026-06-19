@@ -352,19 +352,6 @@ val chatClient = chatClientBuilderFactory
     .build()
 ```
 
-Or persist scope in conversation metadata:
-
-```kotlin
-conversation.setSelectedChatScope("research")
-
-// Later, resolve saved scope id and apply it explicitly
-val scopeId = conversation.getSelectedChatScope() ?: "global"
-val scope = chatScopeProvider.getScope(scopeId) ?: chatScopeProvider.getGlobalScope()
-val chatClient = chatClientBuilderFactory
-    .builder(conversation)
-    .withChatScope(scope)
-    .build()
-```
 
 ### Scope Rules
 
