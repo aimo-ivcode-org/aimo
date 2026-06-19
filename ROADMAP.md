@@ -201,49 +201,56 @@ For detailed ChatScope documentation and examples, see:
 - **aimo-core tests**: 15 integration tests demonstrating all features
 
 
-### Phase 3: Spring Security
-**Goal**: Provide optional Spring Security integration via interceptors
+### Phase 3: MCP Tool Consuming
+**Goal**: Enable AIMO agents to discover and consume MCP tools from external MCP servers
 
-**Status**: Ready to implement. Phase 2 provides the scope foundation.
+**Status**: Ready to implement. Builds on Phase 2 ChatScopes infrastructure.
 
 **Overview**:
-- Spring Security module provides pre-built interceptors
-- Interceptors hook into ChatClient and ChatScopeProvider to enforce security
-- Users register the interceptors via the builder — no special-purpose wiring needed
-- Uses standard Spring Security annotations (`@Secured`, `@PreAuthorize`) on tools
+- AIMO agents can discover MCP tools from external servers (Claude Desktop, Cline, etc.)
+- External MCP tools are wrapped and exposed as AIMO `@Tool` resources
+- Tools integrate seamlessly with scope and system message architecture
+- Tool results flow naturally through conversation context
+- No need to wait on provider implementation - focus on consuming existing MCP servers
 
 **Key Features**:
-1. **Tool Security**: Declare access control via annotations
-   ```kotlin
-   @Tool(description = "Admin operation")
-   @PreAuthorize("hasRole('ADMIN')")
-   fun adminOperation(): String { ... }
-   ```
+- MCP Client: Connect to external MCP servers and discover available tools
+- Tool Wrapping: Auto-wrap MCP tool definitions as AIMO `@Tool` resources
+- Schema Conversion: Convert MCP tool schemas to AIMO parameter definitions
+- Scope Integration: Wrapped tools respect scope restrictions
+- Multi-Server Support: Connect to multiple MCP servers simultaneously
 
-2. **Scope Access Control**: Filter available scopes by user permissions
-   - ChatScopeProvider interceptor filters scopes based on authentication
-   - Only scopes accessible to current user are available
+**Use Cases**:
+- External Tool Consumption: Integrate tools from Claude Desktop, Cline, other MCP servers
+- Multi-Agent Coordination: One agent calls another agent's MCP-exposed tools
+- Third-Party Tool Integration: Quickly add specialized tools without code changes
 
-3. **Integration with Builder**:
-   ```kotlin
-   chatClientBuilderFactory
-       .builder(conversation)
-       .withSecurityContext(securityContext)  // Optional
-       .build()
-   ```
+**Deliverables**:
+- MCP client implementation with server discovery
+- Tool wrapping/conversion framework
+- Integration with existing `@Tool` and scope infrastructure
+- Example workflows showing MCP tool consumption
+- Documentation on connecting to external MCP servers
 
-**⚠️ User Concept Decision**:
-The codebase has existing user/security infrastructure:
-- `AimoUserProvider` - provides current user from context
-- `AimoUser` - holds userId and metadata  
-- `GlobalUserProvider` - default (single-user mode)
-- `AimoSecurityConfig` - registers default
+### Phase 3.5: MCP Tool Providing
+**Goal**: Enable AIMO to expose its tools as an MCP server for external agents to consume
 
-**Decision Pending**: Before Phase 3 implementation, clarify strategy:
-1. Remove custom user concept and rely entirely on Spring Security
-2. Bridge custom user concept to Spring Security (Spring principal → AimoUserProvider)
+**Status**: Design phase - requires further thinking on architecture and protocol details.
 
-This decision affects DAO access control and user scoping approach.
+**Overview**:
+- AIMO exposes its `@ChatService` tools as discoverable MCP resources
+- External MCP clients can discover and invoke AIMO tools
+- Tool schemas are auto-generated from `@Tool` annotations
+- Remote agents can integrate AIMO tools into their workflows
+
+**Pending Design Decisions**:
+- How to expose scoped tools via MCP (scope filtering on server side)
+- Authentication/authorization for MCP server access
+- Tool invocation context propagation (request metadata, conversation context)
+- Resource lifecycle management for long-running tool operations
+- Rate limiting and resource quotas for external consumers
+
+**Status**: Blocked on design clarity - will revisit after Phase 3 (MCP Consuming) learnings
 
 ### Phase 4: Reusable Kotlin/Java Aimo Client
 **Goal**: Extract and publish a standalone, reusable Kotlin/Java client for Aimo
@@ -305,9 +312,14 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
 - Tool execution includes async/stream support for long-running operations
 
 ### Phase 6: Server API Enhancements
-**Goal**: Extend server API for flexible model specification and message manipulation (testing/admin)
+**Goal**: Extend conversation-server API for flexible model specification and message manipulation (testing/admin). Rename `aimo-server` module to `aimo-conversation-server` to clarify this module provides conversation chat APIs, not necessarily agent-specific functionality.
 
-**Model Specification in Requests**:
+**Module Rename**:
+- `aimo-server` → `aimo-conversation-server`
+- Clarifies the module's purpose: conversation chat management, not generic server infrastructure
+- Updates all references in documentation, Gradle configuration, and examples
+
+**API Enhancements**:
 - Chat requests can specify either:
   1. **Predefined Model**: Name of a configured model (e.g., `"gpt-4"`)
   2. **Custom Model Configuration**: Inline model config with provider, model, and settings
@@ -361,17 +373,58 @@ This client is an **HTTP client** for communicating with a remote Aimo server. I
 - Configured under `aimo.model` in application.yaml alongside existing providers
 - Drop-in addition — no core changes required
 
+### Phase 9: Agentic Flows & Multi-Agent Coordination
+**Goal**: Enable complex, self-directed agent flows with inter-agent communication
+
+**Status**: Depends on Phase 3 (MCP Tooling) and Phase 5 (Chat Client Forwarding).
+
+**Key Features**:
+- Agent Orchestration: Tools can spawn sub-agents, delegate work to remote agents via MCP or HTTP
+- Work Distribution: Distribute tasks across team scopes with result aggregation and parallel execution
+- State & Context Management: Parent/child relationships, shared coordination context, token budget accounting
+- Tool Result Streaming: Long-running operations stream results with execution metadata
+
+**Use Cases**:
+- Research Agent: Coordinates multiple research sub-agents on different topics
+- Code Generation: Manages planning, implementation, and testing agents
+- Distributed Processing: Specialized analysis agents for parallel data processing
+- Customer Support: Routes to specialized support agents based on need
+
+
+---
+
+## Nice to Have / Lower Priority
+
+### Spring Security Integration
+**Goal**: Provide optional Spring Security integration via interceptors
+
+**⚠️ REQUIREMENT**: All phases must include security hooks/extension points to support Spring Security implementation anytime, even if not built-in.
+
+**Overview**:
+- Spring Security module provides pre-built interceptors
+- Interceptors hook into ChatClient via existing `ChatClientInterceptor` mechanism
+- Standard Spring Security annotations (`@Secured`, `@PreAuthorize`) on tools
+- No special-purpose wiring needed — uses builder's interceptor registration
+
+**Implementation Strategy** (when prioritized):
+- Use existing interceptor architecture for policy enforcement
+- Keep custom user concept as primary security layer
+- Bridge to Spring Security if needed via Spring principal → AimoUserProvider
+
+**Why It's Lower Priority**:
+- Current focus is agentic flows and multi-agent coordination
+- Can be added anytime without disrupting core or existing functionality
+- Most agent-to-agent use cases use token/API key security instead
+
 
 ---
 
 ## Frontend
 
 **Philosophy**: 
-- Default tooling will be retired; users implement custom UI mechanisms
-- UI serves dual purpose: simple chatbot AND advanced testing/debugging tool
-- Quick deployment: Stand up a functional chatbot in minutes with minimal configuration
-- Advanced features: Built-in debugging and testing capabilities for developers and power users
-- Primary focus: Flexible, extensible UI that works for both simple and advanced use cases
+- Primary UI focus: **Conversation comparison tool** for testing and analysis
+- Secondary purpose: Simple chatbot interface for basic interactions
+- Advanced features: Comprehensive debugging and comparison tools for agentic workflows
 
 ### Phase 0: Reusable TypeScript Aimo Client
 **Goal**: Extract and publish a standalone, reusable TypeScript client for Aimo
@@ -395,8 +448,28 @@ There are already hand-maintained TypeScript API wrappers in `aimo-ui/src/api/ai
 **Deliverables**:
 - Published npm package
 - Clear API documentation
+- Published npm package
+- Clear API documentation
 - TypeScript types for all Aimo concepts
-- Example usage in debugging tool and custom UIs
+### Phase 1: Conversation Comparison Tool
+**Goal**: Build a powerful conversation comparison UI for testing and analysis
+
+**Core Features**:
+- Side-by-Side View: Display two or more conversations for direct comparison
+- Model/Scope Testing: Run same prompts against different models or scopes, compare results
+- Parameter Variation: Test how temperature, max_tokens, system messages affect outputs
+- Agent Flow Comparison: Visualize different agent coordination strategies handling same tasks
+- Response Metrics: Display token counts, latency, cost per model
+- Diff Highlighting: Show meaningful differences between responses
+
+**Use Cases**:
+- Compare model outputs (Ollama vs OpenAI vs Bedrock)
+- Test scope filtering (which tools were available, which got called)
+- Verify agent coordination patterns (sequential vs parallel)
+- Tune agent prompts and system messages
+- Debug complex agentic workflows
+
+### Phase 2: ChatScope & Model Selection UI
 
 ### Phase 1: ChatScope & Model Selection
 **Goal**: UI components for users to select chat scopes and models
@@ -409,38 +482,54 @@ There are already hand-maintained TypeScript API wrappers in `aimo-ui/src/api/ai
 
 **Model Selector**:
 - Dropdown to choose a provider/LLM + configuration combination
-- Can be per-conversation or global default
+
+### Phase 3: Context & Execution Visualization
+**Goal**: Show conversation context and agent execution flow
 - Display available model configurations based on deployment setup
-- Each model configuration includes provider, LLM, and settings (temperature, max tokens, etc.)
-
+**Context Visualization**:
+- Display which conversation history is included in the current context window
+- Show token counting and context budget utilization
+- Visualize message inclusion/exclusion reasoning
 ### Phase 2: Context Visualization
-**Goal**: Show which conversation history is included in the current context window
-
+**Agent Execution Trace**:
+- Track multi-agent workflows and task delegation
+- Show which scopes were used for each step
+- Display tool calls and results
+- Timeline view of agent coordination
 ### Phase 3: Model Comparison
-**Goal**: Compare responses from multiple models side-by-side
+**MCP Tool Visibility**:
+- Show which MCP tools are available in current scope
+- Display MCP tool schemas and parameter definitions
+- Trace MCP calls between agents
 
+### Phase 4: Advanced Debugging Tool
+**Goal**: Comprehensive debugging interface for agent flows and ChatClient behavior
 ### Phase 4: ChatScope Debugging Tool
 **Goal**: Comprehensive debugging interface for chat scopes and ChatClient behavior
 
 **Foundation**:
 - Built using TypeScript Aimo Client (Phase 0)
 - Runs alongside or as part of the main UI
-
-**Key Features**:
-- **Scope Execution Trace**: Track scope execution flow and decisions
-- **Tool Call Inspector**: View tool calls, parameters, and results
-- **Message History Debugging**: Inspect which messages are included in context
-- **System Message Display**: Show active system messages for the current scope
-- **Model Configuration Display**: Show which model configuration is active
+- Scope Execution Trace: Track scope execution flow and decisions
+- Tool Call Inspector: View tool calls, parameters, and results across all agents
+- Message History Debugging: Inspect messages included in context per agent
+- System Message Display: Show active system messages for each scope
+- Model Configuration Display: Show which model configuration is active per agent
+- Request/Response Inspector: View raw ChatClient requests and responses
+- Guard-Rail Monitoring: Display guard-rail validations and transformations
+- MCP Protocol Inspector: View MCP calls, tool schemas, and responses
+- Agent Lineage: Show parent/child relationships in multi-agent workflows
 - **Request/Response Inspector**: View raw ChatClient requests and responses
 - **Guard-Rail Monitoring**: Display guard-rail validations and transformations
-
-**Primary Use Cases**:
-- Debug scope behavior during development
-- Understand how tool calls and responses flow through the system
+- Debug agent behavior during development
+- Understand how tool calls flow through multi-agent systems
+- Test different scope configurations, models, and agent orchestration patterns
+- Verify context inclusion and message filtering across agents
 - Test different scope configurations and models
-- Verify context inclusion and message filtering
+- Troubleshoot scope forwarding and inter-agent communication
+- Analyze MCP tool calls and performance
 - Monitor guard-rail behavior in real-time
 - Troubleshoot scope forwarding (in-JVM and remote)
+
 
 
