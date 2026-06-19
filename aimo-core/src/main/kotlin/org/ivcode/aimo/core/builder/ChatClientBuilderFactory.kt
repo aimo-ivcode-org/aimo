@@ -10,10 +10,9 @@ import org.ivcode.aimo.core.model.AimoChatModelConfig
  * This factory is initialized once at application startup from `application.yaml` properties.
  * It acts as a singleton registry for:
  * - Models (from model provider factories)
- * - Agents (from `aimo.agents` properties, Phase 2)
- * - Guard-rails (from `aimo.guardRails` properties, Phase 7)
  * - Default interceptors (logging, tracing, error handling)
  *
+ * Chat scope selection is handled by external code using ChatClientBuilder.withChatScope().
  * Users should inject both `ChatClientBuilderFactory` (for creating chat clients)
  * and `ConversationFactory` (for creating conversations) separately.
  */
@@ -77,21 +76,13 @@ interface ChatClientBuilderFactory {
      */
     fun getPrimaryModel(): AimoChatModelConfig
 
-    /**
-     * Look up a model by name.
-     *
-     * @param name The model name
-     * @return The model configuration, or null if not found
-     */
-    fun getModel(name: String): AimoChatModelConfig?
-
-    /**
-     * Look up an agent by ID (Phase 2 feature).
-     *
-     * @param agentId The agent identifier
-     * @return The agent configuration, or null if not found
-     */
-    fun getAgent(agentId: String): Any? // TODO: Return proper Agent type in Phase 2
+     /**
+      * Look up a model by name.
+      *
+      * @param name The model name
+      * @return The model configuration, or null if not found
+      */
+     fun getModel(name: String): AimoChatModelConfig?
 }
 
 

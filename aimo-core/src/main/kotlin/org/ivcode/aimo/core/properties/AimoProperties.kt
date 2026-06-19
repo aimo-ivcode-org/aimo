@@ -39,10 +39,10 @@ data class AimoProperties(
     var globalUserId: String? = "global",
 
     /**
-     * Agent configurations (Phase 2 feature).
-     * Maps agent ID → agent configuration.
+     * ChatScope configurations (Phase 2 feature).
+     * Maps scope ID → scope configuration.
      */
-    var agents: Map<String, AimoAgentProperties> = emptyMap(),
+    var scope: Map<String, AimoChatScopeProperties> = emptyMap(),
 
     /**
      * Guard-rail configurations (Phase 7 feature).
@@ -57,52 +57,88 @@ data class AimoProperties(
 )
 
 /**
- * Agent configuration properties (Phase 2 feature).
+ * ChatScope configuration properties (Phase 2 feature).
  *
- * Structure:
+ * Scopes Auto-Discovered from Annotations:
+ * - All @ChatService(scope=[...]) annotations are discovered automatically
+ * - Each unique scope ID creates a ChatScope automatically
+ *
+ * Config-Based Scope Customization:
+ * - displayName: Human-readable scope name for display
+ * - description: Scope description explaining its purpose
+ * - inheritGlobal: Whether to include tools without scope restrictions (default: true)
+ *                  If false, only tools explicitly in toolRefs are included (plus annotations)
+ * - toolRefs: Explicitly include specific tools in this scope
+ * - systemMessages: Custom inline system messages for this scope (YAML-defined prompts)
+ * - systemMessageRefs: Include pre-defined @SystemMessage beans by name in this scope
+ *
+ * Semantics:
+ * - Tools without scope restrictions (@ChatService with no scope arg) are "global" tools
+ * - inheritGlobal=true (default): scope includes global tools + annotation-scoped tools + toolRefs
+ * - inheritGlobal=false: scope includes ONLY annotation-scoped tools + toolRefs (no global tools)
+ *
+ * Example:
  * ```yaml
- * aimo.agents:
- *   default:
- *     name: "Default Agent"
- *     description: "General-purpose assistant"
- *     system-message: "You are a helpful assistant."
- *     tools: ["*"]  # All tools
- *   calculator:
- *     name: "Calculator"
- *     description: "Math-focused agent"
- *     system-message: "You are a math expert."
- *     tools: ["calculate", "convert_units"]
+ * aimo.scope:
+ *   restricted_admin:
+ *     display-name: "Restricted Admin"
+ *     inherit-global: false  # Don't include global tools
+ *     tool-refs: ["delete_user", "ban_ip"]  # Only these admin tools
+ *     system-messages:
+ *       admin_warning: "You have admin-only access. Be careful."
+ *
+ *   research:
+ *     display-name: "Research Assistant"
+ *     inherit-global: true   # Include global tools (help, status, etc)
+ *     tool-refs: ["search", "analyze"]  # Plus these research tools
  * ```
  */
-data class AimoAgentProperties(
+data class AimoChatScopeProperties(
     /**
-     * Human-readable agent name.
+     * Human-readable scope name for display.
      */
-    var name: String = "",
+    var displayName: String = "",
 
     /**
-     * Agent description.
+     * Scope description explaining its purpose.
      */
     var description: String = "",
 
     /**
-     * System message for this agent.
+     * Whether to include "global" tools (tools with no scope restriction).
+     * true (default): Scope includes both global tools and scoped tools
+     * false: Scope includes ONLY tools explicitly declared for it (via annotations or toolRefs)
      */
-    var systemMessage: String? = null,
+    var inheritGlobal: Boolean = true,
 
     /**
-     * Tool scoping: list of tool names available to this agent.
-     * Special value "*" means all tools.
-     * Empty list means no tools.
+     * Tool name references to explicitly include in this scope.
+     * These are in addition to tools discovered through annotations.
+     * Empty list: no tool-refs specified (uses all annotation-discovered tools + global if inheritGlobal=true)
+     * Non-empty: explicitly include these tool names in the scope
      */
-    var tools: List<String> = listOf("*"),
+    var toolRefs: List<String> = emptyList(),
 
     /**
-     * System message scoping: list of system message names available to this agent.
-     * Special value "*" means all system messages.
-     * Empty list means no system messages (except agent's own systemMessage).
+     * System messages defined inline for this scope.
+     * Map of message ID → prompt text.
+     * These are custom messages created specifically for this scope.
+     * Example:
+     *   research_guide: "You are a research expert..."
+     *   code_style: "Follow PEP 8 standards..."
      */
-    var systemMessages: List<String> = listOf("*")
+    var systemMessages: Map<String, String> = emptyMap(),
+
+    /**
+     * System message references to pre-defined @SystemMessage beans by name.
+     * References pre-defined @SystemMessage beans from ChatService classes by their name property.
+     * Empty list: only inline system-messages are used.
+     * Non-empty: include pre-defined system messages with these names.
+     *
+     * Names come from @SystemMessage(name="...") or auto-generated from method/field name.
+     * Example: ["research_guide", "code_analysis"]
+     */
+    var systemMessageRefs: List<String> = emptyList()
 )
 
 /**

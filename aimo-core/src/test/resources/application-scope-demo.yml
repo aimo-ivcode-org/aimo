@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: scope-demo-test
+
+# No model provider needed - we're testing scope/tool/system-message filtering
+# which is independent of the model implementation
+
+aimo:
+  # Test data storage
+  data-dir: ./data/test-conversations
+
+  # Single-user test mode
+  global-user-id: test-user
+
+  # ChatScope Configuration - test patterns
+  scope:
+    # Public scope
+    public:
+      display-name: "Public Scope"
+      description: "General-purpose tools with global helpers"
+      inherit-global: true
+
+    # Admin scope
+    admin:
+      display-name: "Admin Scope"
+      description: "Administrative tools for management"
+      inherit-global: true
+
+    # Research scope
+    research:
+      display-name: "Research Scope"
+      description: "Research-specific tools"
+      inherit-global: true
+
+    # Use Case 1: Isolated scope without global tools
+    restricted:
+      display-name: "Restricted Scope (No Globals)"
+      description: "Only specific tools - no global helper tools"
+      inherit-global: false
+      tool-refs: ["deleteConversation", "banUser"]
+
+    # Use Case 2: Cherry-pick tools from multiple scopes
+    power_user:
+      display-name: "Power User (Mixed Tools)"
+      description: "Cherry-picked tools from public, admin, and research scopes"
+      inherit-global: true
+      tool-refs:
+        - "add"                   # From public
+        - "multiply"              # From public
+        - "deleteConversation"    # From admin
+        - "searchPapers"          # From research
+      system-message-refs:
+        - "power_user_capabilities"
+      system-messages:
+        power_user_inline: "You are a power user with elevated privileges. Use admin and research tools responsibly. Always confirm sensitive operations."
+
+logging:
+  level:
+    org.ivcode.aimo: DEBUG
+    org.springframework: INFO
+
+
+

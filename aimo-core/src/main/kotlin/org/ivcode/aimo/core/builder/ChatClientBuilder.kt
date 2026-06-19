@@ -3,6 +3,7 @@ package org.ivcode.aimo.core.builder
 import org.ivcode.aimo.core.AimoChatClient
 import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 
 /**
@@ -62,12 +63,24 @@ interface ChatClientBuilder {
      */
     fun withInterceptor(interceptor: ChatClientInterceptor): ChatClientBuilder
 
+      /**
+       * Select a chat scope for this client.
+       *
+       * If not set, defaults to the global scope.
+       * The scope should be obtained from a `ChatScopeProvider` (or constructed explicitly in tests).
+       * @param scope The chat scope to use, or null to use the global scope
+       * @return this builder for chaining
+       */
+      fun withChatScope(scope: ChatScope?): ChatClientBuilder
+
     /**
      * Build the chat client with all registered components and interceptors applied.
      *
      * Resolution logic:
+     * - ChatScope: Use withChatScope() selection, or default to global scope
      * - Model: Use withModel() selection, or factory primary model, or throw exception
      * - Interceptors: Builder-level (outermost) + factory defaults (innermost)
+     * - Tools/SystemMessages: Taken from the selected ChatScope (no additional filtering in the builder)
      *
      * @return The composed chat client instance ready for use
      * @throws IllegalStateException if required components cannot be resolved

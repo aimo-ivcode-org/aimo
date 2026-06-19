@@ -4,6 +4,7 @@ import org.ivcode.aimo.core.builder.ChatClientBuilder
 import org.ivcode.aimo.core.builder.ChatClientBuilderFactory
 import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback
@@ -13,19 +14,23 @@ import org.ivcode.aimo.core.chatservice.SystemMessageCallback
  * Factory for creating chat client builders.
  *
  * This factory is initialized once at application startup from properties and provider factories.
- * It acts as a singleton registry for models, tools, system messages, and default interceptors.
+ * It acts as a singleton registry for models, tools, system messages, chat scopes, and default interceptors.
  *
  * @property modelProviderFactories Map of provider name → factory for creating models
  * @property toolCallbacks All registered tool callbacks from @ChatService beans
  * @property systemMessages All registered system message callbacks from @ChatService beans
+ * @property chatScopeProvider Provider for retrieving chat scopes with tool/message filtering
  * @property defaultInterceptors Default interceptors applied to all chat clients (logging, tracing, error handling)
  */
 class ChatClientBuilderFactoryImpl(
     private val modelProviderFactories: Map<String, AimoChatModelProviderFactory>,
     private val toolCallbacks: List<AimoToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
+    private val chatScopeProvider: ChatScopeProvider,
     private val defaultInterceptors: List<ChatClientInterceptor> = emptyList(),
 ) : ChatClientBuilderFactory {
+
+    // ...existing code...
 
     // Cache of model name → provider that can create it
     // Detect duplicate model names across providers and fail-fast
@@ -62,27 +67,25 @@ class ChatClientBuilderFactoryImpl(
         resolvePrimaryModel()
     }
 
-    override fun builder(): ChatClientBuilder {
-        return ChatClientBuilderImpl(
-            conversation = null,
-            factoryDefaultInterceptors = defaultInterceptors,
-            toolCallbacks = toolCallbacks,
-            systemMessages = systemMessages,
-            getPrimaryModel = { _primaryModel },
-            getModelByName = { name -> getModel(name) },
-        )
-    }
+     override fun builder(): ChatClientBuilder {
+         return ChatClientBuilderImpl(
+             conversation = null,
+             factoryDefaultInterceptors = defaultInterceptors,
+             chatScopeProvider = chatScopeProvider,
+             getPrimaryModel = { _primaryModel },
+             getModelByName = { name -> getModel(name) },
+         )
+     }
 
-    override fun builder(conversation: Conversation): ChatClientBuilder {
-        return ChatClientBuilderImpl(
-            conversation = conversation,
-            factoryDefaultInterceptors = defaultInterceptors,
-            toolCallbacks = toolCallbacks,
-            systemMessages = systemMessages,
-            getPrimaryModel = { _primaryModel },
-            getModelByName = { name -> getModel(name) },
-        )
-    }
+     override fun builder(conversation: Conversation): ChatClientBuilder {
+         return ChatClientBuilderImpl(
+             conversation = conversation,
+             factoryDefaultInterceptors = defaultInterceptors,
+             chatScopeProvider = chatScopeProvider,
+             getPrimaryModel = { _primaryModel },
+             getModelByName = { name -> getModel(name) },
+         )
+     }
 
     override fun getAvailableModels(): List<String> {
         return modelRegistry.keys.toList()
@@ -97,10 +100,6 @@ class ChatClientBuilderFactoryImpl(
         return factory.getModel(name)
     }
 
-    override fun getAgent(agentId: String): Any? {
-        // TODO: Implement agent lookup in Phase 2
-        return null
-    }
 
     /**
      * Resolves the primary model from all registered providers.

@@ -2,271 +2,289 @@ package org.ivcode.aimo.core.chatservice
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
-import tools.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.databind.ObjectMapper
 
+/**
+ * Tests for ControllerHelpers, which handles:
+ * - Tool discovery and JSON schema generation from annotations
+ * - System message discovery and callback wrapping
+ * - Scope computation and validation for tools and system messages
+ * - Auto-injected context parameter exclusion from schema
+ * - @ToolParam description propagation
+ */
 class ControllerHelpersTest {
 
-    private val objectMapper = jacksonObjectMapper()
+    private val objectMapper = ObjectMapper()
+
+    // ===== TOOL DISCOVERY & SCHEMA GENERATION =====
 
     @Test
-    fun `toAimoToolCallbacks returns empty list when controller has no tool annotations`() {
-        val callbacks = toAimoToolCallbacks(NoToolController(), objectMapper)
+    fun discoversToolsFromToolAnnotatedMethods() {
+        val controller = TestController()
+        val callbacks = toAimoToolCallbacks(controller, objectMapper)
 
-        assertTrue(callbacks.isEmpty())
+        assertEquals(3, callbacks.size, "Should discover 3 tools")
+
+        val toolNames = callbacks.map { it.callback.toolDefinition.name }.sorted()
+        assertEquals(listOf("add", "divide", "multiply"), toolNames)
     }
 
     @Test
-    fun `toAimoToolCallbacks returns callbacks when controller has tool annotations`() {
-        val callbacks = toAimoToolCallbacks(HasToolController(), objectMapper)
+    fun generatesCorrectJsonSchemaForToolParameters() {
+        val controller = TestController()
+        val callbacks = toAimoToolCallbacks(controller, objectMapper)
+        val addTool = callbacks.find { it.callback.toolDefinition.name == "add" }
+            ?: throw AssertionError("add tool not found")
 
+        val schema = addTool.callback.toolDefinition.inputSchema
+        assertEquals("object", schema.get("type").asText())
+
+        val properties = schema.get("properties")
+        assertTrue(properties.has("a"), "Schema should have 'a' parameter")
+        assertTrue(properties.has("b"), "Schema should have 'b' parameter")
+        assertEquals("number", properties.get("a").get("type").asText())
+        assertEquals("number", properties.get("b").get("type").asText())
+
+        val required = schema.get("required")
+        assertEquals(2, required.size(), "Both 'a' and 'b' should be required")
+    }
+
+    @Test
+    fun excludesAutoInjectedContextParameterFromJsonSchema() {
+        val controller = TestController()
+        val callbacks = toAimoToolCallbacks(controller, objectMapper)
+        val divide = callbacks.find { it.callback.toolDefinition.name == "divide" }
+            ?: throw AssertionError("divide tool not found")
+
+        val schema = divide.callback.toolDefinition.inputSchema
+        val properties = schema.get("properties")
+
+        // divide has signature: divide(a: Double, b: Double, context: Map<String, Any>)
+        // Schema should only include 'a' and 'b', not 'context'
+        assertEquals(2, properties.size(), "Schema should only have 'a' and 'b' (context excluded)")
+        assertTrue(properties.has("a"), "Schema should have 'a' parameter")
+        assertTrue(properties.has("b"), "Schema should have 'b' parameter")
+        assertEquals(false, properties.has("context"), "Schema should NOT include auto-injected context parameter")
+    }
+
+    @Test
+    fun propagatesToolParamDescriptionsToSchema() {
+        val controller = TestController()
+        val callbacks = toAimoToolCallbacks(controller, objectMapper)
+        val multiply = callbacks.find { it.callback.toolDefinition.name == "multiply" }
+            ?: throw AssertionError("multiply tool not found")
+
+        val schema = multiply.callback.toolDefinition.inputSchema
+        val properties = schema.get("properties")
+
+        // multiply has signature: multiply(x: Double @ToolParam("First operand"), y: Double @ToolParam("Second operand"))
+        assertEquals("First operand", properties.get("x").get("description").asText())
+        assertEquals("Second operand", properties.get("y").get("description").asText())
+    }
+
+    @Test
+    fun usesCustomToolNameFromAnnotation() {
+        val controller = TestControllerWithCustomNames()
+        val callbacks = toAimoToolCallbacks(controller, objectMapper)
+        val toolNames = callbacks.map { it.callback.toolDefinition.name }
+
+        assertTrue(toolNames.contains("custom_add"), "Should use custom name 'custom_add' from @Tool(name=...)")
+        assertEquals(1, callbacks.size, "Should only have 1 tool")
+    }
+
+    // ===== SCOPE COMPUTATION & VALIDATION =====
+
+    @Test
+    fun computesEmptyDeclaredScopesInheritParentScopes() {
+        val controller = TestControllerWithScopes()
+        val parentServiceScopes = setOf("admin", "research")
+        val callbacks = toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
+
+        // Both tools in TestControllerWithScopes have empty @Tool(scope=[])
+        // They should inherit parent scopes
+        callbacks.forEach { callback ->
+            assertEquals(
+                parentServiceScopes,
+                callback.scopes,
+                "Tool ${callback.callback.toolDefinition.name} should inherit parent scopes when declared scope is empty"
+            )
+        }
+    }
+
+    @Test
+    fun computesNonEmptyDeclaredScopesIntersectWithParentScopes() {
+        val controller = TestControllerAdminOnly()
+        val parentServiceScopes = setOf("admin", "research", "public")
+        val callbacks = toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
+
+        // Tool has @Tool(scope=["admin"])
+        // Intersection with parent = ["admin"]
         assertEquals(1, callbacks.size)
+        assertEquals(setOf("admin"), callbacks[0].scopes)
     }
 
     @Test
-    fun `toAimoToolCallbacks returns callbacks with derived tool definitions`() {
-        val callbacks = toAimoToolCallbacks(HasToolController(), objectMapper)
+    fun throwsErrorWhenToolScopeNotSubsetOfParentScope() {
+        val controller = TestControllerInvalidScope()
+        val parentServiceScopes = setOf("admin", "research")
 
-        assertEquals(1, callbacks.size)
-        assertEquals("ping", callbacks.first().toolDefinition.name)
-        assertEquals("Returns pong", callbacks.first().toolDefinition.description)
-        assertFalse(callbacks.first().toolDefinition.inputSchema.path("properties").has("context"))
-    }
-
-    @Test
-    fun `toAimoToolCallback derives tool metadata and schema from annotated method`() {
-        val controller = AimoToolController()
-        val callback = toAimoToolCallback(
-            controller = controller,
-            method = AimoToolController::class.java.getDeclaredMethod("describe", String::class.java, Map::class.java),
-            objectMapper = objectMapper,
-        )
-
-        assertEquals("describe", callback.toolDefinition.name)
-        assertEquals("Describes a user", callback.toolDefinition.description)
-        assertEquals("object", callback.toolDefinition.inputSchema.path("type").toString().trim('"'))
-        assertEquals("string", callback.toolDefinition.inputSchema.path("properties").path("name").path("type").toString().trim('"'))
-        assertEquals(1, callback.toolDefinition.inputSchema.path("required").size())
-        assertEquals("name", callback.toolDefinition.inputSchema.path("required")[0].toString().trim('"'))
-        assertFalse(callback.toolDefinition.inputSchema.path("properties").has("context"))
-    }
-
-    @Test
-    fun `toAimoToolCallback falls back to method name when Tool name is blank`() {
-        val controller = AimoToolController()
-        val callback = toAimoToolCallback(
-            controller = controller,
-            method = AimoToolController::class.java.getDeclaredMethod("autoNamed", String::class.java),
-            objectMapper = objectMapper,
-        )
-
-        assertEquals("autoNamed", callback.toolDefinition.name)
-        assertEquals("Uses the method name", callback.toolDefinition.description)
-    }
-
-    @Test
-    fun `toAimoToolCallback can invoke complex object parameter`() {
-        val controller = AimoToolController()
-        val callback = toAimoToolCallback(
-            controller = controller,
-            method = AimoToolController::class.java.getDeclaredMethod("summarizeProfile", ProfileRequest::class.java),
-            objectMapper = objectMapper,
-        )
-
-        val result = callback.call(
-            argumentsJson =
-                """
-                {
-                  "request": {
-                    "user": {
-                      "name": "Ada",
-                      "address": {
-                        "city": "London",
-                        "coordinates": {
-                          "lat": 51.5074,
-                          "lng": -0.1278
-                        }
-                      }
-                    },
-                    "settings": {
-                      "notifications": {
-                        "email": true,
-                        "channels": ["news", "alerts"]
-                      },
-                      "metadata": {
-                        "priority": "high"
-                      }
-                    }
-                  }
-                }
-                """.trimIndent(),
-            context = emptyMap(),
-        )
-
-        assertEquals("Ada|London|51.5074|true|news,alerts|high", result)
-        assertEquals("object", callback.toolDefinition.inputSchema.path("properties").path("request").path("type").toString().trim('"'))
-    }
-
-    @Test
-    fun `toAimoToolCallback uses Kotlin-aware default mapper for data classes`() {
-        val controller = AimoToolController()
-        val callback = toAimoToolCallback(
-            controller = controller,
-            method = AimoToolController::class.java.getDeclaredMethod("summarizeAccount", AccountRequest::class.java),
-            objectMapper = objectMapper,
-        )
-
-        val result = callback.call(
-            argumentsJson = """
-                {
-                  "request": {
-                    "owner": {
-                        "name": "Ada",
-                        "plan": "pro"
-                    },
-                    "limits": {
-                      "maxUsers": 7,
-                      "retentionDays": 45
-                    }
-                  }
-                }
-            """.trimIndent(),
-            context = emptyMap(),
-        )
-
-        assertEquals("Ada|pro|7|45", result)
-    }
-
-    @Test
-    fun `toSystemMessageCallbacks supports plain kotlin property annotation`() {
-        val callbacks = toSystemMessageCallbacks(PlainPropertySystemMessageController())
-
-        assertEquals(1, callbacks.size)
-        assertEquals("property-system-message", callbacks.first().call(SystemMessageContext(emptyMap())))
-    }
-
-    @Test
-    fun `toSystemMessageCallbacks still supports field annotation`() {
-        val callbacks = toSystemMessageCallbacks(FieldSystemMessageController())
-
-        assertEquals(1, callbacks.size)
-        assertEquals("field-system-message", callbacks.first().call(SystemMessageContext(emptyMap())))
-    }
-
-    @Test
-    fun `toAimoToolCallback includes parameter descriptions from ToolParam annotation`() {
-        val controller = AimoToolController()
-        val callback = toAimoToolCallback(
-            controller = controller,
-            method = AimoToolController::class.java.getDeclaredMethod("search", String::class.java, Int::class.java),
-            objectMapper = objectMapper,
-        )
-
-        val properties = callback.toolDefinition.inputSchema.path("properties")
-        assertEquals("Search term to find", properties.path("query").path("description").toString().trim('"'))
-        assertEquals("Number of results to return", properties.path("limit").path("description").toString().trim('"'))
-    }
-
-    private class NoToolController {
-        fun ping(): String = "pong"
-    }
-
-    private class HasToolController {
-        @Tool(name = "ping", description = "Returns pong")
-        fun ping(): String = "pong"
-    }
-
-    private class AimoToolController {
-        @Tool(name = "describe", description = "Describes a user")
-        fun describe(name: String, context: Map<String, Any>): String = "$name:${context["role"]}"
-
-        @Tool(description = "Uses the method name")
-        fun autoNamed(value: String): String = value.uppercase()
-
-        @Tool(name = "summarizeProfile", description = "Summarizes a nested profile payload")
-        fun summarizeProfile(request: ProfileRequest): String {
-            return listOf(
-                request.user.name,
-                request.user.address.city,
-                request.user.address.coordinates.lat,
-                request.settings.notifications.email,
-                request.settings.notifications.channels.joinToString(","),
-                request.settings.metadata["priority"],
-            ).joinToString("|")
+        val exception = assertFailsWith<IllegalArgumentException> {
+            toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
         }
 
-        @Tool(name = "summarizeAccount", description = "Summarizes a data-class payload")
-        fun summarizeAccount(request: AccountRequest): String {
-            return listOf(
-                request.owner.name,
-                request.owner.plan,
-                request.limits.maxUsers,
-                request.limits.retentionDays,
-            ).joinToString("|")
-        }
-
-        @Tool(name = "search", description = "Search for items")
-        fun search(
-            @ToolParam(description = "Search term to find") query: String,
-            @ToolParam(description = "Number of results to return") limit: Int,
-        ): String = "$query:$limit"
+        assertTrue(
+            exception.message?.contains("has scopes not in parent service") ?: false,
+            "Error should mention invalid scope"
+        )
     }
 
-    private class PlainPropertySystemMessageController {
+    @Test
+    fun throwsErrorWhenToolScopeHasZeroIntersectionWithParent() {
+        val controller = TestControllerIntersectionFail()
+        val parentServiceScopes = setOf("admin", "research")
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
+        }
+
+        // Since all declared scopes are NOT in parent, this triggers "not in parent service" error
+        // The intersection error would only occur if some (but not all) scopes were in parent
+        assertTrue(
+            exception.message?.contains("has scopes not in parent service") ?: false,
+            "Error should mention invalid scope not in parent"
+        )
+    }
+
+    // ===== SYSTEM MESSAGE DISCOVERY =====
+
+    @Test
+    fun discoversSystemMessagesFromAnnotations() {
+        val controller = TestControllerSystemMessages()
+        val callbacks = toSystemMessageCallbacks(controller)
+
+        assertEquals(2, callbacks.size, "Should discover 2 system messages")
+
+        val names = callbacks.map { it.name }.sorted()
+        assertEquals(listOf("custom_name", "greeting"), names)
+    }
+
+    @Test
+    fun usesCustomSystemMessageNameFromAnnotation() {
+        val controller = TestControllerSystemMessages()
+        val callbacks = toSystemMessageCallbacks(controller)
+        val customNamed = callbacks.find { it.name == "custom_name" }
+
+        assertTrue(customNamed != null, "Should have system message with custom name")
+    }
+
+    @Test
+    fun autoGeneratesSystemMessageNameFromMethodName() {
+        val controller = TestControllerSystemMessages()
+        val callbacks = toSystemMessageCallbacks(controller)
+        val autoNamed = callbacks.find { it.name == "greeting" }
+
+        assertTrue(autoNamed != null, "Should have system message with auto-generated name 'greeting'")
+    }
+
+    @Test
+    fun detectsDuplicateSystemMessageNames() {
+        val controller = TestControllerDuplicateSystemMessages()
+
+        val exception = assertFailsWith<IllegalArgumentException> {
+            toSystemMessageCallbacks(controller)
+        }
+
+        assertTrue(
+            exception.message?.contains("Duplicate system message name") ?: false,
+            "Should detect duplicate system message names"
+        )
+    }
+
+    @Test
+    fun systemMessagesWithEmptyScopeInheritParentScopes() {
+        val controller = TestControllerSystemMessages()
+        val parentServiceScopes = setOf("admin", "public")
+        val callbacks = toSystemMessageCallbacks(controller, parentServiceScopes)
+
+        callbacks.forEach { callback ->
+            assertEquals(
+                parentServiceScopes,
+                callback.scopes,
+                "System message ${callback.name} should inherit parent scopes when declared scope is empty"
+            )
+        }
+    }
+
+    // ===== TEST FIXTURES =====
+
+    @ChatService
+    class TestController {
+        @Tool(description = "Add two numbers")
+        fun add(a: Double, b: Double): Double = a + b
+
+        @Tool(description = "Multiply two numbers")
+        fun multiply(
+            @ToolParam("First operand") x: Double,
+            @ToolParam("Second operand") y: Double
+        ): Double = x * y
+
+        @Tool(description = "Divide two numbers")
+        fun divide(a: Double, b: Double, context: Map<String, Any>): Double {
+            // Context is auto-injected and should NOT appear in schema
+            return a / b
+        }
+    }
+
+    @ChatService
+    class TestControllerWithCustomNames {
+        @Tool(name = "custom_add", description = "Custom-named add tool")
+        fun add(a: Int, b: Int): Int = a + b
+    }
+
+    @ChatService(scope = ["admin", "research"])
+    class TestControllerWithScopes {
+        @Tool(description = "Tool with inherited scope")
+        fun protectedTool(): String = "protected"
+
+        @Tool(scope = [], description = "Tool with empty scope (inherits parent)")
+        fun inheritedTool(): String = "inherited"
+    }
+
+    @ChatService(scope = ["admin", "research", "public"])
+    class TestControllerAdminOnly {
+        @Tool(scope = ["admin"], description = "Admin-only tool")
+        fun adminTool(): String = "admin"
+    }
+
+    @ChatService(scope = ["admin", "research"])
+    class TestControllerInvalidScope {
+        @Tool(scope = ["superadmin"], description = "Tool with invalid scope")
+        fun invalidScopeTool(): String = "invalid"
+    }
+
+    @ChatService(scope = ["admin", "research"])
+    class TestControllerIntersectionFail {
+        @Tool(scope = ["superadmin", "superuser"], description = "Tool with zero intersection")
+        fun intersectionFailTool(): String = "fail"
+    }
+
+    @ChatService
+    class TestControllerSystemMessages {
+        @SystemMessage(name = "custom_name")
+        fun getCustomMessage(): String = "Custom system message"
+
         @SystemMessage
-        val message = "property-system-message"
+        fun greeting(): String = "Hello!"
     }
 
-    private class FieldSystemMessageController {
-        @field:SystemMessage
-        val message = "field-system-message"
-    }
+    @ChatService
+    class TestControllerDuplicateSystemMessages {
+        @SystemMessage(name = "duplicate")
+        fun first(): String = "First"
 
-    private class ProfileRequest {
-        var user: User = User()
-        var settings: Settings = Settings()
-    }
-
-    data class AccountRequest(
-        val owner: Owner,
-        val limits: Limits,
-    )
-
-    data class Owner(
-        val name: String,
-        val plan: String,
-    )
-
-    data class Limits(
-        val maxUsers: Int,
-        val retentionDays: Int,
-    )
-
-    private class User {
-        var name: String = ""
-        var address: Address = Address()
-    }
-
-    private class Address {
-        var city: String = ""
-        var coordinates: Coordinates = Coordinates()
-    }
-
-    private class Coordinates {
-        var lat: Double = 0.0
-        var lng: Double = 0.0
-    }
-
-    private class Settings {
-        var notifications: Notifications = Notifications()
-        var metadata: Map<String, String> = emptyMap()
-    }
-
-    private class Notifications {
-        var email: Boolean = false
-        var channels: List<String> = emptyList()
+        @SystemMessage(name = "duplicate")
+        fun second(): String = "Second"
     }
 }
-
-

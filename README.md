@@ -6,6 +6,17 @@
 > 
 > See the [Roadmap](./ROADMAP.md) for planned changes and current direction.
 
+## 📊 Project Status
+
+**Current Phase**: ✅ **Phase 2 (ChatScopes)** is **COMPLETE**
+
+For detailed status, phase progress, and next steps, see [ROADMAP.md](./ROADMAP.md).
+
+| Completed | Current | Next |
+|-----------|---------|------|
+| ✅ Phase 1: Configuration | ✅ Phase 2: ChatScopes | 📋 Phase 3: Spring Security |
+| ✅ Phase 1.5: Rename @ChatController | ✅ Phase 2: Tests (15 tests) | |
+
 Aimo is the Artificial Intelligence Model Orchestrator: a modular Kotlin/Spring project for building AI chat applications with conversation memory, tool-calling controllers, an Ollama-backed model adapter, and a React UI.
 
 ## What this repository contains
@@ -263,6 +274,100 @@ class SecurityService {
 ```
 
 System messages are automatically prepended to every chat request.
+
+## Chat Scopes (Phase 2)
+
+**Chat Scopes** define which tools and system messages are available in a conversation—the autonomous decision-making capabilities. Each scope is a named configuration that restricts tool access and defines custom system messages.
+
+### What are Chat Scopes?
+
+- **Limit tool visibility**: Different roles/users see different tools
+- **Custom instructions per scope**: Define specialized system messages for each scope
+- **Scope inheritance**: Tools and system messages can be restricted to specific scopes
+- **Inline + pre-defined messages**: Combine YAML-defined prompts with code-defined system messages
+
+### Example Scope Configuration
+
+```yaml
+aimo:
+  scope:
+    # Research assistant with research-specific tools
+    research:
+      display-name: "Research Assistant"
+      description: "Research and analysis capabilities"
+      tool-refs: ["search", "summarize", "web_fetch"]  # Only these tools available
+      system-messages:
+        research_guide: |
+          You are a research expert specializing in data analysis and academic research.
+          Focus on accuracy, citations, and evidence-based reasoning.
+      system-message-refs: ["research_prompt"]  # References @SystemMessage(name="research_prompt")
+    
+    # Public assistant with limited tools
+    public:
+      display-name: "Public Assistant"
+      description: "General purpose for public users"
+      tool-refs: ["help", "explain"]  # Limited toolset
+      system-messages:
+        public_guide: |
+          You are a helpful assistant available to the public.
+          Keep responses clear and avoid technical jargon.
+```
+
+**Built-in global scope**: Always available with tools and system messages that have no scope restriction.
+
+### Defining Scoped Tools and System Messages
+
+Use `@ChatService` to declare scope restrictions:
+
+```kotlin
+@ChatService(scope = ["research", "admin"])  // Available only in these scopes
+class ResearchService {
+    
+    @Tool(description = "Search research papers")
+    fun searchPapers(@ToolParam("Query") query: String): String {
+        // implementation
+    }
+    
+    @SystemMessage(name = "research_prompt")
+    fun researchPrompt(): String = "Focus on academic sources..."
+}
+
+@ChatService  // Empty scope = available to all scopes
+class GeneralService {
+    
+    @Tool(description = "Get help")
+    fun getHelp(): String = "How can I help?"
+}
+```
+
+### Using Scopes at Runtime
+
+Select a scope when building a chat client:
+
+```kotlin
+val scope = chatScopeProvider.getScope("research") ?: chatScopeProvider.getGlobalScope()
+val chatClient = chatClientBuilderFactory
+    .builder(conversation)
+    .withChatScope(scope)
+    .build()
+```
+
+
+### Scope Rules
+
+1. **Empty scope** on `@Tool` or `@SystemMessage` = inherits parent `@ChatService(scope=...)` when parent is scoped; available to all scopes only when parent has no scope restriction
+2. **Non-empty scope** must be a subset of parent `@ChatService` scope (fail-fast validation at startup)
+3. **Tool/System message names** must be unique across the application
+4. **YAML references** (`tool-refs`, `system-message-refs`) must match actual tool/message names
+
+### How Scopes Work
+
+1. **At startup**: All tools/system messages are discovered and categorized by scope
+2. **On build**: Select a scope via `withChatScope()` (the chosen `ChatScope` already contains the filtered tools/messages)
+3. **Scope resolution order**:
+   - Explicit scope via `withChatScope()`
+   - Default: `"global"` scope (unrestricted tools/messages only)
+
 
 ## Prerequisites
 
