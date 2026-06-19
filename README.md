@@ -313,7 +313,7 @@ aimo:
           Keep responses clear and avoid technical jargon.
 ```
 
-**Built-in global scope**: Always available with all tools and system messages.
+**Built-in global scope**: Always available with tools and system messages that have no scope restriction.
 
 ### Defining Scoped Tools and System Messages
 
@@ -379,8 +379,7 @@ val chatClient = chatClientBuilderFactory
 2. **On build**: ChatClientBuilder filters tools/messages based on selected scope
 3. **Scope resolution order**:
    - Explicit scope via `withChatScope()`
-   - Conversation metadata (`aimo.chatScopeId`)
-   - Default: `"global"` scope (all tools/messages)
+   - Default: `"global"` scope (unrestricted tools/messages only)
 
 
 ## Prerequisites
