@@ -150,43 +150,63 @@ class AimoConfig {
           )
       }
 
-    private fun buildPredefinedScopes(
-        scopeConfigs: Map<String, AimoChatScopeProperties>,
-        allTools: List<AimoToolCallback>,
-        allSystemMessages: List<SystemMessageCallback>,
-        toolScopeMap: Map<String, Set<String>>,
-        systemMessageScopeMap: Map<String, Set<String>>,
-        scopedSystemMessages: List<ScopedSystemMessageCallbackWithName>
-    ): Map<String, ChatScope> {
-        // Build a map from callback to name for system messages
-        val callbackToName = mutableMapOf<SystemMessageCallback, String>()
-        for (scoped in scopedSystemMessages) {
-            callbackToName[scoped.callback] = scoped.name
-        }
+     private fun buildPredefinedScopes(
+         scopeConfigs: Map<String, AimoChatScopeProperties>,
+         allTools: List<AimoToolCallback>,
+         allSystemMessages: List<SystemMessageCallback>,
+         toolScopeMap: Map<String, Set<String>>,
+         systemMessageScopeMap: Map<String, Set<String>>,
+         scopedSystemMessages: List<ScopedSystemMessageCallbackWithName>
+     ): Map<String, ChatScope> {
+         // Build a map from callback to name for system messages
+         val callbackToName = mutableMapOf<SystemMessageCallback, String>()
+         for (scoped in scopedSystemMessages) {
+             callbackToName[scoped.callback] = scoped.name
+         }
 
-         // AUTO-DISCOVER SCOPES FROM ANNOTATIONS AND YAML
-         // Collect all scope IDs from two sources:
-         // 1. Annotation-based: mentioned in @ChatService(scope=[...])
-         val discoveredAnnotationScopes = mutableSetOf<String>()
-         discoveredAnnotationScopes.addAll(toolScopeMap.values.flatten())
-         discoveredAnnotationScopes.addAll(systemMessageScopeMap.values.flatten())
+          // AUTO-DISCOVER SCOPES FROM ANNOTATIONS AND YAML
+          // Collect all scope IDs from two sources:
+          // 1. Annotation-based: mentioned in @ChatService(scope=[...])
+          val discoveredAnnotationScopes = mutableSetOf<String>()
+          discoveredAnnotationScopes.addAll(toolScopeMap.values.flatten())
+          discoveredAnnotationScopes.addAll(systemMessageScopeMap.values.flatten())
 
-         // 2. YAML-based: defined in application.yml aimo.scope.*
-         val yamlDefinedScopes = scopeConfigs.keys
+          // 2. YAML-based: defined in application.yml aimo.scope.*
+          val yamlDefinedScopes = scopeConfigs.keys
 
-         // Combine both sources (but exclude "global" - it's handled by ChatScopeProviderImpl)
-         val allScopeIds = (discoveredAnnotationScopes + yamlDefinedScopes) - "global"
+          // Combine both sources (but exclude "global" - it's handled by ChatScopeProviderImpl)
+          val allScopeIds = (discoveredAnnotationScopes + yamlDefinedScopes) - "global"
 
-         // Create ChatScope for each discovered/configured scope
-         return allScopeIds.associateWith { scopeId ->
-            val config = scopeConfigs[scopeId] ?: AimoChatScopeProperties(
-                displayName = scopeId.replaceFirstChar { it.uppercase() },
-                description = "Scope: $scopeId",
-                inheritGlobal = true,
-                toolRefs = emptyList(),
-                systemMessages = emptyMap(),
-                systemMessageRefs = emptyList()
-            )
+          // Build set of available tool names for validation
+          val availableToolNames = allTools.map { it.toolDefinition.name }.toSet()
+
+          // Build set of available system message names for validation
+          val availableSystemMessageNames = callbackToName.values.toSet()
+
+          // Create ChatScope for each discovered/configured scope
+          return allScopeIds.associateWith { scopeId ->
+             val config = scopeConfigs[scopeId] ?: AimoChatScopeProperties(
+                 displayName = scopeId.replaceFirstChar { it.uppercase() },
+                 description = "Scope: $scopeId",
+                 inheritGlobal = true,
+                 toolRefs = emptyList(),
+                 systemMessages = emptyMap(),
+                 systemMessageRefs = emptyList()
+             )
+
+             // Validate tool-refs: all configured tool references must exist
+             val unknownToolRefs = config.toolRefs.filterNot { availableToolNames.contains(it) }
+             require(unknownToolRefs.isEmpty()) {
+                 "Scope '$scopeId' references unknown tools: ${unknownToolRefs.joinToString(", ")}. " +
+                 "Available tools: ${availableToolNames.sorted().joinToString(", ")}"
+             }
+
+             // Validate system-message-refs: all configured message references must exist
+             val unknownMessageRefs = config.systemMessageRefs.filterNot { availableSystemMessageNames.contains(it) }
+             require(unknownMessageRefs.isEmpty()) {
+                 "Scope '$scopeId' references unknown system messages: ${unknownMessageRefs.joinToString(", ")}. " +
+                 "Available system messages: ${availableSystemMessageNames.sorted().joinToString(", ")}"
+             }
 
             // Collect tools for this scope
             val scopedTools = mutableListOf<AimoToolCallback>()
