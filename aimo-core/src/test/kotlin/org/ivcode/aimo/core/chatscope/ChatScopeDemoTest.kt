@@ -324,6 +324,7 @@ class ChatScopeDemoTest {
         }
     }
 
+    @org.junit.jupiter.api.Disabled("Debug-only helper; produces noisy output and has no assertions")
     @Test
     fun `DEBUG - print all discovered tools and scopes`() {
         println("=" .repeat(60))

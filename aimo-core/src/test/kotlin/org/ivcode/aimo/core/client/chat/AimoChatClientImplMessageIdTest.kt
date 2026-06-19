@@ -200,7 +200,7 @@ class AimoChatClientImplMessageIdTest {
     }
 
     @Test
-    fun `chat persists multiple tool calls in same turn when de-duped by same argument`() {
+    fun `chat persists tool message again when same tool call id appears in a later assistant turn`() {
         val dao = AimoChatClientDaoMemory()
         val chatId = dao.createChatConversation("user1").chatId
         val client = AimoChatClientImpl(

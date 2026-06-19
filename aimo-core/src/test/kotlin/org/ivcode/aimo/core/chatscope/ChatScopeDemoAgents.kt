@@ -4,11 +4,9 @@ import org.ivcode.aimo.core.chatservice.ChatService
 import org.ivcode.aimo.core.chatservice.SystemMessage
 import org.ivcode.aimo.core.chatservice.Tool
 import org.ivcode.aimo.core.chatservice.ToolParam
-import org.springframework.context.annotation.Configuration
-
 /**
- * Test agent definitions for ChatScope integration testing.
- * These agents demonstrate scope restrictions and system messages.
+ * Test scope tool/system-message definitions for ChatScope integration testing.
+ * These ChatService beans demonstrate scope restrictions and system messages.
  */
 
 /**

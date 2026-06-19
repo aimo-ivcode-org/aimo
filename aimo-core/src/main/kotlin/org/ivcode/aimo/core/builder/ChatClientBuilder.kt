@@ -77,10 +77,10 @@ interface ChatClientBuilder {
      * Build the chat client with all registered components and interceptors applied.
      *
      * Resolution logic:
-     * - ChatScope: Use withChatScope() selection, or conversation metadata, or global scope
+     * - ChatScope: Use withChatScope() selection, or default to global scope
      * - Model: Use withModel() selection, or factory primary model, or throw exception
      * - Interceptors: Builder-level (outermost) + factory defaults (innermost)
-     * - Tools/SystemMessages: Filtered by selected scope at build time
+     * - Tools/SystemMessages: Taken from the selected ChatScope (no additional filtering in the builder)
      *
      * @return The composed chat client instance ready for use
      * @throws IllegalStateException if required components cannot be resolved

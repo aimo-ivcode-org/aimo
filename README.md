@@ -363,7 +363,7 @@ val chatClient = chatClientBuilderFactory
 ### How Scopes Work
 
 1. **At startup**: All tools/system messages are discovered and categorized by scope
-2. **On build**: ChatClientBuilder filters tools/messages based on selected scope
+2. **On build**: Select a scope via `withChatScope()` (the chosen `ChatScope` already contains the filtered tools/messages)
 3. **Scope resolution order**:
    - Explicit scope via `withChatScope()`
    - Default: `"global"` scope (unrestricted tools/messages only)

@@ -20,14 +20,14 @@
 - Title behavior is strict: assistant cannot overwrite a USER-set title (`aimo-plugin-ui/.../chatcontroller/TitleChatController.kt`).
 
 ## Chat Scopes (Phase 2)
-- **Scope concept**: ChatScopes define which tools and system messages are available in a conversation. Every instance has a built-in `"global"` scope with all tools.
+- **Scope concept**: ChatScopes define which tools and system messages are available in a conversation. Every instance has a built-in `"global"` scope with unrestricted tools and system messages only.
 - **Scope definition**: Use `@ChatService(scope=["admin", "research"])` on class and `@Tool(scope=[...])` / `@SystemMessage(scope=[...])` on members to restrict visibility.
 - **Empty scope semantics**: Empty `scope = []` on tool/message inherits the parent `@ChatService(scope=...)` when the parent is scoped; available to all scopes only when parent has no scope restriction. Empty on `@ChatService` means the service has no scope restrictions.
 - **Scope validation**: At startup, scopes on tools/messages are validated as subsets of parent `@ChatService` scope; fail-fast if invalid.
 - **Named system messages**: System messages get stable names via `@SystemMessage(name="...")` or auto-generated from method/field name. YAML `system-message-refs` reference by name.
 - **Inline system messages**: Scopes can define custom system messages in YAML under `system-messages: {id: "text"}`. These are always included in the scope.
 - **Runtime resolution**: Builder uses explicit `withChatScope()` selection or defaults to global scope.
-- **Scope filtering**: At build time, `ChatClientBuilderImpl` filters tools and system messages from `ChatScope` to only those scoped to or unrestricted in the selected scope.
+- **Scope filtering**: Scopes are constructed by `ChatScopeProvider` with tools/system messages already filtered; the builder only selects which `ChatScope` to use.
 - **Configuration**: Scopes are pre-defined in `application.yml` under `aimo.scope.*`; each scope lists `tool-refs` and `system-message-refs` (`aimo-core/.../properties/AimoProperties.kt`).
 
 ## Integration Points
