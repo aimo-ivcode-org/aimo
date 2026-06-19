@@ -1,5 +1,7 @@
 package org.ivcode.aimo.core.conf
 
+import org.springframework.core.annotation.AnnotationUtils
+
 import org.ivcode.aimo.core.builder.ChatClientBuilderFactory
 import org.ivcode.aimo.core.builder.ConversationFactory
 import org.ivcode.aimo.core.builder.impl.ChatClientBuilderFactoryImpl
@@ -45,7 +47,7 @@ class AimoConfig {
 
         ctx.getBeansWithAnnotation<ChatService>().forEach {(beanName, chatService) ->
             // Extract parent @ChatService scopes for scope validation
-            val chatServiceAnnotation = chatService::class.java.getAnnotation(ChatService::class.java)
+            val chatServiceAnnotation = AnnotationUtils.getAnnotation(chatService.javaClass, ChatService::class.java)!!
             val parentServiceScopes = chatServiceAnnotation.scope.toSet()
 
             list.add(ChatServiceEntity (
