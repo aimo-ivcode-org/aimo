@@ -22,7 +22,7 @@
 ## Chat Scopes (Phase 2)
 - **Scope concept**: ChatScopes define which tools and system messages are available in a conversation. Every instance has a built-in `"global"` scope with all tools.
 - **Scope definition**: Use `@ChatService(scope=["admin", "research"])` on class and `@Tool(scope=[...])` / `@SystemMessage(scope=[...])` on members to restrict visibility.
-- **Empty scope semantics**: Empty `scope = []` on tool/message means "available to all scopes"; empty on `@ChatService` means parent scope has no restrictions.
+- **Empty scope semantics**: Empty `scope = []` on tool/message inherits the parent `@ChatService(scope=...)` when the parent is scoped; available to all scopes only when parent has no scope restriction. Empty on `@ChatService` means the service has no scope restrictions.
 - **Scope validation**: At startup, scopes on tools/messages are validated as subsets of parent `@ChatService` scope; fail-fast if invalid.
 - **Named system messages**: System messages get stable names via `@SystemMessage(name="...")` or auto-generated from method/field name. YAML `system-message-refs` reference by name.
 - **Inline system messages**: Scopes can define custom system messages in YAML under `system-messages: {id: "text"}`. These are always included in the scope.
