@@ -14,8 +14,8 @@ import kotlin.annotation.Target
  * Chat services are discovered at startup via reflection and their annotated
  * methods/fields are registered as LLM-callable tools and system messages.
  *
- * @property scope List of chat scope IDs this service is available in.
- *                 Empty array means available to all scopes (default, backwards compatible).
+ *  @property scope List of chat scope IDs this service is available in.
+ *                 Empty array means the service has no scope restrictions (available to all scopes).
  *                 Example: scope = ["admin", "research"]
  */
 @Retention(AnnotationRetention.RUNTIME)
