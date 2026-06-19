@@ -156,11 +156,10 @@ class CalculatorService {
    - Comprehensive test coverage (15 unit tests in `aimo-core`)
 
 5. **Runtime Scope Selection**:
-   - Builder method: `withChatScope(scopeId)` for explicit selection
-   - Conversation metadata storage via `setSelectedChatScope(scopeId)`
-   - Fallback chain: explicit scope → conversation metadata → global scope
+   - Builder method: `withChatScope(scope)` for explicit scope selection (takes a ChatScope object, not a string)
+   - Scope resolution: explicit selection or default to global scope
    - Scope filtering happens at ChatClient build time (not runtime)
-   - Different conversations can have different scopes independently
+   - Different conversations can have different scopes independently via per-request scope selection
 
 6. **Scope Configuration in YAML**:
    - Scopes pre-defined in `application.yml` under `aimo.scope.*`
