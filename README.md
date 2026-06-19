@@ -364,6 +364,7 @@ val chatClient = chatClientBuilderFactory
     .builder(conversation)
     .withChatScope(scope)
     .build()
+```
 
 ### Scope Rules
 

@@ -20,7 +20,6 @@ import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.chatscope.ChatScopeProviderImpl
 import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.properties.AimoProperties

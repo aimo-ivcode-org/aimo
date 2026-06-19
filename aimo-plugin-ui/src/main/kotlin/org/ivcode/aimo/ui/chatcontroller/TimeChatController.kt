@@ -25,8 +25,8 @@ class TimeChatController {
     @Tool(
         name ="current_time",
         description = "Returns current server time and, when x-timezone-offset is provided, inferred user-local time"
-        // Scope: Available to all scopes. To restrict: scope=["admin"]
     )
+    // Scope: Available to all scopes. To restrict: scope=["admin"]
     fun currentTime(context: Map<String, Any>): TimeResponse {
         val now = Instant.now().truncatedTo(ChronoUnit.SECONDS)
 

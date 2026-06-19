@@ -26,9 +26,8 @@
 - **Scope validation**: At startup, scopes on tools/messages are validated as subsets of parent `@ChatService` scope; fail-fast if invalid.
 - **Named system messages**: System messages get stable names via `@SystemMessage(name="...")` or auto-generated from method/field name. YAML `system-message-refs` reference by name.
 - **Inline system messages**: Scopes can define custom system messages in YAML under `system-messages: {id: "text"}`. These are always included in the scope.
-- **Runtime resolution**: Builder uses explicit `withChatScope()` selection or defaults to global scope. (Future: builder will support conversation metadata fallback via `aimo.chatScopeId`).
+- **Runtime resolution**: Builder uses explicit `withChatScope()` selection or defaults to global scope.
 - **Scope filtering**: At build time, `ChatClientBuilderImpl` filters tools and system messages from `ChatScope` to only those scoped to or unrestricted in the selected scope.
-- **Durable scope**: Scope selection can be persisted in conversation via `Conversation.setSelectedChatScope(id)` (`aimo-core/.../conversation/ConversationExtensions.kt`). Callers must explicitly retrieve and pass it to the builder.
 - **Configuration**: Scopes are pre-defined in `application.yml` under `aimo.scope.*`; each scope lists `tool-refs` and `system-message-refs` (`aimo-core/.../properties/AimoProperties.kt`).
 
 ## Integration Points
