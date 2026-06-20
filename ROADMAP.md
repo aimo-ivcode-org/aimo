@@ -200,6 +200,67 @@ For detailed ChatScope documentation and examples, see:
 - **AGENTS.md**: "Chat Scopes (Phase 2)" technical section
 - **aimo-core tests**: 15 integration tests demonstrating all features
 
+#### Missed Requirement: Programmatic Scope Builder
+**Status**: Future work. Can be added post-Phase 2 to enhance scope management capabilities.
+
+**Problem**: Current implementation only supports scope configuration via YAML or annotation discovery. There's no programmatic way to:
+- Build custom scopes at runtime from scratch
+- Add `AimoToolCallback` instances to scopes dynamically
+- Parse annotated classes and extract tools/system messages programmatically
+- Create scopes from MCP server definitions at runtime
+
+**Solution**: Implement a **ChatScopeBuilder** fluent API:
+
+```kotlin
+// Builder for creating scopes programmatically
+val customScope = ChatScopeBuilder(id = "custom_research")
+    .displayName("Custom Research")
+    .description("Dynamically built research scope")
+    // Parse @ChatService annotated class
+    .withAnnotatedService(MyResearchService::class)
+    // Add individual tools manually
+    .withToolCallback(myToolCallback1)
+    .withToolCallback(myToolCallback2)
+    // Add system messages
+    .withSystemMessage(mySystemMessageCallback)
+    .withSystemMessageByName("research_guide")
+    .build()  // Returns ChatScope
+```
+
+**Implementation Phases**:
+
+1. **Phase 2.5a: Annotation-Based Builder**
+   - `ChatScopeBuilder.withAnnotatedService(clazz)` — parse `@ChatService` class, extract `@Tool` and `@SystemMessage` members
+   - Reuse existing reflection/annotation discovery logic from `AimoConfig`
+   - Validate scope constraints (subset validation)
+
+2. **Phase 2.5b: Manual Tool Registration**
+   - `ChatScopeBuilder.withToolCallback(callback)` — manually add individual tools
+   - `ChatScopeBuilder.withSystemMessage(callback)` — manually add individual messages
+   - Support for creating one-off tools without needing `@ChatService` beans
+
+3. **Phase 2.5c: MCP Integration** (deferred until Phase 3)
+   - `ChatScopeBuilder.withMcpServerTools(serverId, toolNames)` — cherry-pick MCP tools by name (use `"{serverId}:{toolName}"` naming)
+   - Requires MCP tool registry to be accessible (inject `List<ScopedToolCallback>` from `aimo-mcp`)
+   - Support glob patterns: `"claude-desktop:*"` to include all tools from a server
+
+**Files to Create** (Missed Requirement):
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeBuilder.kt`
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeBuilderImpl.kt`
+- `aimo-core/src/test/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeBuilderTest.kt`
+
+**Why This Matters**:
+- Enables dynamic scope creation at runtime (not just YAML/annotations)
+- Allows frameworks/applications to programmatically compose scopes from multiple sources
+- Supports runtime scope modifications (add/remove tools from a scope)
+- Necessary for advanced use cases: multi-tenant scoping, user-specific scopes, A/B testing different tool sets
+
+**Rationale for Deferred Implementation**:
+- Should have been part of Phase 2 but wasn't prioritized initially
+- Can be added as a post-Phase 2 enhancement without blocking Phase 3
+- YAML-based configuration sufficient for initial use cases
+- Will inform future programmatic APIs for other components
+
 
 ### Phase 3: MCP Tool Consuming
 **Goal**: Enable AIMO agents to discover and consume MCP tools from external MCP servers
