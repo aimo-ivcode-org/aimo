@@ -1,41 +1,114 @@
 # Plan: Phase 3 — MCP Tool Consuming (Integration Strategy)
 
+> ⚠️ **Implementation Note**: The plan was reviewed against the actual codebase. See **"Codebase Reconciliation"** section before implementing.
+
 **TL;DR**: MCP tools integrate at **bean/Spring configuration time** in the `aimo-mcp` module. MCP servers are configured in YAML, discovered tools are wrapped as `ScopedToolCallback` instances, and injected into `AimoConfig` via Spring's dependency injection. The core framework remains completely unaware of MCP—it just works with a single unified list of scoped callbacks from all sources. Scopes handle tool availability; core doesn't need to know about MCP servers.
+
+## Codebase Reconciliation
+
+Before implementing, review these design constraints and required pre-Phase 3 work:
+
+### Design Principle: No Circular Dependencies
+
+`ChatServiceProvider` and all callback types (`ScopedToolCallback`, `ScopedSystemMessageCallback`) must stay in `aimo-core`. `aimo-mcp` imports from `aimo-core` (one-way). Core never imports from `aimo-mcp`.
+
+- MCP tools implement the existing `AimoToolCallback` interface (as `McpAimoToolCallback`) and are wrapped in `ScopedToolCallback`
+- No new callback interface types in `aimo-mcp`
+
+### Pre-Phase 3 Refactor: Add `name` to `SystemMessageCallback`
+
+`SystemMessageCallback` currently has no `name` property, forcing the name onto the wrapper `ScopedSystemMessageCallbackWithName` (the old wrapper name). This is inconsistent with `AimoToolCallback` which carries its name via `toolDefinition.name`.
+
+**Required**: Add `val name: String` to `SystemMessageCallback` and rename the wrapper:
+
+```kotlin
+// Updated interface
+interface SystemMessageCallback {
+    val name: String
+    fun call(context: SystemMessageContext): String?
+}
+
+// Wrapper renamed (name now on callback, not wrapper)
+data class ScopedSystemMessageCallback(
+    val callback: SystemMessageCallback,  // callback.name replaces wrapper's name field
+    val scopes: Set<String>
+)
+```
+
+**Files affected**:
+- `SystemMessageCallback.kt` — add `val name: String`
+- `FieldSystemMessageCallback.kt` — implement `name`
+- `MethodSystemMessageCallback.kt` — implement `name`
+- `PropertySystemMessageCallback.kt` — implement `name`
+- `ControllerHelpers.kt` — rename `ScopedSystemMessageCallbackWithName` → `ScopedSystemMessageCallback`, remove `name` from wrapper
+- `ChatServiceEntity.kt`, `AimoConfig.kt`, `ChatScopeProviderImpl.kt` — update type references
+- All tests referencing `ScopedSystemMessageCallbackWithName` (now `ScopedSystemMessageCallback`) (now `ScopedSystemMessageCallback`)
+
+> ⚠️ Do this refactor before implementing Phase 3.1.
+
+### Reference: Correct Interface Signatures
+
+```kotlin
+// ChatServiceProvider — in aimo-core
+interface ChatServiceProvider {
+    val id: String
+    val scopes: Set<String>
+    fun callbacks(): List<ScopedToolCallback>           // AimoToolCallback + scopes
+    fun systemMessages(): List<ScopedSystemMessageCallback>  // SystemMessageCallback + scopes
+}
+
+// MCPServer — in aimo-mcp, extends ChatServiceProvider
+interface MCPServer : ChatServiceProvider {
+    override val id: String
+    override val scopes: Set<String>
+    override fun callbacks(): List<ScopedToolCallback>
+    fun refresh(): List<ScopedToolCallback>
+}
+
+// McpAimoToolCallback — implements EXISTING AimoToolCallback, wrapped in ScopedToolCallback
+class McpAimoToolCallback(
+    override val toolDefinition: AimoToolDefinition,
+    private val mcpClient: McpClient,
+    private val toolName: String
+) : AimoToolCallback {
+    override fun call(argumentsJson: String, context: Map<String, Any>): String { /* MCP invocation */ }
+}
+```
+
+
 
 ## Checklist
 
-### Phase 3.1: Foundation — Callback Group Infrastructure
+### Phase 3.1: Foundation — ChatServiceProvider Infrastructure
 
 **aimo-core**:
-- [ ] Create `CallbackGroup.kt` interface (base for all groups)
-- [ ] Create `ScopedCallbackGroup.kt` interface (extends CallbackGroup with scope metadata)
-- [ ] Create `ScopedCallbackManager.kt` class
-- [ ] Create `AnnotatedScopedCallbackGroup.kt` wrapper for annotated tools/messages
+- [ ] Create `ChatServiceProvider.kt` interface (in `chatservice` package, uses existing `ScopedToolCallback` / `ScopedSystemMessageCallback`)
+- [ ] Create `ChatServiceProviderManager.kt` class
+- [ ] Create `AnnotatedChatServiceProvider.kt` wrapper for `ChatServiceEntity` (annotated tools/messages)
 - [ ] Refactor `AimoConfig.kt`:
-  - [ ] Create `annotatedScopedCallbackGroup()` bean
-  - [ ] Create `scopedCallbackManager()` bean
+  - [ ] Create `annotatedChatServiceProvider()` bean
+  - [ ] Create `chatServiceProviderManager()` bean
   - [ ] Update `createChatScopeProvider()` to accept manager
-  - [ ] Refactor `buildPredefinedScopes()` to query manager dynamically
+  - [ ] Refactor `ChatScopeProvider` to filter callbacks by scope at runtime
   - [ ] Keep/deprecate static tool/message beans
 
 **aimo-mcp**:
 - [ ] Create module structure and `build.gradle.kts`
 - [ ] Create `McpProperties.kt` with `@ConfigurationProperties(prefix = "aimo.mcp")`
 - [ ] Create `McpServerConfig.kt` and `McpTransportConfig.kt`
-- [ ] Create `ToolCallback.kt` interface (base for MCP tools)
-- [ ] Create `MCPServer.kt` interface (extends CallbackGroup)
+- [ ] Create `MCPServer.kt` interface (extends `ChatServiceProvider`, returns `ScopedToolCallback`)
 - [ ] Create `MCPServerManager.kt` class
 - [ ] Create `McpToolProviderFactory.kt` @Bean to create MCPServer instances from config
-- [ ] Create `McpScopedCallbackGroup.kt` wrapper for MCP servers
+- [ ] Create `McpChatServiceProvider.kt` wrapper for MCP servers
+- [ ] Create `McpAimoToolCallback.kt` (implements existing `AimoToolCallback` for MCP tools)
 - [ ] Register `aimo-mcp` module in `settings.gradle.kts`
 
 ### Phase 3.2: Schema Conversion & Runtime
 
 **aimo-mcp**:
-- [ ] Create `McpSchemaConverter.kt` (OpenRPC → AIMO AimoToolDefinition)
+- [ ] Create `McpSchemaConverter.kt` (OpenRPC → AIMO `AimoToolDefinition`)
 - [ ] Create `McpClientManager.kt` (manages MCP client connections)
-- [ ] Create `McpToolCallback.kt` (implements ToolCallback for MCP tools)
-- [ ] Implement MCP tool naming: `"{serverId}:{toolName}"` format
+- [ ] Implement MCP tool naming: `"{serverId}:{toolName}"` format (in `McpAimoToolCallback`)
 - [ ] Add tool-refs validation (both annotated + MCP tools)
 - [ ] Add scope validation (MCP server scopes match defined scopes)
 - [ ] Create `PeriodicToolDiscoveryScheduler.kt` for periodic refresh
@@ -43,7 +116,7 @@
 - [ ] Implement scope cache invalidation on tool discovery refresh
 
 **aimo-core**:
-- [ ] Update `ChatScopeProvider` to query `ScopedCallbackManager` for tools
+- [ ] Update `ChatScopeProviderImpl` to query `ChatServiceProviderManager` for tools and messages
 - [ ] Implement dynamic scope building (queries manager at scope build time)
 - [ ] Test tool-refs cherry-picking with MCP tools
 
@@ -65,16 +138,18 @@
 
 ### Testing
 
-- [ ] Unit tests for `ScopedCallbackManager`
-- [ ] Unit tests for `AnnotatedScopedCallbackGroup`
-- [ ] Unit tests for `McpScopedCallbackGroup`
+- [ ] Unit tests for `ChatServiceProviderManager`
+- [ ] Unit tests for `AnnotatedChatServiceProvider`
+- [ ] Unit tests for `McpChatServiceProvider`
 - [ ] Unit tests for `PeriodicToolDiscoveryScheduler`
+- [ ] Unit tests for callback scope filtering (verify tool.scopes filtering works)
 - [ ] Integration tests for MCP server discovery
-- [ ] Integration tests for dynamic tool refresh
+- [ ] Integration tests for dynamic tool refresh with scope reapplication
 - [ ] Integration tests for scope-based tool filtering with MCP tools
 - [ ] Test tool naming collision detection
 - [ ] Test scope validation (fail-fast on invalid scopes)
 - [ ] Test tool-refs with mixed annotated + MCP tools
+- [ ] Test that each callback maintains its own scopes property
 
 ### Validation & Sign-off
 
@@ -119,12 +194,12 @@ At Chat Time (runtime)
 
 4. **Create `McpAimoToolCallback`** — Implements `AimoToolCallback`; holds reference to MCP client and tool definition; invokes tool via MCP Java SDK on `call()`. Wrapped as `ScopedToolCallback` during factory creation.
 
-5. **Wire callback groups into core** — Modify `AimoConfig.kt` and `ChatScopeProvider`:
-   - Create `AnnotatedScopedCallbackGroup` bean wrapping annotated tools + system messages
-   - Create `ScopedCallbackManager` bean that collects all `ScopedCallbackGroup` instances (annotated + MCP)
-   - Update `createChatScopeProvider()` to accept `ScopedCallbackManager` instead of static lists
-   - `ChatScopeProvider` queries manager for current tools/messages at scope build time
-   - Refactor `buildPredefinedScopes()` to work with groups dynamically
+5. **Wire service providers into core** — Modify `AimoConfig.kt` and `ChatScopeProviderImpl`:
+   - Create `AnnotatedChatServiceProvider` bean wrapping `ChatServiceEntity` tools + system messages
+   - Create `ChatServiceProviderManager` bean that collects all `ChatServiceProvider` instances (annotated + MCP)
+   - Update `createChatScopeProvider()` to accept `ChatServiceProviderManager` instead of static lists
+   - `ChatScopeProviderImpl` queries manager for current tools/messages at scope build time
+   - Refactor `buildPredefinedScopes()` to work with providers dynamically
    - Remove or deprecate static tool/message list beans (keep for backward compat if needed)
 
 6. **Test & document** — Integration test showing YAML configuration; document server discovery, tool naming, scope assignment, and scope-based tool availability.
@@ -172,27 +247,27 @@ Each MCP server defines which ChatScopes can access its tools via the `scope` fi
 
 During chat runtime, when a user selects a ChatScope (e.g., "research"), all MCP tools configured for that scope become available to the LLM, alongside annotated tools and other MCP servers that support that scope.
 
-## Core Integration: Scoped Callback Group Architecture
+## Core Integration: ChatServiceProvider Architecture
 
-The key design uses a **scoped callback group architecture** for managing dynamic tool discovery:
+The key design uses existing `ScopedToolCallback` and `ScopedSystemMessageCallback` types — scopes are already on these wrappers. See **Codebase Reconciliation** section above for details on type alignment with existing code.
 
 ```kotlin
-// MCPServer interface - represents a single MCP server connection, extends CallbackGroup
-interface MCPServer : CallbackGroup {
-    override val id: String  // e.g., "claude-desktop", "external-service"
-    override fun callbacks(): List<ToolCallback>  // current tools from this server
-    fun refresh(): List<ToolCallback>  // rediscover and return updated tools
+// MCPServer - in aimo-mcp, extends ChatServiceProvider from aimo-core
+// Uses EXISTING ScopedToolCallback / ScopedSystemMessageCallback types
+interface MCPServer : ChatServiceProvider {
+    override val id: String
+    override val scopes: Set<String>  // provider-level scope (e.g., server config `scope: ["research"]`)
+    override fun callbacks(): List<ScopedToolCallback>  // tools with scopes already set
+    fun refresh(): List<ScopedToolCallback>
 }
 
-// MCPServerManager - manages all MCP servers
+// MCPServerManager - manages all MCP servers, applies scope config to each tool
 class MCPServerManager(val servers: List<MCPServer>) {
-    fun refreshServer(serverId: String): List<ToolCallback> {
-        // Refresh a single server's tools
+    fun refreshServer(serverId: String): List<ScopedToolCallback> {
         return servers.find { it.id == serverId }?.refresh() ?: emptyList()
     }
     
     fun refreshAllServers(): List<MCPServer> {
-        // Refresh all servers (periodic scheduler, manual endpoint)
         servers.forEach { it.refresh() }
         return servers
     }
@@ -201,28 +276,34 @@ class MCPServerManager(val servers: List<MCPServer>) {
     fun getAllServers(): List<MCPServer> = servers
 }
 
-
-// CallbackGroup interface - base interface for any group of callbacks (non-scoped)
-interface CallbackGroup {
-    val groupId: String
-    fun callbacks(): List<ToolCallback>
+// ChatServiceProvider - in aimo-core (read-only, uses EXISTING types)
+interface ChatServiceProvider {
+    val id: String
+    val scopes: Set<String>
+    fun callbacks(): List<ScopedToolCallback>                        // EXISTING type
+    fun systemMessages(): List<ScopedSystemMessageCallback>  // EXISTING type
 }
 
-// ScopedCallbackGroup interface - extends CallbackGroup with scope metadata
-interface ScopedCallbackGroup : CallbackGroup {
-    val scopes: Set<String>  // scopes this group (and all its tools) participates in
-}
-
-// Implementation for MCP server group
-class McpScopedCallbackGroup(val server: MCPServer) : ScopedCallbackGroup {
-    override val groupId = "mcp:${server.id}"
-    override val scopes = server.scopes  // Group declares its scopes
+// McpChatServiceProvider - in aimo-mcp, wraps MCPServer
+class McpChatServiceProvider(val server: MCPServer) : ChatServiceProvider {
+    override val id = "mcp:${server.id}"
+    override val scopes = server.scopes
     
-    override fun callbacks(): List<ToolCallback> {
-        // Return server's tools as-is (raw, unscoped)
-        // Scoping is handled at the group level, not individual tool level
-        return server.callbacks()
-    }
+    override fun callbacks(): List<ScopedToolCallback> = server.callbacks()
+    
+    override fun systemMessages(): List<ScopedSystemMessageCallback> = emptyList()
+    // MCP servers provide tools only, not system messages
+}
+
+// AnnotatedChatServiceProvider - in aimo-core, wraps @ChatService beans
+class AnnotatedChatServiceProvider(
+    override val id: String,
+    override val scopes: Set<String>,
+    private val tools: List<ScopedToolCallback>,                         // from ChatServiceEntity.tools
+    private val messages: List<ScopedSystemMessageCallback>      // from ChatServiceEntity.systemMessages
+) : ChatServiceProvider {
+    override fun callbacks() = tools
+    override fun systemMessages() = messages
 }
 
 ```
@@ -230,35 +311,36 @@ class McpScopedCallbackGroup(val server: MCPServer) : ScopedCallbackGroup {
 **Architecture Flow**:
 
 1. **Startup**:
-   - `MCPServerManager` created with all configured servers
-   - Each server connects and discovers tools
-   - For each server, `McpScopedCallbackGroup` created
-   - Groups registered as Spring `@Bean` instances
-   - `ScopedCallbackManager` collects all groups
+   - Each MCP server connects and discovers tools via MCP protocol
+   - For each discovered tool, wrap as `McpAimoToolCallback` (implements existing `AimoToolCallback`)
+   - Apply server's scope config: wrap each callback as `ScopedToolCallback(callback, serverScopes)`
+   - `McpChatServiceProvider` created wrapping the server
+   - All providers (annotated + MCP) collected in `ChatServiceProviderManager`
 
-2. **Periodic Refresh** (configurable interval):
-   - Scheduler calls `mcpServerManager.refreshAllServers()`
-   - Each server re-discovers tools independently
-   - Server's tool list updates in-place
-   - Next time `ChatScopeProvider` queries manager, it gets current tools
+2. **Periodic Refresh**:
+   - `mcpServerManager.refreshAllServers()` re-discovers tools from MCP servers
+   - New `ScopedToolCallback` instances created with scopes re-applied from server config
+   - Tools updated in-place; next query gets current tools
 
-3. **Manual Refresh** (admin endpoint):
-   - Endpoint calls `mcpServerManager.refreshServer(serverId)` or `refreshAllServers()`
-   - Immediate tool re-discovery
-   - ChatScope cache invalidated
-
-4. **Runtime Tool Access**:
-   - `ChatScopeProvider` queries `scopedCallbackManager.getAllCallbacks()`
-   - Gets current tools from all groups (including refreshed servers)
-   - Builds scopes with current tool set
+3. **Runtime Tool Access**:
+   - `ChatScopeProvider` queries `chatServiceProviderManager.getAllCallbacks()`
+   - Gets all `ScopedToolCallback` instances from all providers
+   - Filters by: `(provider.scopes contains requestedScope) AND (callback.scopes contains requestedScope)`
+   - Builds scope with filtered tools (as `AimoToolCallback` list for the model)
+   - Gets all tools from all providers
+   - For each tool: checks if (provider.scopes contains requestedScope) AND (tool.scopes contains requestedScope)
+   - Both conditions must be true to include tool in scope
+   - Builds scope with filtered tools
 
 **Responsibilities**:
 
-- **MCPServer** (aimo-mcp): Connection, discovery, refresh
-- **MCPServerManager** (aimo-mcp): Orchestrates all servers, refresh coordination
-- **McpScopedCallbackGroup** (aimo-mcp): Wraps server, provides scope integration
-- **ScopedCallbackManager** (aimo-core): Collects groups, provides unified interface
-- **Core** (aimo-core): Queries manager for tools, builds scopes, unaware of servers/refresh
+- **ToolCallback / SystemMessageCallback**: Each callback owns its `scopes: Set<String>` (callback-level scope restriction)
+- **ChatServiceProvider**: Declares provider-level `scopes: Set<String>` that restrict which scopes can access this provider
+- **MCPServer**: Discovers tools, returns them as ToolCallback instances, declares provider-level scopes
+- **MCPServerManager**: Applies scope config to each discovered tool
+- **McpChatServiceProvider**: Provides access to server's tools with both provider-level and callback-level scopes
+- **ChatServiceProviderManager**: Collects all providers
+- **ChatScopeProvider**: Filters callbacks by checking both provider scopes AND callback scopes at runtime
 
 ## AimoConfig Refactoring for Phase 3
 
@@ -269,63 +351,130 @@ class McpScopedCallbackGroup(val server: MCPServer) : ScopedCallbackGroup {
 - **Problem**: Can't support dynamic tool discovery (MCP refresh) with static lists
 
 **Phase 3 Architecture**:
-- `AimoConfig` works with callback groups instead of static lists
-- Creates `AnnotatedScopedCallbackGroup` bean for annotated tools/messages
-- Creates `ScopedCallbackManager` bean that collects all groups
-- `ChatScopeProvider` queries manager for current tools at scope build time
+- `AimoConfig` works with service providers instead of static lists
+- Creates `AnnotatedChatServiceProvider` bean for annotated tools/messages (each with scopes)
+- Creates `ChatServiceProviderManager` bean that collects all providers
+- `ChatScopeProvider` queries manager for current tools/messages and filters by scope ID at runtime
 - **Benefit**: Supports MCP refresh; tool list updates without restart
 
 **Specific AimoConfig Changes**:
 
-1. **Create AnnotatedScopedCallbackGroup bean**:
+1. **Parse @ChatService into AnnotatedChatServiceProvider**:
+   - Discover all `@ChatService` beans (as currently done)
+   - For each bean, extract its tools and system messages
+   - Create `AnnotatedChatServiceProvider` instance with all tools/messages and provider-level scopes (if any)
+   - Register as Spring `@Bean`
+   - **Key**: Each `@ChatService` becomes a provider; tools/messages are no longer static lists
+
+2. **Create AnnotatedChatServiceProvider bean**:
    ```kotlin
    @Bean
-   fun annotatedScopedCallbackGroup(
+   fun annotatedChatServiceProvider(
        chatServices: List<ChatServiceEntity>
-   ): ScopedCallbackGroup {
-       return AnnotatedScopedCallbackGroup(
-           tools = chatServices.flatMap { it.tools },
-           systemMessages = chatServices.flatMap { it.systemMessages }
+   ): ChatServiceProvider {
+       return AnnotatedChatServiceProvider(
+           scopes = emptySet(),  // or extracted from @ChatService if provider needs scope restriction
+           tools = chatServices.flatMap { it.tools },  // each tool already has scopes
+           systemMessages = chatServices.flatMap { it.systemMessages }  // each message already has scopes
        )
    }
    ```
 
-2. **Create ScopedCallbackManager bean**:
+3. **Create ChatServiceProviderManager bean**:
    ```kotlin
    @Bean
-   fun scopedCallbackManager(
-       groups: List<ScopedCallbackGroup>  // Spring auto-discovers all groups
-   ): ScopedCallbackManager {
-       return ScopedCallbackManager(groups)
+   fun chatServiceProviderManager(
+       providers: List<ChatServiceProvider>  // Spring auto-discovers all providers
+   ): ChatServiceProviderManager {
+       return ChatServiceProviderManager(providers)
    }
    ```
 
-3. **Update createChatScopeProvider()**:
-   - Accept `ScopedCallbackManager` instead of static lists
-   - Accept `scopedSystemMessages` for backward compat (system messages still static for now)
+4. **Update createChatScopeProvider()**:
+   - Accept `ChatServiceProviderManager` instead of static lists
    - Pass manager to `ChatScopeProvider`
 
-4. **Refactor buildPredefinedScopes()**:
-   - Query manager dynamically for current tools: `manager.getAllCallbacks()`
-   - Build scope maps from current tools at scope build time
-   - Still handle YAML config, tool-refs, system messages same way
+5. **Refactor ChatScopeProvider**:
+   - Query manager dynamically for current tools/messages: `manager.getAllCallbacks()`, `manager.getAllSystemMessages()`
+   - At scope-build time, filter by scope: for each callback, check (provider.scopes.contains(scopeId) AND callback.scopes.contains(scopeId))
+   - Only include callback if both provider and callback allow the requested scope
+   - Build scope map from filtered callbacks
+   - Still handle YAML config, tool-refs, system message refs same way
 
-5. **Remove/deprecate static beans** (optional for Phase 3):
+6. **Rework ChatScope construction**:
+   - Update `ChatScope` data class to hold `providers: List<ChatServiceProvider>` in addition to filtered callbacks
+   - Scope building now produces a ChatScope with both the providers that contribute to it AND the filtered tools/messages
+   - This enables scope rebuilding when providers refresh
+
+7. **Support for Additional Tools/Messages Per Scope**:
+   - Scopes can have individual tools/messages added beyond those from providers
+   - Update scope definition (YAML or programmatic) to allow:
+     ```yaml
+     aimo:
+       scope:
+         research:
+           tool-refs: ["searchPapers"]  # from providers
+           additional-tools: [...]  # new: individual ToolCallback instances
+           system-message-refs: ["research_guide"]
+           additional-messages: [...]  # new: individual SystemMessageCallback instances
+     ```
+   - At scope build time, include all three sources: provider callbacks + additional tools + additional messages
+   - Validate all callbacks (regardless of source) have compatible scopes
+
+8. **Remove/deprecate static beans** (optional for Phase 3):
    - Keep `createToolCallbacks()`, `createScopedToolCallbacks()` for now
-   - Mark as deprecated; MCP phase will phase them out
+   - Mark as deprecated
    - Or remove if backward compat not needed
 
 **Key Insight**:
-- System messages can stay static for Phase 3 (no dynamic system message discovery in MCP)
-- Tools must be dynamic via groups to support MCP refresh
-- `ScopedCallbackManager` is the bridge: queries groups for current tools
+- Scopes exist at two levels: provider-level and callback-level
+- Provider scopes restrict which scopes can access ANY tool/message from that provider
+- Callback scopes restrict which scopes can access THAT SPECIFIC tool/message
+- `ChatScopeProvider` filters callbacks by checking both provider scopes AND callback scopes
+- MCP scope config applies to provider level (server's scope); individual tool scopes can further restrict
 
 ## Further Considerations
 
-1. **Connection Lifecycle**:
-   - **Eager connect at startup** (recommended): All MCP servers connect during `McpToolProviderFactory` bean creation. Fails fast if unreachable; simplifies per-request logic.
-   - **Lazy connect on first tool call**: Lower startup latency, but tool list not known until first use. More complex error recovery.
-   - **Recommendation**: Start eager; add lazy mode as configurable option later.
+1. **Individual Tool & System Message Addition to Scopes**:
+   - Scopes should support adding individual `ToolCallback` and `SystemMessageCallback` instances in addition to those from `ChatServiceProvider`
+   - This enables mixing provider-sourced callbacks with one-off/dynamic callbacks
+   - **Implementation**: Extend `ChatScope` to hold both:
+     - `providers: List<ChatServiceProvider>` (sources of callbacks)
+     - `additionalTools: List<ToolCallback>` (individual tools added directly)
+     - `additionalSystemMessages: List<SystemMessageCallback>` (individual messages added directly)
+   - **Scope Building**: When building a scope, include callbacks from all three sources:
+     1. Filtered callbacks from all providers (after scope filtering)
+     2. Additional tools that match the scope
+     3. Additional system messages that match the scope
+   - **Use Cases**: 
+     - Add one-off tools for specific scopes without creating `@ChatService` beans
+     - Mix MCP tools, annotated tools, and dynamically created tools in one scope
+     - Support programmatic scope building with fluent API (future enhancement)
+   - **Validation**: At scope build time, validate that all callbacks (provider + additional) have compatible scopes
+
+2. **ChatScope Refactoring** (updated):
+   - Current `ChatScope` holds only filtered tools and system messages (results of scope building)
+   - Phase 3 will rework to also hold:
+     - `providers: List<ChatServiceProvider>` (sources that contribute to this scope)
+     - `additionalTools: List<ToolCallback>` (one-off tools added directly to this scope)
+     - `additionalSystemMessages: List<SystemMessageCallback>` (one-off messages added directly to this scope)
+   - `ChatScope` becomes a complete snapshot: providers + filtered provider-callbacks + additional callbacks
+   - Enables dynamic scope rebuilding when providers refresh
+
+3. **Scope Construction Refactoring** (updated):
+   - Current process: Static lists of tools/messages → hand-filtered maps → ChatScope objects at startup
+   - Phase 3 process: Parse `@ChatService` annotations into `ChatServiceProvider` → collect all providers in `ChatServiceProviderManager` → dynamic scope building on-demand with support for additional callbacks
+   - **New steps**:
+     1. Parse `@ChatService` beans into `ChatServiceProvider` instances
+     2. Collect all providers in `ChatServiceProviderManager`
+     3. For each scope in YAML or programmatic definition:
+        a. Query manager for provider-sourced callbacks
+        b. Filter by scope ID (both provider-level and callback-level scopes)
+        c. Add any additional tools/messages registered for this scope
+        d. Build `ChatScope` with providers + all callbacks (provider + additional)
+   - **Timing**: Scope building can happen per-request (dynamic) or cached with invalidation on provider refresh
+
+4. **Connection Lifecycle**:
 
 2. **Tool Naming Collisions**:
    - Prefix by server: `"claude-desktop:searchWeb"` → namespace-safe but verbose
@@ -347,8 +496,13 @@ class McpScopedCallbackGroup(val server: MCPServer) : ScopedCallbackGroup {
    - MCP servers may add/remove tools during runtime (not just at startup)
    - **Manual refresh**: Admin endpoint or method to force tool re-discovery from all servers
    - **Periodic re-discovery**: Background task that rechecks available tools at configurable intervals (e.g., every 5 minutes)
-   - **Tool caching**: Cache discovered tools in memory; periodically refresh from servers
-   - **Scope invalidation**: When tools change, invalidate cached ChatScope objects so they're rebuilt with updated tool lists
+   - **Tool caching**: Discovered tools are cached in-memory in `MCPServer` instances. When refresh is triggered (manual or periodic):
+     1. Re-connect to MCP server
+     2. Re-discover available tools via MCP protocol
+     3. Update cached tools in-place (replaces previous cache)
+     4. Apply scope configuration to each tool
+     5. ChatScope objects are rebuilt on next query
+   - **Scope invalidation**: When tools change, ChatScope cache is invalidated (scope objects rebuilt on next request) so they include updated tool sets
    - **Recommendation**: Support both manual refresh (explicit control) + periodic re-discovery (catch changes automatically)
 
 ## Key Design Decisions
@@ -381,8 +535,12 @@ class McpScopedCallbackGroup(val server: MCPServer) : ScopedCallbackGroup {
 ### Decision 7: Dynamic Tool Discovery Strategy
 - **Manual refresh**: Admin endpoint/method to force re-discovery from all MCP servers
 - **Periodic re-discovery**: Background scheduled task runs every N minutes (configurable, default: 5 min)
-- **Tool caching**: In-memory cache of discovered tools; periodically refreshed from servers
-- **Scope invalidation**: When tool sets change, ChatScope cache is invalidated so scopes rebuild with updated tools
+- **Tool caching strategy** (clarified):
+  - Discovered tools are stored in-memory in `MCPServer` instances (the cache)
+  - When refresh is triggered: re-discover tools from MCP server, update cached tools in-place
+  - Scope builders query the cache via `server.callbacks()` — always get latest cached tools
+  - No restart needed — scope rebuilding picks up changes automatically on next query
+- **Scope invalidation**: ChatScope cache invalidated on tool discovery refresh, forcing scopes to rebuild
 - **Configuration**: `aimo.mcp.discovery-interval-minutes: 5` (0 = disabled, only manual refresh)
 - **Rationale**: MCP servers can dynamically add/remove tools; framework must support detecting changes without requiring restart
 
@@ -418,21 +576,21 @@ class McpScopedCallbackGroup(val server: MCPServer) : ScopedCallbackGroup {
 ## Files to Create/Modify
 
 ### New Files (in aimo-core)
-- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/callback/CallbackGroup.kt` — Base interface for groups (non-scoped)
-- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/callback/ScopedCallbackGroup.kt` — Interface for scoped groups
-- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/callback/ScopedCallbackManager.kt` — Manages all groups
-- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/callback/AnnotatedScopedCallbackGroup.kt` — Wraps annotated tools/messages
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatservice/ChatServiceProvider.kt` — Base interface for providers (uses existing `ScopedToolCallback`, `ScopedSystemMessageCallback`)
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatservice/ChatServiceProviderManager.kt` — Manages all providers
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatservice/AnnotatedChatServiceProvider.kt` — Wraps `ChatServiceEntity` (annotated tools/messages already scoped)
+
+> ⚠️ Note: `ToolCallback.kt` and `SystemMessageCallback.kt` are NOT new files. Use existing `ScopedToolCallback` (in `ControllerHelpers.kt`) and `ScopedSystemMessageCallback` (in `ControllerHelpers.kt`).
 
 ### New Files (in aimo-mcp)
 - `aimo-mcp/build.gradle.kts` — Module with MCP Java SDK dependency
 - `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/properties/McpProperties.kt` — `@ConfigurationProperties(prefix = "aimo.mcp")`
-- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/server/MCPServer.kt` — Interface for a single MCP server
-- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/server/MCPServerManager.kt` — Manages all servers, refresh orchestration
+- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/server/MCPServer.kt` — Interface for a single MCP server (extends `ChatServiceProvider`, returns `ScopedToolCallback`)
+- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/server/MCPServerManager.kt` — Manages all servers, applies scope config to each tool
 - `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/config/McpToolProviderFactory.kt` — Creates `MCPServer` instances from `McpProperties`
-- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/group/McpScopedCallbackGroup.kt` — Implements `ScopedCallbackGroup`, wraps `MCPServer`
-- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/tool/ToolCallback.kt` — Base interface for tool callbacks
-- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/tool/McpToolCallback.kt` — Implements `ToolCallback` for MCP tools
-- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/schema/McpSchemaConverter.kt` — Converts MCP OpenRPC → AIMO schemas
+- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/provider/McpChatServiceProvider.kt` — Implements `ChatServiceProvider`, wraps `MCPServer`
+- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/tool/McpAimoToolCallback.kt` — Implements **existing** `AimoToolCallback` interface for MCP tools
+- `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/schema/McpSchemaConverter.kt` — Converts MCP OpenRPC → AIMO schemas (`AimoToolDefinition`)
 - `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/client/McpClientManager.kt` — Manages MCP client connections + tool discovery
 - `aimo-mcp/src/main/kotlin/org/ivcode/aimo/mcp/discovery/PeriodicToolDiscoveryScheduler.kt` — Scheduled periodic refresh
 - `aimo-mcp/src/test/kotlin/org/ivcode/aimo/mcp/...` — Unit + integration tests
@@ -444,27 +602,31 @@ class McpScopedCallbackGroup(val server: MCPServer) : ScopedCallbackGroup {
 - `examples/simple-ollama/src/test/kotlin/.../McpIntegrationTest.kt` — Integration test showing MCP tools work
 
 ### Modified Files (in aimo-core)
-- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/conf/AimoConfig.kt` — Create `ScopedCallbackManager` bean, register annotated callbacks group
-- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeProvider.kt` — Query `ScopedCallbackManager.getAllCallbacks()` instead of static list
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/conf/AimoConfig.kt` — Create `ChatServiceProviderManager` bean, wrap `ChatServiceEntity` list in `AnnotatedChatServiceProvider`
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeProviderImpl.kt` — Query `ChatServiceProviderManager`, filter `ScopedToolCallback` by scope ID at runtime
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatscope/ChatScope.kt` — Update to hold `providers: List<ChatServiceProvider>`, `additionalTools: List<ScopedToolCallback>`, `additionalSystemMessages: List<ScopedSystemMessageCallback>`
 
 
 ## Notes
 
-- **Callback Group Hierarchy**: `CallbackGroup` is the base interface (non-scoped) for any group of callbacks. `ScopedCallbackGroup` extends `CallbackGroup` and adds scope metadata. `MCPServer` implements `CallbackGroup` directly (non-scoped).
-- **MCP Server Management**: `MCPServer` represents a single server connection and is itself a callback group. `MCPServerManager` orchestrates all servers and refresh operations.
-- **Group Wrapping**: `McpScopedCallbackGroup` wraps an `MCPServer` and implements `ScopedCallbackGroup`, providing scope integration at the group level.
-- **Core Queries Groups**: `ChatScopeProvider` queries `ScopedCallbackManager.getAllCallbacks()`. Manager flattens all groups' scoped callbacks into single list for scope building.
+- **Existing Types Used**: `ScopedToolCallback` (wraps `AimoToolCallback` + scopes) and `ScopedSystemMessageCallback` (wraps `SystemMessageCallback` + name + scopes) already exist in `aimo-core`. `ChatServiceProvider` uses these — no new callback types needed.
+- **MCP Tool Implementation**: `McpAimoToolCallback` implements the existing `AimoToolCallback` interface. It is then wrapped in `ScopedToolCallback` just like annotated tools.
+- **No Circular Dependency**: `ChatServiceProvider` and all callback types are in `aimo-core`. `aimo-mcp` imports from `aimo-core` (one-way). Core never imports from `aimo-mcp`.
+- **Scope Filtering (Two Levels)**: `ChatScopeProvider` filters callbacks by checking: (1) provider's `scopes` contains requested scope, AND (2) `ScopedToolCallback.scopes` contains requested scope. Both must be true.
+- **ChatServiceProvider Hierarchy**: `ChatServiceProvider` is the base interface (read-only) for any provider. Returns existing wrapper types that already carry scope information.
+- **Provider Wrapping**: `McpChatServiceProvider` wraps an `MCPServer` and provides access to its tools as `ScopedToolCallback` instances.
+- **Individual Callback Addition**: Scopes can include individual `ScopedToolCallback` and `ScopedSystemMessageCallback` instances in addition to provider-sourced callbacks.
+- **Core Filters by Scope**: `ChatScopeProvider` queries `ChatServiceProviderManager`, then filters using `ScopedToolCallback.scopes` and provider-level `scopes`.
 - **MCP tool naming**: Each tool namespaced as `"{serverId}:{toolName}"` to avoid collisions with annotated tools (no prefix) and other MCP servers
 - **tool-refs integration**: Both annotated tools (`"searchPapers"`) and MCP tools (`"claude-desktop:web_search"`) can be cherry-picked in YAML `tool-refs` lists
 - **Namespace safety**: No collision possible; annotated tools and MCP tools coexist in the same scope via different naming conventions
-- **Scope integration**: MCP tools inherit per-server scope restrictions; scopes automatically filter them just like annotated tools via `ChatScopeProvider`.
-- **Scope configuration**: Each MCP server declares its `scope: List<String>` in YAML; scope IDs are validated at startup. Supports `["*"]` for all scopes.
+- **Scope configuration**: Each MCP server declares its `scope: List<String>` in YAML. During discovery, each tool is wrapped as `ScopedToolCallback(callback, serverScopes)`.
 - **tool-refs validation**: At startup, validate that all `tool-refs` names exist in the unified tool pool (both annotated and MCP tools with namespacing)
 - **No builder methods for MCP**: The core framework does NOT have `withMcpServer()` or any MCP-related builder methods. Configuration is YAML-only.
-- **No LLM changes needed**: Model providers (Ollama, Bedrock, etc.) receive tools as normal `AimoToolDefinition` list; they don't know tools are MCP-sourced or which scopes they belong to.
+- **No LLM changes needed**: Model providers (Ollama, Bedrock, etc.) receive tools as normal `AimoToolDefinition` list via existing `AimoToolCallback`; they don't know which are MCP-sourced.
 - **Backward compatible**: Existing apps without MCP config continue to work unchanged (empty MCP server list by default).
-- **Dynamic tool discovery**: `MCPServerManager` supports periodic refresh (background scheduler) and manual refresh (admin endpoint). Tools updated in-place in servers; next scope build gets current tools.
-- **Tool caching strategy**: Tools cached in-place in `MCPServer` instances. On refresh, server re-discovers and updates cache. Groups query servers for current tools via `callbacks()`.
-- **Scope cache invalidation**: ChatScope objects rebuilt when underlying tool sets change; `ScopedCallbackManager` queries fresh tools each time `ChatScopeProvider` needs them.
+- **Tool caching strategy**: Tools discovered from MCP servers are cached in-place in `MCPServer` instances. When refresh (manual or periodic) is triggered: (1) re-discover tools from MCP server, (2) update cached tools in-place, (3) apply scope config to tools. Scope builders query `server.callbacks()` to get latest cached tools. No restart needed — changes picked up on next scope query.
+- **Scope cache invalidation**: ChatScope objects rebuilt when underlying tool sets change; `ChatServiceProviderManager` queries fresh tools and messages each time `ChatScopeProvider` needs them.
+- **Provider interface is read-only**: `ChatServiceProvider` interface offers no mutation methods. Refresh is internal to MCP server management, not exposed through provider interface.
 - **Defer Phase 3.5 (Programmatic Scope Builder)**: Focus Phase 3 on consuming; Phase 3.5 is a future enhancement added to the ROADMAP.
 
