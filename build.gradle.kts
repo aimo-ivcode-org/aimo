@@ -1,5 +1,7 @@
 plugins {
+	kotlin("jvm") version "2.1.21" apply false
 	id("io.spring.dependency-management").version("1.1.7").apply(false)
+	id("org.jetbrains.dokka").version("2.2.0").apply(false)
 }
 
 group = "org.ivcode"
@@ -48,6 +50,7 @@ subprojects {
 	// so projects that don't apply it will be skipped.
 	pluginManager.withPlugin("java") {
 		extensions.configure(org.gradle.api.plugins.JavaPluginExtension::class.java) {
+			withSourcesJar()
 			toolchain {
 				languageVersion.set(org.gradle.jvm.toolchain.JavaLanguageVersion.of(21))
 			}
@@ -59,6 +62,8 @@ subprojects {
 	// dependency on the Kotlin Gradle plugin classes (which would cause
 	// unresolved reference errors when compiling the root script).
 	pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+		pluginManager.apply("org.jetbrains.dokka")
+
 		val kotlinExt = extensions.findByName("kotlin")
 		if (kotlinExt != null) {
 			try {
@@ -71,5 +76,26 @@ subprojects {
 		}
 	}
 
+	pluginManager.withPlugin("org.jetbrains.dokka") {
+		extensions.configure<org.jetbrains.dokka.gradle.DokkaExtension> {
+			dokkaSourceSets.configureEach {
+				val modulePath = project.projectDir
+					.relativeTo(rootDir)
+					.invariantSeparatorsPath
 
+				sourceLink {
+					// local source directory
+					localDirectory.set(file("src/main/kotlin"))
+
+					// GitHub remote URL
+					remoteUrl.set(
+						uri("https://github.com/aimo-ivcode-org/aimo/blob/main/${modulePath}/src/main/kotlin/")
+					)
+
+					// maps line numbers to GitHub
+					remoteLineSuffix.set("#L")
+				}
+			}
+		}
+	}
 }
