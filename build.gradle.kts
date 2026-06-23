@@ -63,6 +63,9 @@ subprojects {
 	// unresolved reference errors when compiling the root script).
 	pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
 		pluginManager.apply("org.jetbrains.dokka")
+		tasks.named("build") {
+			dependsOn("dokkaGenerateHtml")
+		}
 
 		val kotlinExt = extensions.findByName("kotlin")
 		if (kotlinExt != null) {

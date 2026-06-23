@@ -1,0 +1,31 @@
+name: Aimo Build
+
+on:
+  push:
+    branches:
+      #- main
+      - chore/build-setup
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    steps:
+      # Checkout the main branch into "main" directory
+      - name: checkout
+        uses: actions/checkout@v3
+
+      # Set up JDK
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      # Build and Test
+      - name: Build and Test
+        run: ./gradlew clean build
