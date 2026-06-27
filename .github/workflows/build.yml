@@ -31,7 +31,7 @@ jobs:
         run: |
           mkdir -p pages
 
-          cat > pages/index.html <<'EOF'
+          cat > pages/index.html <<EOF
           <!DOCTYPE html>
           <html lang="en">
           <head>
