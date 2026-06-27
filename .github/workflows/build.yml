@@ -12,6 +12,9 @@ jobs:
     permissions:
       packages: write
 
+    environment:
+      name: github-pages
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
