@@ -3,7 +3,7 @@ name: Aimo Build
 on:
   push:
     branches:
-      - chore/build-setup
+      - main
 
 jobs:
   build:
