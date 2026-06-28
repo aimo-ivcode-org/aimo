@@ -1,8 +1,7 @@
 plugins {
-	kotlin("jvm") version "2.1.21" apply false
-	id("io.spring.dependency-management").version("1.1.7").apply(false)
-	id("org.jetbrains.dokka").version("2.2.0").apply(false)
-	id("org.jetbrains.dokka-javadoc").version("2.2.0").apply(false)
+	kotlin("jvm").apply(false)
+	id("io.spring.dependency-management").apply(false)
+	id("org.jetbrains.dokka").apply(false)
 	id("org.ivcode.core.gradle-dokka-pages")
 }
 
@@ -12,6 +11,10 @@ version = "0.1-SNAPSHOT"
 tasks.register("buildAll") {
 	description = "Builds all modules and generates all documentation."
     dependsOn("dokkaPages")
+}
+tasks.register("clean") {
+	description = "Cleans all build artifacts from all modules."
+    layout.buildDirectory.asFile.get().deleteRecursively()
 }
 
 subprojects {
