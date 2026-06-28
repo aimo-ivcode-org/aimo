@@ -1,6 +1,6 @@
 package org.ivcode.aimo.ui.controller
 
-import org.ivcode.aimo.core.builder.ConversationFactory
+import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.security.AimoUserProvider
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
