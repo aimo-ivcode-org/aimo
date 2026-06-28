@@ -28,51 +28,10 @@ jobs:
       - name: Build and Test
         run: ./gradlew clean buildAll
 
-      - name: Prepare Pages Content
-        env:
-          REDIRECT_URL: ${{ vars.REDIRECT_URL }}
-        run: |
-          mkdir -p pages
-
-          cat > pages/index.html <<EOF
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta http-equiv="refresh" content="0; url=${REDIRECT_URL}">
-              <link rel="canonical" href="${REDIRECT_URL}">
-              <script>
-                  window.location.replace("${REDIRECT_URL}");
-              </script>
-              <title>Redirecting...</title>
-          </head>
-          <body>
-              <p>If you are not redirected automatically,
-                  <a href="${REDIRECT_URL}">click here</a>.
-              </p>
-          </body>
-          </html>
-          EOF
-
-          cp -r aimo-core/build/dokka/html pages/kdoc/aimo-core
-          cp -r aimo-core/build/dokka/javadoc pages/javadoc/aimo-core
-          
-          cp -r aimo-model-bedrock/build/dokka/html pages/kdoc/aimo-model-bedrock
-          cp -r aimo-model-bedrock/build/dokka/javadoc pages/javadoc/aimo-model-bedrock
-          
-          cp -r aimo-model-ollama/build/dokka/html pages/kdoc/aimo-model-ollama
-          cp -r aimo-model-ollama/build/dokka/javadoc pages/javadoc/aimo-model-ollama
-          
-          cp -r aimo-plugin-ui/build/dokka/html pages/kdoc/aimo-plugin-ui
-          cp -r aimo-plugin-ui/build/dokka/javadoc pages/javadoc/aimo-plugin-ui
-          
-          cp -r aimo-server/build/dokka/html pages/kdoc/aimo-server
-          cp -r aimo-server/build/dokka/javadoc pages/javadoc/aimo-server
-
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: pages
+          path: ./build/dokka-pages
 
   deploy-gh-pages:
     runs-on: ubuntu-latest
