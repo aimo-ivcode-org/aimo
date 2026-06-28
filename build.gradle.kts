@@ -2,10 +2,17 @@ plugins {
 	kotlin("jvm") version "2.1.21" apply false
 	id("io.spring.dependency-management").version("1.1.7").apply(false)
 	id("org.jetbrains.dokka").version("2.2.0").apply(false)
+	id("org.jetbrains.dokka-javadoc").version("2.2.0").apply(false)
+	id("org.ivcode.core.gradle-dokka-pages")
 }
 
 group = "org.ivcode"
 version = "0.1-SNAPSHOT"
+
+tasks.register("buildAll") {
+	description = "Builds all modules and generates all documentation."
+    dependsOn("dokkaPages")
+}
 
 subprojects {
 
@@ -45,10 +52,19 @@ subprojects {
 		}
 	}
 
+	tasks.register("buildAll") {
+		group = "build"
+		description = "Builds all modules and generates all documentation."
+	}
+
 	// Configure Java toolchain for subprojects that apply the Java plugin.
 	// This will only run in projects that actually apply the 'java' plugin,
 	// so projects that don't apply it will be skipped.
 	pluginManager.withPlugin("java") {
+		tasks.named("buildAll") {
+			dependsOn("build")
+		}
+
 		extensions.configure(org.gradle.api.plugins.JavaPluginExtension::class.java) {
 			withSourcesJar()
 			toolchain {
@@ -63,9 +79,7 @@ subprojects {
 	// unresolved reference errors when compiling the root script).
 	pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
 		pluginManager.apply("org.jetbrains.dokka")
-		tasks.named("build") {
-			dependsOn("dokkaGenerateHtml")
-		}
+		pluginManager.apply("org.jetbrains.dokka-javadoc")
 
 		val kotlinExt = extensions.findByName("kotlin")
 		if (kotlinExt != null) {

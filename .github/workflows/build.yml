@@ -26,7 +26,7 @@ jobs:
           java-version: '21'
 
       - name: Build and Test
-        run: ./gradlew clean build
+        run: ./gradlew clean buildAll
 
       - name: Prepare Pages Content
         env:
@@ -54,11 +54,20 @@ jobs:
           </html>
           EOF
 
-          cp -r aimo-core/build/dokka/html pages/aimo-core
-          cp -r aimo-model-bedrock/build/dokka/html pages/aimo-model-bedrock
-          cp -r aimo-model-ollama/build/dokka/html pages/aimo-model-ollama
-          cp -r aimo-plugin-ui/build/dokka/html pages/aimo-plugin-ui
-          cp -r aimo-server/build/dokka/html pages/aimo-server
+          cp -r aimo-core/build/dokka/html pages/kdoc/aimo-core
+          cp -r aimo-core/build/dokka/javadoc pages/javadoc/aimo-core
+          
+          cp -r aimo-model-bedrock/build/dokka/html pages/kdoc/aimo-model-bedrock
+          cp -r aimo-model-bedrock/build/dokka/javadoc pages/javadoc/aimo-model-bedrock
+          
+          cp -r aimo-model-ollama/build/dokka/html pages/kdoc/aimo-model-ollama
+          cp -r aimo-model-ollama/build/dokka/javadoc pages/javadoc/aimo-model-ollama
+          
+          cp -r aimo-plugin-ui/build/dokka/html pages/kdoc/aimo-plugin-ui
+          cp -r aimo-plugin-ui/build/dokka/javadoc pages/javadoc/aimo-plugin-ui
+          
+          cp -r aimo-server/build/dokka/html pages/kdoc/aimo-server
+          cp -r aimo-server/build/dokka/javadoc pages/javadoc/aimo-server
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
