@@ -2,7 +2,6 @@ package org.ivcode.aimo.ui.controller
 
 import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.security.AimoUserProvider
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
 import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.ui.chatcontroller.TitleChatController
@@ -16,10 +15,6 @@ import java.util.UUID
 
 /**
  * REST endpoints for reading and manually updating chat titles.
- *
- * This controller exists for user-driven title management outside of the LLM tool flow.
- * When a title is updated through [setTitle], it is recorded through [TitleChatController]
- * as a user-set title so it can be preserved from later assistant-driven title changes.
  */
 @RestController
 @RequestMapping("/$API_CONTROLLER_CONTEXT/title")
@@ -27,46 +22,31 @@ class TitleController constructor(
     private val conversationFactory: ConversationFactory,
     private val conversationStore: AimoChatClientDao,
     private val titleChatController: TitleChatController,
-    private val userProvider: AimoUserProvider
 ) {
 
-    /** Returns the current title metadata for a single conversation. */
     @GetMapping("/{chatId}")
     fun getTitle(
         @PathVariable chatId: UUID
     ): ConversationTitle? {
-        val user = userProvider.getCurrentUser()
-        val conversation = conversationFactory.getConversation(chatId, user.userId)
+        val conversation = conversationFactory.getConversation(chatId)
             ?: throw NotFoundException("Conversation not found: chatId=$chatId")
         return titleChatController.getTitle(conversation)
     }
 
-    /** Returns title metadata for all conversations that currently have a stored title. */
     @GetMapping("/")
     fun getTitles(): List<ConversationTitle> {
-        val user = userProvider.getCurrentUser()
-        val conversations = conversationStore.getChatConversations(user.userId)
-        return conversations.mapNotNull { entity ->
+        return conversationStore.getChatConversations().mapNotNull { entity ->
             titleChatController.getTitle(entity.chatId, entity.metadata)
         }
     }
 
-    /**
-     * Manually sets the title for a specific chat.
-     *
-     * This endpoint is intended for user actions from the UI or other external clients.
-     * The title is stored as a user-set title, which means assistant-generated title
-     * updates should not overwrite it later.
-     */
     @PutMapping("/{chatId}/{title}")
     fun setTitle(
         @PathVariable chatId: UUID,
         @PathVariable title: String
     ) {
-        val user = userProvider.getCurrentUser()
-        val conversation = conversationFactory.getConversation(chatId, user.userId)
+        val conversation = conversationFactory.getConversation(chatId)
             ?: throw NotFoundException("Conversation not found: chatId=$chatId")
         titleChatController.setTitle(title, conversation, "USER")
     }
 }
-

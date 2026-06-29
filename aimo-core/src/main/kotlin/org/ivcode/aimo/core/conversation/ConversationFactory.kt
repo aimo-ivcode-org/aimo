@@ -3,44 +3,20 @@ package org.ivcode.aimo.core.conversation
 import java.util.UUID
 
 /**
- * Factory for creating Conversation instances from the DAO/store with interceptors.
+ * Factory for creating [Conversation] instances with optional interceptors.
  *
- * This factory creates Conversation instances from the underlying store and optionally
- * wraps them with interceptors for cross-cutting concerns:
- * - Security and access control (enforce user ownership)
- * - Auditing (log all DAO operations)
- * - Caching (memoize getMessages calls)
- * - Data transformation (encryption, schema migration)
- *
- * Typical usage:
- * ```kotlin
- * val conversation = factory
- *     .withInterceptor(SecurityConversationInterceptor(userId))
- *     .withInterceptor(AuditingInterceptor())
- *     .getConversation(chatId, userId)
- * ```
- *
- * **Only accepts ConversationInterceptor**, not ChatClientInterceptor.
+ * Metadata passed to [getConversation] is used for DAO-level filtering and scoping.
+ * Interceptors can enrich the metadata before DAO operations.
  */
 interface ConversationFactory {
-    /**
-     * Register a conversation-level interceptor.
-     *
-     * Interceptors are applied in registration order. First registered interceptor is the
-     * outermost link (executes first).
-     *
-     * @param interceptor The interceptor to register
-     * @return this factory for chaining
-     */
     fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory
 
     /**
-     * Create a conversation from the DAO/store and apply all registered interceptors.
+     * Get a conversation with optional metadata for DAO scoping.
      *
-     * @param chatId The conversation identifier
-     * @param userId The user identifier (for access control and scoping)
-     * @return The conversation instance ready for use (wrapped with interceptors if any were registered),
-     *         or null if the conversation is not found or the user does not have access
+     * @param chatId The chat identifier
+     * @param metadata Metadata for DAO scoping (e.g., tenant, user scope); interceptors may add entries
+     * @return The conversation instance, or null if not found or access denied
      */
-    fun getConversation(chatId: UUID, userId: String): Conversation?
+    fun getConversation(chatId: UUID, metadata: Map<String, Any> = emptyMap()): Conversation?
 }

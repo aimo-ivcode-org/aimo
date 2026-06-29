@@ -1,24 +1,9 @@
 package org.ivcode.aimo.core.conversation
 
-import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.AimoChatMessage
+import org.ivcode.aimo.core.dao.AimoChatClientDao
 import java.util.UUID
 
-/**
- * Concrete implementation of [ConversationFactory] that creates conversations from DAO/store.
- *
- * This factory creates Conversation instances from the underlying store,
- * then optionally wraps them with interceptors.
- *
- * Interceptors are applied in registration order, with the first registered interceptor
- * being the outermost link (executes first).
- *
- * This implementation is immutable - withInterceptor() returns a new factory instance
- * with the additional interceptor, ensuring thread-safety and preventing cross-request leakage.
- *
- * @property conversationStore The DAO/store for conversation persistence
- * @property interceptors Immutable list of interceptors for this factory instance
- */
 class ConversationFactoryImpl(
     private val conversationStore: AimoChatClientDao,
     private val interceptors: List<ConversationInterceptor> = emptyList()
@@ -27,175 +12,132 @@ class ConversationFactoryImpl(
     override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
         return ConversationFactoryImpl(conversationStore, interceptors + interceptor)
     }
-     override fun getConversation(chatId: UUID, userId: String): Conversation? {
-         // Check if the conversation exists and user has access
-         if(conversationStore.getChatConversation(chatId, userId) == null) {
-             return null
-         }
 
-         // Create the base conversation
-         val baseConversation = ConversationImpl(chatId, conversationStore, userId)
+    override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
+        if (conversationStore.getChatConversation(chatId, metadata) == null) {
+            return null
+        }
 
-         // If no interceptors, return base conversation
-         if (interceptors.isEmpty()) {
-             return baseConversation
-         }
+        val baseConversation = ConversationImpl(chatId, conversationStore, metadata)
 
-         // Wrap with all registered interceptors, passing userId for interceptor context
-         return InterceptedConversation(baseConversation, interceptors, userId)
-     }
+        if (interceptors.isEmpty()) {
+            return baseConversation
+        }
+
+        return InterceptedConversation(baseConversation, interceptors, metadata.toMutableMap())
+    }
 }
 
-/**
- * Wrapped conversation that applies interceptor chain to all operations.
- *
- * Each method invocation builds a context map with operation parameters, then
- * executes the interceptor chain.
- */
 private class InterceptedConversation(
     private val delegate: Conversation,
     private val interceptors: List<ConversationInterceptor>,
-    private val userId: String
+    private val scopeMetadata: MutableMap<String, Any>,
 ) : Conversation {
 
     override val chatId: UUID
         get() = delegate.chatId
 
-     override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
-         val context = mutableMapOf<String, Any>(
-             "operation" to "getMessages",
-             "chatId" to chatId,
-             "userId" to userId
-         )
-         if (maxCacheCharacters != null) {
-             context["maxCacheCharacters"] = maxCacheCharacters
-         }
+    override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
+        val metadata = scopeMetadata.toMutableMap()
+        if (maxCacheCharacters != null) {
+            metadata["maxCacheCharacters"] = maxCacheCharacters
+        }
 
-        val chain = buildChain(interceptors, 0) { ctx ->
-            val max = ctx["maxCacheCharacters"] as? Long
+        val chain = buildChain(interceptors, 0) { cid, md ->
+            val max = md["maxCacheCharacters"] as? Long
             delegate.getMessages(max)
         }
 
         @Suppress("UNCHECKED_CAST")
-        return chain.proceed(context) as? List<AimoChatMessage>
+        return chain.proceed(chatId, metadata) as? List<AimoChatMessage>
     }
 
-     override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
-         val context = mutableMapOf<String, Any>(
-             "operation" to "addMessages",
-             "chatId" to chatId,
-             "userId" to userId,
-             "requestId" to requestId,
-             "messages" to messages
-         )
-         if (maxCacheCharacters != null) {
-             context["maxCacheCharacters"] = maxCacheCharacters
-         }
+    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
+        val metadata = scopeMetadata.toMutableMap().apply {
+            put("requestId", requestId)
+            put("messages", messages)
+            if (maxCacheCharacters != null) {
+                put("maxCacheCharacters", maxCacheCharacters)
+            }
+        }
 
-        val chain = buildChain(interceptors, 0) { ctx ->
-            val rid = ctx["requestId"] as UUID
+        val chain = buildChain(interceptors, 0) { cid, md ->
+            val rid = md["requestId"] as UUID
             @Suppress("UNCHECKED_CAST")
-            val msgs = ctx["messages"] as List<AimoChatMessage>
-            val max = ctx["maxCacheCharacters"] as? Long
+            val msgs = md["messages"] as List<AimoChatMessage>
+            val max = md["maxCacheCharacters"] as? Long
             delegate.addMessages(rid, msgs, max)
         }
 
-        chain.proceed(context)
+        chain.proceed(chatId, metadata)
     }
 
-     override fun getChatMetadata(): Map<String, Any> {
-         val context = mutableMapOf<String, Any>(
-             "operation" to "getChatMetadata",
-             "chatId" to chatId,
-             "userId" to userId
-         )
+    override fun getChatMetadata(): Map<String, Any> {
+        val metadata = scopeMetadata.toMutableMap()
 
-        val chain = buildChain(interceptors, 0) { _ ->
+        val chain = buildChain(interceptors, 0) { _, _ ->
             delegate.getChatMetadata()
         }
 
         @Suppress("UNCHECKED_CAST")
-        return chain.proceed(context) as Map<String, Any>
+        return chain.proceed(chatId, metadata) as Map<String, Any>
     }
 
-     override fun getChatProperty(property: String): Any? {
-         val context = mutableMapOf<String, Any>(
-             "operation" to "getChatProperty",
-             "chatId" to chatId,
-             "userId" to userId,
-             "property" to property
-         )
+    override fun getChatProperty(property: String): Any? {
+        val metadata = scopeMetadata.toMutableMap().apply {
+            put("property", property)
+        }
 
-        val chain = buildChain(interceptors, 0) { ctx ->
-            val prop = ctx["property"] as String
+        val chain = buildChain(interceptors, 0) { _, md ->
+            val prop = md["property"] as String
             delegate.getChatProperty(prop)
         }
 
-
-        return chain.proceed(context)
+        return chain.proceed(chatId, metadata)
     }
 
-     override fun writeChatProperty(property: String, value: Any) {
-         val context = mutableMapOf<String, Any>(
-             "operation" to "writeChatProperty",
-             "chatId" to chatId,
-             "userId" to userId,
-             "property" to property,
-             "value" to value
-         )
+    override fun writeChatProperty(property: String, value: Any) {
+        val metadata = scopeMetadata.toMutableMap().apply {
+            put("property", property)
+            put("value", value)
+        }
 
-        val chain = buildChain(interceptors, 0) { ctx ->
-            val prop = ctx["property"] as String
-            val v = ctx["value"] as Any
+        val chain = buildChain(interceptors, 0) { _, md ->
+            val prop = md["property"] as String
+            val v = md["value"] as Any
             delegate.writeChatProperty(prop, v)
         }
 
-        chain.proceed(context)
+        chain.proceed(chatId, metadata)
     }
 
-     override fun deleteChatProperty(property: String): Boolean {
-         val context = mutableMapOf<String, Any>(
-             "operation" to "deleteChatProperty",
-             "chatId" to chatId,
-             "userId" to userId,
-             "property" to property
-         )
+    override fun deleteChatProperty(property: String): Boolean {
+        val metadata = scopeMetadata.toMutableMap().apply {
+            put("property", property)
+        }
 
-        val chain = buildChain(interceptors, 0) { ctx ->
-            val prop = ctx["property"] as String
+        val chain = buildChain(interceptors, 0) { _, md ->
+            val prop = md["property"] as String
             delegate.deleteChatProperty(prop)
         }
 
-        return chain.proceed(context) as Boolean
+        return chain.proceed(chatId, metadata) as Boolean
     }
 
-    /**
-     * Builds a chain of responsibility for the interceptors.
-     *
-     * @param interceptors List of interceptors to chain
-     * @param index Current index in the interceptors list
-     * @param finalAction The final action to execute after all interceptors
-     * @return A Chain that will execute the interceptors and final action
-     */
     private fun buildChain(
         interceptors: List<ConversationInterceptor>,
         index: Int,
-        finalAction: (MutableMap<String, Any>) -> Any?
+        finalAction: (UUID, MutableMap<String, Any>) -> Any?
     ): ConversationInterceptor.Chain {
         return object : ConversationInterceptor.Chain {
-            override fun proceed(context: MutableMap<String, Any>): Any? {
+            override fun proceed(cid: UUID, metadata: MutableMap<String, Any>): Any? {
                 return if (index < interceptors.size) {
-                    // Call the next interceptor
                     val nextChain = buildChain(interceptors, index + 1, finalAction)
-                    interceptors[index].intercept(nextChain, context)
+                    interceptors[index].intercept(nextChain, cid, metadata)
                 } else {
-                    // All interceptors processed, execute final action
-                    finalAction(context)
+                    finalAction(cid, metadata)
                 }
             }
         }
     }
 }
-
-
-

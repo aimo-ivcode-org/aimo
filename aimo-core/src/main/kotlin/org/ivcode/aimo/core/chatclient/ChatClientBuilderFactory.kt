@@ -45,8 +45,8 @@ interface ChatClientBuilderFactory {
      *
      * // Create conversation
      * val conversation = conversationFactory
-     *     .withInterceptor(SecurityConversationInterceptor(userId))
-     *     .getConversation(chatId, userId)
+     *     .withInterceptor(MyAccessInterceptor())
+     *     .getConversation(chatId, mapOf("userId" to currentUserId))
      *
      * // Create chat client
      * val chatClient = chatClientBuilderFactory

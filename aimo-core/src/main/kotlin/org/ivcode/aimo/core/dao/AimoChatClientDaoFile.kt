@@ -5,24 +5,6 @@ import tools.jackson.databind.ObjectMapper
 import java.io.File
 import java.util.UUID
 
-/**
- * File-based implementation of [AimoChatClientDao].
- *
- * Persists conversations and requests to the filesystem in JSON format.
- * Directory structure:
- * ```
- * dataDir/
- *   <chatId>/
- *     metadata.json (ChatConversationEntity)
- *     requests/
- *       <requestId>.json (ChatRequestEntity)
- * ```
- *
- * Thread-safe via synchronized access patterns.
- *
- * @param dataDir the root directory where all chat data is persisted
- * @param objectMapper JSON serializer
- */
 class AimoChatClientDaoFile(
     private val dataDir: File,
     private val objectMapper: ObjectMapper
@@ -34,8 +16,6 @@ class AimoChatClientDaoFile(
     init {
         dataDir.mkdirs()
     }
-
-    // ===== Helper methods for file operations =====
 
     private fun getChatDir(chatId: UUID): File = File(dataDir, chatId.toString())
     private fun getMetadataFile(chatId: UUID): File = File(getChatDir(chatId), "metadata.json")
@@ -78,21 +58,25 @@ class AimoChatClientDaoFile(
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, request)
     }
 
-    private fun canAccess(conversation: ChatConversationEntity, userId: String): Boolean {
-        return conversation.userId == userId
+    override fun createChatConversation(metadata: Map<String, Any>): ChatConversationEntity {
+        synchronized(lock) {
+            val chatId = UUID.randomUUID()
+            val conversation = ChatConversationEntity(
+                chatId = chatId,
+                metadata = metadata,
+            )
+            saveConversation(getMetadataFile(chatId), conversation)
+            return conversation
+        }
     }
 
-    // =========================================
-    // User-Scoped Methods
-    // =========================================
-
-    override fun getChatConversations(userId: String): List<ChatConversationEntity> {
+    override fun getChatConversations(scopeMetadata: Map<String, Any>): List<ChatConversationEntity> {
         synchronized(lock) {
             val conversations = mutableListOf<ChatConversationEntity>()
             dataDir.listFiles { file -> file.isDirectory }?.forEach { chatDir ->
                 val metadataFile = File(chatDir, "metadata.json")
                 loadConversation(metadataFile)?.let { conversation ->
-                    if (conversation.userId == userId) {
+                    if (ConversationMetadataMatcher.matches(conversation.metadata, scopeMetadata)) {
                         conversations.add(conversation)
                     }
                 }
@@ -101,37 +85,31 @@ class AimoChatClientDaoFile(
         }
     }
 
-    override fun getChatConversation(chatId: UUID, userId: String): ChatConversationEntity? {
+    override fun getChatConversation(chatId: UUID, scopeMetadata: Map<String, Any>): ChatConversationEntity? {
         synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return null
-            return if (canAccess(conversation, userId)) conversation else null
+            return getConversationIfMatches(chatId, scopeMetadata)
         }
     }
 
-    override fun deleteChatConversation(chatId: UUID, userId: String): Boolean {
+    override fun deleteChatConversation(chatId: UUID, scopeMetadata: Map<String, Any>): Boolean {
         synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return false
-            if (!canAccess(conversation, userId)) return false
-
+            if (getConversationIfMatches(chatId, scopeMetadata) == null) return false
             getChatDir(chatId).deleteRecursively()
             return true
         }
     }
 
-    override fun addChatRequest(userId: String, request: ChatRequestEntity): Boolean {
+    override fun addChatRequest(request: ChatRequestEntity, scopeMetadata: Map<String, Any>): Boolean {
         synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(request.chatId)) ?: return false
-            if (!canAccess(conversation, userId)) return false
-
+            if (getConversationIfMatches(request.chatId, scopeMetadata) == null) return false
             saveRequest(getRequestFile(request.chatId, request.requestId), request)
             return true
         }
     }
 
-    override fun getChatRequests(userId: String, chatId: UUID): List<ChatRequestEntity> {
+    override fun getChatRequests(chatId: UUID, scopeMetadata: Map<String, Any>): List<ChatRequestEntity> {
         synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return emptyList()
-            if (!canAccess(conversation, userId)) return emptyList()
+            if (getConversationIfMatches(chatId, scopeMetadata) == null) return emptyList()
 
             val requestsDir = getRequestsDir(chatId)
             if (!requestsDir.exists()) return emptyList()
@@ -143,14 +121,14 @@ class AimoChatClientDaoFile(
         }
     }
 
-    override fun getChatRequests(userId: String, chatId: UUID, maxRequestCharacters: Long): List<ChatRequestEntity> {
+    override fun getChatRequests(
+        chatId: UUID,
+        maxRequestCharacters: Long,
+        scopeMetadata: Map<String, Any>,
+    ): List<ChatRequestEntity> {
         synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return emptyList()
-            if (!canAccess(conversation, userId)) return emptyList()
-
-            if (maxRequestCharacters <= 0) {
-                return emptyList()
-            }
+            if (getConversationIfMatches(chatId, scopeMetadata) == null) return emptyList()
+            if (maxRequestCharacters <= 0) return emptyList()
 
             val requestsDir = getRequestsDir(chatId)
             if (!requestsDir.exists()) return emptyList()
@@ -160,14 +138,11 @@ class AimoChatClientDaoFile(
                 ?.sortedBy { it.createdAt }
                 ?: return emptyList()
 
-            if (allRequests.isEmpty()) {
-                return emptyList()
-            }
+            if (allRequests.isEmpty()) return emptyList()
 
             var totalCharacters = 0L
             val selected = mutableListOf<ChatRequestEntity>()
 
-            // Pick newest requests first until adding the next would exceed the budget.
             for (request in allRequests.asReversed()) {
                 val requestCharacters = request.requestCharacters.toLong()
                 if (totalCharacters + requestCharacters > maxRequestCharacters) {
@@ -181,37 +156,36 @@ class AimoChatClientDaoFile(
         }
     }
 
-    override fun getMessages(userId: String, chatId: UUID): List<ChatMessageEntity> {
+    override fun getMessages(chatId: UUID, scopeMetadata: Map<String, Any>): List<ChatMessageEntity> {
         synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return emptyList()
-            if (!canAccess(conversation, userId)) return emptyList()
-
-            val requests = getChatRequests(userId, chatId)
-            return requests.flatMap { it.messages }
+            if (getConversationIfMatches(chatId, scopeMetadata) == null) return emptyList()
+            return getChatRequests(chatId, scopeMetadata).flatMap { it.messages }
         }
     }
 
-    override fun upsertConversationMetadata(chatId: UUID, userId: String, metadata: Map<String, Any>): Boolean {
+    override fun upsertConversationMetadata(
+        chatId: UUID,
+        metadata: Map<String, Any>,
+        scopeMetadata: Map<String, Any>,
+    ): Boolean {
         synchronized(lock) {
-            val existing = loadConversation(getMetadataFile(chatId)) ?: return false
-            if (!canAccess(existing, userId)) return false
-
+            val existing = getConversationIfMatches(chatId, scopeMetadata) ?: return false
             if (metadata.isEmpty()) return true
 
             val merged = existing.metadata.toMutableMap()
-            for ((k, v) in metadata) {
-                merged[k] = v
-            }
+            merged.putAll(metadata)
             saveConversation(getMetadataFile(chatId), existing.copy(metadata = merged.toMap()))
             return true
         }
     }
 
-    override fun deleteConversationMetadata(chatId: UUID, userId: String, keys: List<String>): Boolean {
+    override fun deleteConversationMetadata(
+        chatId: UUID,
+        keys: List<String>,
+        scopeMetadata: Map<String, Any>,
+    ): Boolean {
         synchronized(lock) {
-            val existing = loadConversation(getMetadataFile(chatId)) ?: return false
-            if (!canAccess(existing, userId)) return false
-
+            val existing = getConversationIfMatches(chatId, scopeMetadata) ?: return false
             if (keys.isEmpty()) return true
 
             val updated = existing.metadata.toMutableMap()
@@ -224,166 +198,9 @@ class AimoChatClientDaoFile(
         }
     }
 
-    // =========================================
-    // Admin Methods (no auth check)
-    // =========================================
-
-    override fun getChatConversation(chatId: UUID): ChatConversationEntity? {
-        synchronized(lock) {
-            return loadConversation(getMetadataFile(chatId))
-        }
-    }
-
-    override fun getChatConversationsAdmin(): List<ChatConversationEntity> {
-        synchronized(lock) {
-            val conversations = mutableListOf<ChatConversationEntity>()
-            dataDir.listFiles { file -> file.isDirectory }?.forEach { chatDir ->
-                val metadataFile = File(chatDir, "metadata.json")
-                loadConversation(metadataFile)?.let { conversation ->
-                    conversations.add(conversation)
-                }
-            }
-            return conversations
-        }
-    }
-
-    override fun getChatConversationAdmin(chatId: UUID): ChatConversationEntity? {
-        synchronized(lock) {
-            return loadConversation(getMetadataFile(chatId))
-        }
-    }
-
-    override fun deleteChatConversationAdmin(chatId: UUID): Boolean {
-        synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return false
-            getChatDir(chatId).deleteRecursively()
-            return true
-        }
-    }
-
-    override fun addChatRequestAdmin(request: ChatRequestEntity): Boolean {
-        synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(request.chatId)) ?: return false
-            saveRequest(getRequestFile(request.chatId, request.requestId), request)
-            return true
-        }
-    }
-
-    override fun getChatRequestsAdmin(chatId: UUID): List<ChatRequestEntity> {
-        synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return emptyList()
-
-            val requestsDir = getRequestsDir(chatId)
-            if (!requestsDir.exists()) return emptyList()
-
-            return requestsDir.listFiles()
-                ?.mapNotNull { file -> loadRequest(file) }
-                ?.sortedBy { it.createdAt }
-                ?: emptyList()
-        }
-    }
-
-    override fun getChatRequestsAdmin(chatId: UUID, maxRequestCharacters: Long): List<ChatRequestEntity> {
-        synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return emptyList()
-
-            if (maxRequestCharacters <= 0) {
-                return emptyList()
-            }
-
-            val requestsDir = getRequestsDir(chatId)
-            if (!requestsDir.exists()) return emptyList()
-
-            val allRequests = requestsDir.listFiles()
-                ?.mapNotNull { file -> loadRequest(file) }
-                ?.sortedBy { it.createdAt }
-                ?: return emptyList()
-
-            if (allRequests.isEmpty()) {
-                return emptyList()
-            }
-
-            var totalCharacters = 0L
-            val selected = mutableListOf<ChatRequestEntity>()
-
-            // Pick newest requests first until adding the next would exceed the budget.
-            for (request in allRequests.asReversed()) {
-                val requestCharacters = request.requestCharacters.toLong()
-                if (totalCharacters + requestCharacters > maxRequestCharacters) {
-                    break
-                }
-                selected.add(request)
-                totalCharacters += requestCharacters
-            }
-
-            return selected.asReversed()
-        }
-    }
-
-    override fun getMessagesAdmin(chatId: UUID): List<ChatMessageEntity> {
-        synchronized(lock) {
-            val conversation = loadConversation(getMetadataFile(chatId)) ?: return emptyList()
-            val requests = getChatRequestsAdmin(chatId)
-            return requests.flatMap { it.messages }
-        }
-    }
-
-    override fun upsertConversationMetadataAdmin(chatId: UUID, metadata: Map<String, Any>): Boolean {
-        synchronized(lock) {
-            val existing = loadConversation(getMetadataFile(chatId)) ?: return false
-
-            if (metadata.isEmpty()) return true
-
-            val merged = existing.metadata.toMutableMap()
-            for ((k, v) in metadata) {
-                merged[k] = v
-            }
-            saveConversation(getMetadataFile(chatId), existing.copy(metadata = merged.toMap()))
-            return true
-        }
-    }
-
-    override fun deleteConversationMetadataAdmin(chatId: UUID, keys: List<String>): Boolean {
-        synchronized(lock) {
-            val existing = loadConversation(getMetadataFile(chatId)) ?: return false
-
-            if (keys.isEmpty()) return true
-
-            val updated = existing.metadata.toMutableMap()
-            for (k in keys) {
-                updated.remove(k)
-            }
-
-            saveConversation(getMetadataFile(chatId), existing.copy(metadata = updated.toMap()))
-            return true
-        }
-    }
-
-    // ===== Creation (requires userId) =====
-
-    override fun createChatConversation(userId: String): ChatConversationEntity {
-        synchronized(lock) {
-            val chatId = UUID.randomUUID()
-            val conversation = ChatConversationEntity(
-                chatId = chatId,
-                userId = userId,
-                metadata = mapOf()
-            )
-            saveConversation(getMetadataFile(chatId), conversation)
-            return conversation
-        }
-    }
-
-    override fun createChatConversation(userId: String, metadata: Map<String, String>): ChatConversationEntity {
-        synchronized(lock) {
-            val chatId = UUID.randomUUID()
-            val conversation = ChatConversationEntity(
-                chatId = chatId,
-                userId = userId,
-                metadata = metadata
-            )
-            saveConversation(getMetadataFile(chatId), conversation)
-            return conversation
-        }
+    private fun getConversationIfMatches(chatId: UUID, scopeMetadata: Map<String, Any>): ChatConversationEntity? {
+        val conversation = loadConversation(getMetadataFile(chatId)) ?: return null
+        if (!ConversationMetadataMatcher.matches(conversation.metadata, scopeMetadata)) return null
+        return conversation
     }
 }

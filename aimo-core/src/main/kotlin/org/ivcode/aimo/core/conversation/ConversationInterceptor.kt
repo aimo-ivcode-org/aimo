@@ -1,41 +1,48 @@
 package org.ivcode.aimo.core.conversation
 
+import java.util.UUID
+
 /**
- * Interceptor for conversation (DAO-level) operations.
+ * Interceptor for conversation operations.
  *
- * Handles cross-cutting concerns at the conversation storage layer such as:
- * - Security and access control (verify user ownership before DAO access)
- * - Auditing (log all conversation reads/writes)
- * - Caching (memoize getMessages calls)
- * - Data transformation (encryption, schema migration)
+ * Interceptors can add cross-cutting concerns such as:
+ * - **Auditing**: Log all DAO operations
+ * - **Caching**: Memoize results
+ * - **Data transformation**: Encryption, compression, schema migration
+ * - **Metadata enrichment**: Add or modify metadata before DAO calls
  *
- * **NOT interchangeable with ChatClientInterceptor** — different operations, different signatures.
+ * ## Usage Pattern
  *
- * Interceptors form a chain where each interceptor can read/modify the context before
- * calling `chain.proceed(context)` to pass control to the next interceptor.
+ * Interceptors receive the `chatId` and a mutable `metadata` map. They can:
+ * 1. Enrich the metadata with additional entries
+ * 2. Call the chain to proceed to the next interceptor or final DAO operation
+ * 3. Post-process the result
+ *
+ * ```kotlin
+ * factory
+ *     .withInterceptor(MyCustomInterceptor())
+ *     .getConversation(chatId, mapOf("tenant" to "acme"))
+ * ```
  */
 interface ConversationInterceptor {
     /**
-     * Intercepts a conversation operation.
+     * Intercept a conversation operation.
      *
-     * @param chain The next link in the interceptor chain.
-     * @param context Mutable operation context containing parameters like `chatId`, `userId`,
-     *                `messages`, `property`, `value`, etc. Modifications propagate downstream only.
-     * @return The operation result (type depends on the operation being intercepted).
+     * @param chain The interceptor chain to proceed with
+     * @param chatId The chat identifier for this operation
+     * @param metadata Mutable metadata map for DAO scoping; interceptors may add entries to enrich the metadata
+     * @return The result of the operation
      */
-    fun intercept(chain: Chain, context: MutableMap<String, Any>): Any?
+    fun intercept(chain: Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any?
 
-    /**
-     * Chain link for conversation operation execution.
-     */
     interface Chain {
         /**
-         * Proceeds to the next interceptor in the chain, or executes the base operation
-         * if this is the last link.
+         * Proceed to the next interceptor or final operation.
          *
-         * @param context The operation context with potentially modified parameters.
-         * @return The operation result.
+         * @param chatId The chat identifier
+         * @param metadata The metadata for this operation (may have been enriched by interceptors)
+         * @return The operation result
          */
-        fun proceed(context: MutableMap<String, Any>): Any?
+        fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Any?
     }
 }

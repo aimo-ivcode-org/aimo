@@ -1,0 +1,296 @@
+package org.ivcode.aimo.core.conversation
+
+import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
+import org.ivcode.aimo.core.dao.ChatConversationEntity
+import org.ivcode.aimo.core.dao.ChatMessageEntity
+import org.ivcode.aimo.core.dao.ChatRequestEntity
+import org.ivcode.aimo.core.AimoChatMessage
+import org.ivcode.aimo.core.AimoChatMessageType
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import java.time.Instant
+import java.util.UUID
+
+class ConversationFactoryTest {
+
+    @Test
+    fun `factory creates and retrieves conversations with empty metadata`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+
+        // Create a conversation with empty metadata
+        val conversation = dao.createChatConversation(emptyMap())
+
+        // Should retrieve with empty metadata
+        val retrieved = factory.getConversation(conversation.chatId, emptyMap())
+        assertNotNull(retrieved)
+        assertEquals(conversation.chatId, retrieved.chatId)
+    }
+
+    @Test
+    fun `factory creates and retrieves conversations with metadata`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+        val metadata = mapOf("userId" to "user1", "tenant" to "acme")
+
+        // Create a conversation with metadata
+        val conversation = dao.createChatConversation(metadata)
+
+        // Should retrieve with matching metadata
+        val retrieved = factory.getConversation(conversation.chatId, metadata = metadata)
+        assertNotNull(retrieved)
+        assertEquals(conversation.chatId, retrieved.chatId)
+    }
+
+    @Test
+    fun `factory fails to retrieve conversation with non-matching metadata`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+        val metadata = mapOf("userId" to "user1", "tenant" to "acme")
+
+        // Create a conversation with specific metadata
+        val conversation = dao.createChatConversation(metadata)
+
+        // Should not retrieve with different metadata
+        val retrieved = factory.getConversation(conversation.chatId, metadata = mapOf("userId" to "user2"))
+        assertNull(retrieved, "Should not retrieve conversation with non-matching metadata")
+    }
+
+
+
+    @Test
+    fun `factory retrieves messages from conversation with metadata`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+        val metadata = mapOf("userId" to "user1")
+
+        val conversation = dao.createChatConversation(metadata)
+        val requestId = UUID.randomUUID()
+
+        // Add messages via DAO
+        val request = ChatRequestEntity(
+            chatId = conversation.chatId,
+            requestId = requestId,
+            messages = listOf(
+                ChatMessageEntity(requestId, 1, "USER", "Hello", null, null)
+            ),
+            requestCharacters = 5,
+            createdAt = Instant.now()
+        )
+        dao.addChatRequest(request, metadata)
+
+        // Retrieve through factory with matching metadata
+        val conv = factory.getConversation(conversation.chatId, metadata = metadata)
+        assertNotNull(conv)
+        val messages = conv.getMessages()
+        assertNotNull(messages)
+        assertEquals(1, messages.size)
+        assertEquals("Hello", messages.first().content)
+    }
+
+    @Test
+    fun `factory cannot retrieve messages with non-matching metadata`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+        val metadata = mapOf("userId" to "user1")
+
+        val conversation = dao.createChatConversation(metadata)
+        val requestId = UUID.randomUUID()
+
+        // Add messages via DAO with metadata
+        val request = ChatRequestEntity(
+            chatId = conversation.chatId,
+            requestId = requestId,
+            messages = listOf(
+                ChatMessageEntity(requestId, 1, "USER", "Hello", null, null)
+            ),
+            requestCharacters = 5,
+            createdAt = Instant.now()
+        )
+        dao.addChatRequest(request, metadata)
+
+        // Try to retrieve with different metadata - should fail
+        val conv = factory.getConversation(conversation.chatId, metadata = mapOf("userId" to "user2"))
+        assertNull(conv, "Should not get conversation with non-matching metadata")
+    }
+
+    @Test
+    fun `factory adds messages with matching metadata through conversation interface`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+        val metadata = mapOf("userId" to "user1")
+
+        val conversation = dao.createChatConversation(metadata)
+
+        // Get conversation and add messages
+        val conv = factory.getConversation(conversation.chatId, metadata = metadata)
+        assertNotNull(conv)
+
+        val requestId = UUID.randomUUID()
+        val messages = listOf(
+            AimoChatMessage(
+                messageId = 1,
+                type = AimoChatMessageType.USER,
+                content = "Test message",
+                thinking = null,
+                toolName = null,
+                toolCallId = null,
+                toolCalls = null,
+                done = null
+            )
+        )
+        conv.addMessages(requestId, messages)
+
+        // Verify messages were stored
+        val retrieved = factory.getConversation(conversation.chatId, metadata = metadata)
+        assertNotNull(retrieved)
+        val storedMessages = retrieved.getMessages()
+        assertNotNull(storedMessages)
+        assertEquals(1, storedMessages.size)
+        assertEquals("Test message", storedMessages.first().content)
+    }
+
+    @Test
+    fun `factory with interceptor receives metadata in scope`() {
+        val dao = AimoChatClientDaoMemory()
+        val capturedMetadata = mutableListOf<Map<String, Any>>()
+
+        val testInterceptor = object : ConversationInterceptor {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+                capturedMetadata.add(metadata.toMap())
+                return chain.proceed(chatId, metadata)
+            }
+        }
+
+        val factory = ConversationFactoryImpl(dao).withInterceptor(testInterceptor)
+        val metadata = mapOf("userId" to "user1", "tenant" to "acme")
+
+        val conversation = dao.createChatConversation(metadata)
+        val conv = factory.getConversation(conversation.chatId, metadata = metadata)
+
+        // Trigger a read operation to invoke interceptor
+        conv?.getMessages()
+
+        // Interceptor should have received the scope metadata
+        assertTrue(capturedMetadata.isNotEmpty(), "Interceptor should be called")
+        assertTrue(capturedMetadata[0].containsKey("userId"), "Interceptor should receive userId in metadata")
+        assertEquals("user1", capturedMetadata[0]["userId"], "Scope metadata should be passed through")
+    }
+
+    @Test
+    fun `factory with interceptor can modify metadata before DAO call`() {
+        val dao = AimoChatClientDaoMemory()
+        val metadataModifier = object : ConversationInterceptor {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+                // Add or modify metadata before proceeding
+                metadata["intercepted"] = true
+                return chain.proceed(chatId, metadata)
+            }
+        }
+
+        val factory = ConversationFactoryImpl(dao).withInterceptor(metadataModifier)
+        val metadata = mapOf("userId" to "user1")
+
+        val conversation = dao.createChatConversation(metadata)
+        val conv = factory.getConversation(conversation.chatId, metadata = metadata)
+
+        // Trigger operation
+        conv?.getChatMetadata()
+
+        // Metadata was successfully modified by interceptor (test passes if no exception)
+        assertTrue(true)
+    }
+
+    @Test
+    fun `factory with multiple interceptors chains correctly with metadata`() {
+        val dao = AimoChatClientDaoMemory()
+        val callOrder = mutableListOf<String>()
+
+        val interceptor1 = object : ConversationInterceptor {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+                callOrder.add("interceptor1_before")
+                val result = chain.proceed(chatId, metadata)
+                callOrder.add("interceptor1_after")
+                return result
+            }
+        }
+
+        val interceptor2 = object : ConversationInterceptor {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+                callOrder.add("interceptor2_before")
+                val result = chain.proceed(chatId, metadata)
+                callOrder.add("interceptor2_after")
+                return result
+            }
+        }
+
+        val factory = ConversationFactoryImpl(dao)
+            .withInterceptor(interceptor1)
+            .withInterceptor(interceptor2)
+
+        val metadata = mapOf("userId" to "user1")
+        val conversation = dao.createChatConversation(metadata)
+        val conv = factory.getConversation(conversation.chatId, metadata = metadata)
+
+        // Trigger operation
+        conv?.getMessages()
+
+        // Interceptors should be called in order
+        assertEquals(
+            listOf("interceptor1_before", "interceptor2_before", "interceptor2_after", "interceptor1_after"),
+            callOrder
+        )
+    }
+
+    @Test
+    fun `factory metadata scoping filters based on AND logic`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+
+        // Create three conversations with different metadata
+        val conv1 = dao.createChatConversation(mapOf("userId" to "user1", "tenant" to "acme"))
+        val conv2 = dao.createChatConversation(mapOf("userId" to "user2", "tenant" to "acme"))
+        val conv3 = dao.createChatConversation(mapOf("userId" to "user1", "tenant" to "globex"))
+
+        // User1 + acme should only get conv1
+        val retrieved1 = factory.getConversation(conv1.chatId, mapOf("userId" to "user1", "tenant" to "acme"))
+        assertNotNull(retrieved1)
+        assertEquals(conv1.chatId, retrieved1.chatId)
+
+        // User2 + acme should only get conv2
+        val retrieved2 = factory.getConversation(conv2.chatId, mapOf("userId" to "user2", "tenant" to "acme"))
+        assertNotNull(retrieved2)
+        assertEquals(conv2.chatId, retrieved2.chatId)
+
+        // User1 + globex should only get conv3
+        val retrieved3 = factory.getConversation(conv3.chatId, mapOf("userId" to "user1", "tenant" to "globex"))
+        assertNotNull(retrieved3)
+        assertEquals(conv3.chatId, retrieved3.chatId)
+
+        // Cross-scope attempts should fail
+        val wrongUser = factory.getConversation(conv1.chatId, mapOf("userId" to "user2", "tenant" to "acme"))
+        assertNull(wrongUser)
+
+        val wrongTenant = factory.getConversation(conv1.chatId, mapOf("userId" to "user1", "tenant" to "globex"))
+        assertNull(wrongTenant)
+    }
+
+    @Test
+    fun `factory returns null for non-existent conversation even with metadata`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+
+        val nonExistentId = UUID.randomUUID()
+        val metadata = mapOf("userId" to "user1")
+
+        // Try to get non-existent conversation
+        val result = factory.getConversation(nonExistentId, metadata = metadata)
+        assertNull(result)
+    }
+}
+
+

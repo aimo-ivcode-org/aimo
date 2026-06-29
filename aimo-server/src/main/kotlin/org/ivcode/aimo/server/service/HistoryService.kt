@@ -9,17 +9,10 @@ import java.util.UUID
 class HistoryService (
     private val conversationStore: AimoChatClientDao
 ) {
-    /**
-     * Get history for a specific user's conversation.
-     * This is a user-scoped operation with user isolation enforcement.
-     *
-     * @param chatId The conversation ID
-     * @param userId The user ID requesting the history (must own the conversation)
-     * @return The conversation history, or empty list if not found or unauthorized
-     */
-    fun getHistory(chatId: UUID, userId: String): List<ChatHistoryRequest> {
-        val requests = conversationStore.getChatRequests(userId, chatId)
-        return requests.map { it.toChatHistoryRequest() }
+    fun getHistory(chatId: UUID, scopeMetadata: Map<String, Any> = emptyMap()): List<ChatHistoryRequest> {
+        if (conversationStore.getChatConversation(chatId, scopeMetadata) == null) {
+            return emptyList()
+        }
+        return conversationStore.getChatRequests(chatId, scopeMetadata).map { it.toChatHistoryRequest() }
     }
 }
-
