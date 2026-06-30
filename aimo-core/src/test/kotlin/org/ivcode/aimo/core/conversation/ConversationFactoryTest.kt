@@ -160,7 +160,7 @@ class ConversationFactoryTest {
         val capturedMetadata = mutableListOf<Map<String, Any>>()
 
         val testInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 capturedMetadata.add(metadata.toMap())
                 return chain.proceed(chatId, metadata)
             }
@@ -172,9 +172,6 @@ class ConversationFactoryTest {
         val conversation = dao.createChatConversation(metadata)
         val conv = factory.getConversation(conversation.chatId, metadata = metadata)
 
-        // Trigger a read operation to invoke interceptor
-        conv?.getMessages()
-
         // Interceptor should have received the scope metadata
         assertTrue(capturedMetadata.isNotEmpty(), "Interceptor should be called")
         assertTrue(capturedMetadata[0].containsKey("userId"), "Interceptor should receive userId in metadata")
@@ -185,7 +182,7 @@ class ConversationFactoryTest {
     fun `factory with interceptor can modify metadata before DAO call`() {
         val dao = AimoChatClientDaoMemory()
         val metadataModifier = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 // Add or modify metadata before proceeding
                 metadata["intercepted"] = true
                 return chain.proceed(chatId, metadata)
@@ -198,10 +195,8 @@ class ConversationFactoryTest {
         val conversation = dao.createChatConversation(metadata)
         val conv = factory.getConversation(conversation.chatId, metadata = metadata)
 
-        // Trigger operation
-        conv?.getChatMetadata()
-
-        // Metadata was successfully modified by interceptor (test passes if no exception)
+        // Verify conversation was retrieved
+        assertNotNull(conv)
         assertTrue(true)
     }
 
@@ -211,7 +206,7 @@ class ConversationFactoryTest {
         val callOrder = mutableListOf<String>()
 
         val interceptor1 = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 callOrder.add("interceptor1_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor1_after")
@@ -220,7 +215,7 @@ class ConversationFactoryTest {
         }
 
         val interceptor2 = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 callOrder.add("interceptor2_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor2_after")
@@ -236,8 +231,6 @@ class ConversationFactoryTest {
         val conversation = dao.createChatConversation(metadata)
         val conv = factory.getConversation(conversation.chatId, metadata = metadata)
 
-        // Trigger operation
-        conv?.getMessages()
 
         // Interceptors should be called in order
         assertEquals(

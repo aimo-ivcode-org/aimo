@@ -30,14 +30,7 @@ internal object ConversationMetadataMatcher {
 
     private fun valuesMatch(stored: Any?, expected: Any): Boolean {
         if (stored == null) return false
-        if (stored == expected) return true
-        return stored.toString() == expected.toString()
+        // Require strict equality; reject type mismatches
+        return stored == expected
     }
 }
-
-
-
-
-
-
-

@@ -3,20 +3,18 @@ package org.ivcode.aimo.core.conversation
 import java.util.UUID
 
 /**
- * Interceptor for conversation operations.
+ * Interceptor for conversation factory operations.
  *
  * Interceptors can add cross-cutting concerns such as:
- * - **Auditing**: Log all DAO operations
- * - **Caching**: Memoize results
- * - **Data transformation**: Encryption, compression, schema migration
- * - **Metadata enrichment**: Add or modify metadata before DAO calls
+ * - **Auditing**: Log conversation access
+ * - **Caching**: Memoize conversation instances
+ * - **Metadata enrichment**: Add or modify metadata before DAO access
  *
  * ## Usage Pattern
  *
- * Interceptors receive the `chatId` and a mutable `metadata` map. They can:
- * 1. Enrich the metadata with additional entries
- * 2. Call the chain to proceed to the next interceptor or final DAO operation
- * 3. Post-process the result
+ * Interceptors intercept [ConversationFactory.getConversation] calls and receive:
+ * - `chatId`: The conversation identifier
+ * - `metadata`: Mutable metadata map for DAO scoping; interceptors may enrich it
  *
  * ```kotlin
  * factory
@@ -26,23 +24,23 @@ import java.util.UUID
  */
 interface ConversationInterceptor {
     /**
-     * Intercept a conversation operation.
+     * Intercept a [ConversationFactory.getConversation] call.
      *
      * @param chain The interceptor chain to proceed with
      * @param chatId The chat identifier for this operation
      * @param metadata Mutable metadata map for DAO scoping; interceptors may add entries to enrich the metadata
-     * @return The result of the operation
+     * @return The Conversation instance, or null if not found or access denied
      */
-    fun intercept(chain: Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any?
+    fun intercept(chain: Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation?
 
     interface Chain {
         /**
-         * Proceed to the next interceptor or final operation.
+         * Proceed to the next interceptor or final [ConversationFactory.getConversation] operation.
          *
          * @param chatId The chat identifier
          * @param metadata The metadata for this operation (may have been enriched by interceptors)
-         * @return The operation result
+         * @return The Conversation instance, or null if not found or access denied
          */
-        fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Any?
+        fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Conversation?
     }
 }

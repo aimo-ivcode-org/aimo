@@ -30,13 +30,13 @@ class ConversationInterceptorChainTest {
 
         val result = buildAndExecuteChain(listOf(interceptor), chatId, metadata) { _, _ ->
             callLog.add("final-action")
-            emptyList<AimoChatMessage>()
+            null
         }
 
         assertEquals(2, callLog.size)
         assertEquals("test", callLog[0], "Interceptor should execute first")
         assertEquals("final-action", callLog[1], "Final action should execute last")
-        assertNotNull(result)
+        assertNull(result)
     }
 
     @Test
@@ -67,7 +67,7 @@ class ConversationInterceptorChainTest {
         val chatId = UUID.randomUUID()
 
         val modifyingInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 metadata["modified"] = true
                 callLog.add("modified")
                 return chain.proceed(chatId, metadata)
@@ -75,7 +75,7 @@ class ConversationInterceptorChainTest {
         }
 
         val readingInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 val value = metadata["modified"]
                 callLog.add("read:$value")
                 return chain.proceed(chatId, metadata)
@@ -99,7 +99,7 @@ class ConversationInterceptorChainTest {
         val chatId = UUID.randomUUID()
 
         val capturingInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 capturedMetadata = metadata
                 return chain.proceed(chatId, metadata)
             }
@@ -122,7 +122,7 @@ class ConversationInterceptorChainTest {
         val chatId = UUID.randomUUID()
 
         val capturingInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 capturedChatId = cid
                 capturedMetadata = metadata
                 return chain.proceed(cid, metadata)
@@ -160,7 +160,7 @@ class ConversationInterceptorChainTest {
         val chatId = UUID.randomUUID()
 
         val capturingInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 capturedMetadata = metadata
                 return chain.proceed(cid, metadata)
             }
@@ -184,19 +184,10 @@ class ConversationInterceptorChainTest {
         val chatId = UUID.randomUUID()
 
         val shortCircuitInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 callLog.add("short-circuit")
-                // Don't call chain.proceed() - return cached value
-                return listOf(
-                    AimoChatMessage(
-                        messageId = 1,
-                        type = AimoChatMessageType.ASSISTANT,
-                        content = "cached",
-                        thinking = null,
-                        toolName = null,
-                        done = true
-                    )
-                )
+                // Short-circuit by returning null (conversation not found)
+                return null
             }
         }
 
@@ -204,15 +195,14 @@ class ConversationInterceptorChainTest {
 
         val metadata = mutableMapOf<String, Any>()
 
-        @Suppress("UNCHECKED_CAST")
         val result = buildAndExecuteChain(listOf(shortCircuitInterceptor, neverCalledInterceptor), chatId, metadata) { _, _ ->
             callLog.add("final-action")
-            emptyList<AimoChatMessage>()
-        } as List<AimoChatMessage>
+            null
+        }
 
         assertEquals(1, callLog.size)
         assertEquals("short-circuit", callLog[0])
-        assertEquals("cached", result.first().content)
+        assertNull(result)
     }
 
     @Test
@@ -234,7 +224,7 @@ class ConversationInterceptorChainTest {
     fun `interceptors can return nullable results`() {
         val chatId = UUID.randomUUID()
         val interceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 return chain.proceed(cid, metadata)
             }
         }
@@ -252,7 +242,7 @@ class ConversationInterceptorChainTest {
         val originalChatId = UUID.randomUUID()
 
         val trackingInterceptor = object : ConversationInterceptor {
-            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun intercept(chain: ConversationInterceptor.Chain, cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 capturedChatIds.add(cid)
                 return chain.proceed(cid, metadata)
             }
@@ -275,8 +265,8 @@ class ConversationInterceptorChainTest {
         interceptors: List<ConversationInterceptor>,
         chatId: UUID,
         metadata: MutableMap<String, Any>,
-        finalAction: (UUID, MutableMap<String, Any>) -> Any?
-    ): Any? {
+        finalAction: (UUID, MutableMap<String, Any>) -> Conversation?
+    ): Conversation? {
         val chain = buildChain(interceptors, 0, finalAction)
         return chain.proceed(chatId, metadata)
     }
@@ -284,10 +274,10 @@ class ConversationInterceptorChainTest {
     private fun buildChain(
         interceptors: List<ConversationInterceptor>,
         index: Int,
-        finalAction: (UUID, MutableMap<String, Any>) -> Any?
+        finalAction: (UUID, MutableMap<String, Any>) -> Conversation?
     ): ConversationInterceptor.Chain {
         return object : ConversationInterceptor.Chain {
-            override fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+            override fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 return if (index < interceptors.size) {
                     val nextChain = buildChain(interceptors, index + 1, finalAction)
                     interceptors[index].intercept(nextChain, chatId, metadata)
@@ -302,7 +292,7 @@ class ConversationInterceptorChainTest {
         private val name: String,
         private val callLog: MutableList<String>
     ) : ConversationInterceptor {
-        override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Any? {
+        override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
             callLog.add(name)
             return chain.proceed(chatId, metadata)
         }
