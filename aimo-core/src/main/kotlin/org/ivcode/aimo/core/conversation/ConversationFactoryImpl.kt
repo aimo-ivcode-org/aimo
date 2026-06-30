@@ -13,18 +13,22 @@ class ConversationFactoryImpl(
     }
 
     override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
-        if (conversationStore.getChatConversation(chatId, metadata) == null) {
-            return null
-        }
-
-        val baseConversation = ConversationImpl(chatId, conversationStore, metadata)
-
         if (interceptors.isEmpty()) {
-            return baseConversation
+            // No interceptors: check DAO and build conversation directly
+            if (conversationStore.getChatConversation(chatId, metadata) == null) {
+                return null
+            }
+            return ConversationImpl(chatId, conversationStore, metadata)
         }
 
         // Build the interceptor chain for get operation and proceed
-        val chain = buildGetChain(interceptors, 0) { _, _ -> baseConversation }
+        // Interceptors can mutate metadata before DAO scoping occurs
+        val chain = buildGetChain(interceptors, 0) { cid, md ->
+            if (conversationStore.getChatConversation(cid, md) == null) {
+                return@buildGetChain null
+            }
+            ConversationImpl(cid, conversationStore, md.toMap())
+        }
         return chain.proceed(chatId, metadata.toMutableMap())
     }
 

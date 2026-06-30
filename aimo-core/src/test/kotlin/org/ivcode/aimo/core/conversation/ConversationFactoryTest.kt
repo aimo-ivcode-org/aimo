@@ -185,28 +185,31 @@ class ConversationFactoryTest {
     @Test
     fun `factory with interceptor can modify metadata before DAO call`() {
         val dao = AimoChatClientDaoMemory()
-        val metadataModifier = object : ConversationInterceptor {
+        val metadataEnricher = object : ConversationInterceptor {
             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
-                // Add or modify metadata before proceeding
-                metadata["intercepted"] = true
+                // Add required scope key that enables access
+                metadata["userId"] = "user1"
                 return chain.proceed(chatId, metadata)
             }
 
             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
-                metadata["intercepted"] = true
+                metadata["userId"] = "user1"
                 return chain.proceed(chatId, metadata)
             }
         }
 
-        val factory = ConversationFactoryImpl(dao).withInterceptor(metadataModifier)
-        val metadata = mapOf("userId" to "user1")
+        val factory = ConversationFactoryImpl(dao).withInterceptor(metadataEnricher)
 
-        val conversation = dao.createChatConversation(metadata)
-        val conv = factory.getConversation(conversation.chatId, metadata = metadata)
+        // Create conversation WITH userId scope
+        val conversation = dao.createChatConversation(mapOf("userId" to "user1"))
 
-        // Verify conversation was retrieved
-        assertNotNull(conv)
-        assertTrue(true)
+        // Request with empty metadata (no scope)
+        // Interceptor will ADD userId=user1 to metadata, making DAO lookup succeed
+        val conv = factory.getConversation(conversation.chatId, metadata = emptyMap())
+
+        // Verify conversation was retrieved because interceptor enriched metadata
+        assertNotNull(conv, "Conversation should be retrieved after metadata enrichment by interceptor")
+        assertEquals(conversation.chatId, conv.chatId)
     }
 
     @Test
