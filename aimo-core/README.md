@@ -84,7 +84,7 @@ class MyService {
 
 ```kotlin
 val conversation = conversationFactory.getConversation(
-    chatId = UUID.from("..."),
+    chatId = UUID.fromString("..."),
     metadata = mapOf("tenant" to "acme", "userId" to "user123")
 )
 
@@ -107,10 +107,10 @@ Cross-cutting concerns for conversation operations via `ConversationInterceptor`
 ```kotlin
 class MyInterceptor : ConversationInterceptor {
     override fun intercept(
-        chain: Chain,
+        chain: ConversationInterceptor.Chain,
         chatId: UUID,
         metadata: MutableMap<String, Any>
-    ): Any? {
+    ): Conversation? {
         // Enrich metadata before DAO operation
         metadata["enriched"] = true
         
