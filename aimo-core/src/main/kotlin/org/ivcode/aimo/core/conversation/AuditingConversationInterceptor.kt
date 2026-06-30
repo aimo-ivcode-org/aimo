@@ -8,7 +8,7 @@ import java.util.UUID
 /**
  * Auditing interceptor for conversation factory operations.
  *
- * Logs all conversation access (via [ConversationFactory.getConversation]) for compliance, debugging, and security auditing.
+ * Logs all conversation access and deletion for compliance, debugging, and security auditing.
  *
  * Captures chat ID, timestamp, and metadata.
  *
@@ -24,13 +24,13 @@ class AuditingConversationInterceptor(
 
     private val logger = auditLogger ?: LoggerFactory.getLogger("AUDIT.Conversation")
 
-    override fun intercept(chain: ConversationInterceptor.Chain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+    override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
         if (!enabled) {
             return chain.proceed(chatId, metadata)
         }
 
         val timestamp = Instant.now()
-        val auditEntry = buildAuditEntry(chatId, timestamp, metadata)
+        val auditEntry = buildAuditEntry("GET", chatId, timestamp, metadata)
 
         log("BEFORE $auditEntry")
 
@@ -48,13 +48,39 @@ class AuditingConversationInterceptor(
         }
     }
 
+    override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+        if (!enabled) {
+            return chain.proceed(chatId, metadata)
+        }
+
+        val timestamp = Instant.now()
+        val auditEntry = buildAuditEntry("DELETE", chatId, timestamp, metadata)
+
+        log("BEFORE $auditEntry")
+
+        return try {
+            val result = chain.proceed(chatId, metadata)
+
+            // Log successful completion
+            log("SUCCESS $auditEntry | conversationDeleted=$result")
+
+            result
+        } catch (e: Exception) {
+            // Log failure with exception details
+            log("FAILURE $auditEntry | error=${e.javaClass.simpleName}: ${e.message}")
+            throw e
+        }
+    }
+
     private fun buildAuditEntry(
+        operation: String,
         chatId: UUID,
         timestamp: Instant,
         metadata: Map<String, Any>
     ): String {
         val sb = StringBuilder()
-        sb.append("timestamp=$timestamp")
+        sb.append("operation=$operation")
+        sb.append(" | timestamp=$timestamp")
         sb.append(" | chatId=$chatId")
         sb.append(" | metadataKeys=${metadata.keys.size}")
 
