@@ -106,19 +106,28 @@ Cross-cutting concerns for conversation operations via `ConversationInterceptor`
 
 ```kotlin
 class MyInterceptor : ConversationInterceptor {
-    override fun intercept(
-        chain: ConversationInterceptor.Chain,
+    override fun interceptGet(
+        chain: ConversationInterceptor.GetChain,
         chatId: UUID,
         metadata: MutableMap<String, Any>
     ): Conversation? {
         // Enrich metadata before DAO operation
         metadata["enriched"] = true
-        
+
         // Proceed to next interceptor or final DAO call
         val result = chain.proceed(chatId, metadata)
-        
+
         // Post-process result
         return result
+    }
+
+    override fun interceptDelete(
+        chain: ConversationInterceptor.DeleteChain,
+        chatId: UUID,
+        metadata: MutableMap<String, Any>
+    ): Boolean {
+        // Optionally enrich/validate before delete
+        return chain.proceed(chatId, metadata)
     }
 }
 
@@ -202,11 +211,12 @@ The typical flow requires two factories:
 
 ```kotlin
 // 1. Create a conversation (for history storage)
-val conversationFactory = ConversationFactoryImpl(AimoChatClientDaoMemory())
-val conversation = conversationFactory.getConversation(
-    chatId = UUID.randomUUID(),
-    metadata = mapOf("tenant" to "acme", "userId" to "user123")
-)
+val dao = AimoChatClientDaoMemory()
+val conversationFactory = ConversationFactoryImpl(dao)
+val metadata = mapOf("tenant" to "acme", "userId" to "user123")
+val entity = dao.createChatConversation(metadata)
+val conversation = conversationFactory.getConversation(entity.chatId, metadata)
+    ?: error("Conversation not found")
 
 // 2. Build and use the chat client
 // (ChatClientBuilderFactory is typically injected or configured in Spring)
