@@ -21,7 +21,7 @@ import kotlin.annotation.Target
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)
 @Component
-annotation class ChatService(
+annotation class ChatService (
     val scope: Array<String> = []
 )
 
@@ -35,7 +35,7 @@ annotation class ChatService(
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(FUNCTION, FIELD, PROPERTY)
-annotation class SystemMessage(
+annotation class SystemMessage (
     /**
      * Optional explicit name for stable reference to this system message.
      * If empty, a name will be auto-generated from the method/field/property name.
@@ -66,7 +66,7 @@ annotation class SystemMessage(
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(FUNCTION)
-annotation class Tool(
+annotation class Tool (
     val name: String = "",
     val description: String = "",
     val scope: Array<String> = []
@@ -80,6 +80,6 @@ annotation class Tool(
  */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(VALUE_PARAMETER)
-annotation class ToolParam(
+annotation class ToolParam (
     val description: String = "",
 )

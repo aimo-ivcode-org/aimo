@@ -2,8 +2,6 @@ package org.ivcode.aimo.examples.basic
 
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.dao.AimoChatClientDaoFile
-import org.ivcode.aimo.core.security.AimoUserProvider
-import org.ivcode.aimo.core.security.GlobalUserProvider
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.beans.factory.annotation.Value
@@ -29,12 +27,5 @@ class SimpleOllamaConfig {
     ): AimoChatClientDao {
         val dataDir = File(dataDirPath)
         return AimoChatClientDaoFile(dataDir, objectMapper)
-    }
-
-    @Bean
-    fun aimoUserProvider(
-        @Value("\${aimo.global-user-id:global}") globalUserId: String
-    ): AimoUserProvider {
-        return GlobalUserProvider(globalUserId)
     }
 }

@@ -59,10 +59,12 @@ internal fun AimoHistoryRequest.toChatHistoryRequest() = ChatHistoryRequest(
 
 internal fun AimoConversationInfo.toChatConversationInfo() = ChatConversationInfo(
     chatId = chatId,
+    metadata = metadata,
 )
 
 internal fun ChatConversationEntity.toChatConversationInfo() = ChatConversationInfo(
     chatId = chatId,
+    metadata = metadata,
 )
 
 internal fun ChatRequestEntity.toChatHistoryRequest() = ChatHistoryRequest(

@@ -1,15 +1,13 @@
 package org.ivcode.aimo.core.conf
 
+import org.ivcode.aimo.core.chatclient.ChatClientBuilderFactory
+import org.ivcode.aimo.core.chatclient.ChatClientBuilderFactoryImpl
+import org.ivcode.aimo.core.chatclient.ChatClientInterceptor
+import org.ivcode.aimo.core.chatclient.ErrorHandlingInterceptor
+import org.ivcode.aimo.core.chatclient.LoggingInterceptor
+import org.ivcode.aimo.core.chatclient.TracingInterceptor
 import org.springframework.core.annotation.AnnotationUtils
 
-import org.ivcode.aimo.core.builder.ChatClientBuilderFactory
-import org.ivcode.aimo.core.builder.ConversationFactory
-import org.ivcode.aimo.core.builder.impl.ChatClientBuilderFactoryImpl
-import org.ivcode.aimo.core.builder.impl.ConversationFactoryImpl
-import org.ivcode.aimo.core.builder.interceptor.ChatClientInterceptor
-import org.ivcode.aimo.core.builder.interceptor.impl.ErrorHandlingInterceptor
-import org.ivcode.aimo.core.builder.interceptor.impl.LoggingInterceptor
-import org.ivcode.aimo.core.builder.interceptor.impl.TracingInterceptor
 import org.ivcode.aimo.core.chatservice.ChatService
 import org.ivcode.aimo.core.chatservice.ChatServiceEntity
 import org.ivcode.aimo.core.chatservice.ScopedSystemMessageCallbackWithName
@@ -21,6 +19,8 @@ import org.ivcode.aimo.core.chatservice.toSystemMessageCallbacks
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.chatscope.ChatScopeProviderImpl
+import org.ivcode.aimo.core.conversation.ConversationFactory
+import org.ivcode.aimo.core.conversation.ConversationFactoryImpl
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoToolCallback

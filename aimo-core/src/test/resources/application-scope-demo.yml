@@ -9,9 +9,6 @@ aimo:
   # Test data storage
   data-dir: ./data/test-conversations
 
-  # Single-user test mode
-  global-user-id: test-user
-
   # ChatScope Configuration - test patterns
   scope:
     # Public scope

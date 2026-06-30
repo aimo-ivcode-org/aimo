@@ -10,7 +10,6 @@ import org.springframework.validation.annotation.Validated
  * ```yaml
  * aimo:
  *   data-dir: ./data/conversations
- *   global-user-id: default-user
  *   model:
  *     # Model configurations (handled by provider-specific properties in adapter modules)
  *     # e.g., aimo.model.ollama.*, aimo.model.bedrock.*
@@ -30,13 +29,6 @@ data class AimoProperties(
      * Default: ./data/conversations
      */
     var dataDir: String = "./data/conversations",
-
-    /**
-     * Global user ID for single-user mode.
-     * When set, all conversations are owned by this user.
-     * Default: "global" (matches GlobalUserProvider default).
-     */
-    var globalUserId: String? = "global",
 
     /**
      * ChatScope configurations (Phase 2 feature).
