@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 /**
  * Tests for ConversationInterceptor chain of responsibility pattern.
@@ -19,8 +20,6 @@ import kotlin.test.assertTrue
  * - ChatId is properly passed to interceptors
  */
 class ConversationInterceptorChainTest {
-
-    // ...existing code...
 
     @Test
     fun `single interceptor executes and calls proceed`() {
@@ -309,22 +308,255 @@ class ConversationInterceptorChainTest {
         return chain.proceed(chatId, metadata)
     }
 
-    private fun buildChain(
-        interceptors: List<ConversationInterceptor>,
-        index: Int,
-        finalAction: (UUID, MutableMap<String, Any>) -> Conversation?
-    ): ConversationInterceptor.GetChain {
-        return object : ConversationInterceptor.GetChain {
-            override fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
-                return if (index < interceptors.size) {
-                    val nextChain = buildChain(interceptors, index + 1, finalAction)
-                    interceptors[index].interceptGet(nextChain, chatId, metadata)
-                } else {
-                    finalAction(chatId, metadata)
-                }
-            }
-        }
-    }
+     private fun buildChain(
+         interceptors: List<ConversationInterceptor>,
+         index: Int,
+         finalAction: (UUID, MutableMap<String, Any>) -> Conversation?
+     ): ConversationInterceptor.GetChain {
+         return object : ConversationInterceptor.GetChain {
+             override fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return if (index < interceptors.size) {
+                     val nextChain = buildChain(interceptors, index + 1, finalAction)
+                     interceptors[index].interceptGet(nextChain, chatId, metadata)
+                 } else {
+                     finalAction(chatId, metadata)
+                 }
+             }
+         }
+     }
+
+     // Tests for DeleteChain (interceptDelete)
+
+     @Test
+     fun `single delete interceptor executes and calls proceed`() {
+         val callLog = mutableListOf<String>()
+         val chatId = UUID.randomUUID()
+
+         val interceptor = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(chatId, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 callLog.add("interceptor")
+                 return chain.proceed(chatId, metadata)
+             }
+         }
+         val metadata = mutableMapOf<String, Any>()
+
+         val result = buildAndExecuteDeleteChain(listOf(interceptor), chatId, metadata) { _, _ ->
+             callLog.add("final-action")
+             true
+         }
+
+         assertEquals(2, callLog.size)
+         assertEquals("interceptor", callLog[0], "Interceptor should execute first")
+         assertEquals("final-action", callLog[1], "Final action should execute last")
+         assertTrue(result)
+     }
+
+     @Test
+     fun `multiple delete interceptors execute in order`() {
+         val callLog = mutableListOf<String>()
+         val chatId = UUID.randomUUID()
+
+         val interceptor1 = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(chatId, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 callLog.add("first")
+                 return chain.proceed(chatId, metadata)
+             }
+         }
+
+         val interceptor2 = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(chatId, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 callLog.add("second")
+                 return chain.proceed(chatId, metadata)
+             }
+         }
+
+         val interceptor3 = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(chatId, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 callLog.add("third")
+                 return chain.proceed(chatId, metadata)
+             }
+         }
+
+         val metadata = mutableMapOf<String, Any>()
+
+         buildAndExecuteDeleteChain(listOf(interceptor1, interceptor2, interceptor3), chatId, metadata) { _, _ ->
+             callLog.add("final-action")
+             true
+         }
+
+         assertEquals(4, callLog.size)
+         assertEquals("first", callLog[0])
+         assertEquals("second", callLog[1])
+         assertEquals("third", callLog[2])
+         assertEquals("final-action", callLog[3])
+     }
+
+     @Test
+     fun `delete interceptors can modify metadata`() {
+         val callLog = mutableListOf<String>()
+         val chatId = UUID.randomUUID()
+
+         val modifyingInterceptor = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(chatId, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 metadata["modified"] = true
+                 callLog.add("modified")
+                 return chain.proceed(chatId, metadata)
+             }
+         }
+
+         val readingInterceptor = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(chatId, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 val value = metadata["modified"]
+                 callLog.add("read:$value")
+                 return chain.proceed(chatId, metadata)
+             }
+         }
+
+         val metadata = mutableMapOf<String, Any>()
+
+         buildAndExecuteDeleteChain(listOf(modifyingInterceptor, readingInterceptor), chatId, metadata) { _, md ->
+             assertEquals(true, md["modified"], "Metadata modification should be visible in final action")
+             true
+         }
+
+         assertTrue(callLog.contains("modified"))
+         assertTrue(callLog.contains("read:true"))
+     }
+
+     @Test
+     fun `delete interceptors can short-circuit the chain`() {
+         val callLog = mutableListOf<String>()
+         val chatId = UUID.randomUUID()
+
+         val shortCircuitInterceptor = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(cid, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, cid: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 callLog.add("short-circuit-delete")
+                 // Short-circuit by returning false (delete denied)
+                 return false
+             }
+         }
+
+         val neverCalledInterceptor = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(chatId, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 callLog.add("never-called")
+                 return chain.proceed(chatId, metadata)
+             }
+         }
+
+         val metadata = mutableMapOf<String, Any>()
+
+         val result = buildAndExecuteDeleteChain(listOf(shortCircuitInterceptor, neverCalledInterceptor), chatId, metadata) { _, _ ->
+             callLog.add("final-action")
+             true
+         }
+
+         assertEquals(1, callLog.size)
+         assertEquals("short-circuit-delete", callLog[0])
+         assertFalse(result, "Delete should return false when short-circuited")
+     }
+
+     @Test
+     fun `empty delete interceptor list executes final action directly`() {
+         val callLog = mutableListOf<String>()
+         val chatId = UUID.randomUUID()
+         val metadata = mutableMapOf<String, Any>()
+
+         buildAndExecuteDeleteChain(emptyList(), chatId, metadata) { _, _ ->
+             callLog.add("final-action")
+             true
+         }
+
+         assertEquals(1, callLog.size)
+         assertEquals("final-action", callLog[0])
+     }
+
+     @Test
+     fun `delete interceptors receive correct chatId`() {
+         var capturedChatIds = mutableListOf<UUID>()
+         val originalChatId = UUID.randomUUID()
+
+         val trackingInterceptor = object : ConversationInterceptor {
+             override fun interceptGet(chain: ConversationInterceptor.GetChain, cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                 return chain.proceed(cid, metadata)
+             }
+
+             override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, cid: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 capturedChatIds.add(cid)
+                 return chain.proceed(cid, metadata)
+             }
+         }
+
+         val metadata = mutableMapOf<String, Any>()
+
+         buildAndExecuteDeleteChain(listOf(trackingInterceptor), originalChatId, metadata) { cid, _ ->
+             capturedChatIds.add(cid)
+             true
+         }
+
+         assertEquals(2, capturedChatIds.size)
+         assertTrue(capturedChatIds.all { it == originalChatId })
+     }
+
+     // Helper methods for DeleteChain
+
+     private fun buildAndExecuteDeleteChain(
+         interceptors: List<ConversationInterceptor>,
+         chatId: UUID,
+         metadata: MutableMap<String, Any>,
+         finalAction: (UUID, MutableMap<String, Any>) -> Boolean
+     ): Boolean {
+         val chain = buildDeleteChain(interceptors, 0, finalAction)
+         return chain.proceed(chatId, metadata)
+     }
+
+     private fun buildDeleteChain(
+         interceptors: List<ConversationInterceptor>,
+         index: Int,
+         finalAction: (UUID, MutableMap<String, Any>) -> Boolean
+     ): ConversationInterceptor.DeleteChain {
+         return object : ConversationInterceptor.DeleteChain {
+             override fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                 return if (index < interceptors.size) {
+                     val nextChain = buildDeleteChain(interceptors, index + 1, finalAction)
+                     interceptors[index].interceptDelete(nextChain, chatId, metadata)
+                 } else {
+                     finalAction(chatId, metadata)
+                 }
+             }
+         }
+     }
 
     private class LoggingInterceptor(
         private val name: String,

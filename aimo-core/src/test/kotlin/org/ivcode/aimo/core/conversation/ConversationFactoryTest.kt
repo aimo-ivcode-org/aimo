@@ -157,7 +157,7 @@ class ConversationFactoryTest {
     @Test
     fun `factory with interceptor receives metadata in scope`() {
         val dao = AimoChatClientDaoMemory()
-        val capturedGetMetadata = mutableListOf<Map<String, Any>>()
+         val capturedGetMetadata = mutableListOf<Map<String, Any>>()
 
         val testInterceptor = object : ConversationInterceptor {
             override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
@@ -210,7 +210,7 @@ class ConversationFactoryTest {
     }
 
     @Test
-    fun `factory with multiple interceptors chains correctly with metadata`() {
+    fun `factory with multiple interceptors chains correctly with metadata for get operation`() {
         val dao = AimoChatClientDaoMemory()
         val callOrder = mutableListOf<String>()
 
@@ -262,6 +262,55 @@ class ConversationFactoryTest {
     }
 
     @Test
+    fun `factory with multiple interceptors chains correctly with metadata for delete operation`() {
+        val dao = AimoChatClientDaoMemory()
+        val callOrder = mutableListOf<String>()
+
+        val interceptor1 = object : ConversationInterceptor {
+            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                return chain.proceed(chatId, metadata)
+            }
+
+            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                callOrder.add("interceptor1_delete_before")
+                val result = chain.proceed(chatId, metadata)
+                callOrder.add("interceptor1_delete_after")
+                return result
+            }
+        }
+
+        val interceptor2 = object : ConversationInterceptor {
+            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                return chain.proceed(chatId, metadata)
+            }
+
+            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                callOrder.add("interceptor2_delete_before")
+                val result = chain.proceed(chatId, metadata)
+                callOrder.add("interceptor2_delete_after")
+                return result
+            }
+        }
+
+        val factory = ConversationFactoryImpl(dao)
+            .withInterceptor(interceptor1)
+            .withInterceptor(interceptor2)
+
+        val metadata = mapOf("userId" to "user1")
+        val conversation = dao.createChatConversation(metadata)
+
+        // Delete the conversation
+        val deleted = factory.deleteConversation(conversation.chatId, metadata = metadata)
+
+        // Interceptors should be called in order for delete
+        assertTrue(deleted, "Delete should succeed")
+        assertEquals(
+            listOf("interceptor1_delete_before", "interceptor2_delete_before", "interceptor2_delete_after", "interceptor1_delete_after"),
+            callOrder
+        )
+    }
+
+    @Test
     fun `factory metadata scoping filters based on AND logic`() {
         val dao = AimoChatClientDaoMemory()
         val factory = ConversationFactoryImpl(dao)
@@ -306,6 +355,109 @@ class ConversationFactoryTest {
         val result = factory.getConversation(nonExistentId, metadata = metadata)
         assertNull(result)
     }
+
+    @Test
+    fun `deleteConversation returns false for non-existent conversation`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+
+        val nonExistentId = UUID.randomUUID()
+        val metadata = mapOf("userId" to "user1")
+
+        // Try to delete non-existent conversation
+        val result = factory.deleteConversation(nonExistentId, metadata = metadata)
+        assertFalse(result, "Delete should return false for non-existent conversation")
+    }
+
+    @Test
+    fun `deleteConversation with matching metadata succeeds`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+        val metadata = mapOf("userId" to "user1", "tenant" to "acme")
+
+        val conversation = dao.createChatConversation(metadata)
+
+        // Delete with matching metadata should succeed
+        val deleted = factory.deleteConversation(conversation.chatId, metadata = metadata)
+        assertTrue(deleted, "Delete should succeed with matching metadata")
+
+        // Verify conversation is gone
+        val retrieved = factory.getConversation(conversation.chatId, metadata = metadata)
+        assertNull(retrieved, "Conversation should be deleted")
+    }
+
+    @Test
+    fun `deleteConversation with non-matching metadata fails`() {
+        val dao = AimoChatClientDaoMemory()
+        val factory = ConversationFactoryImpl(dao)
+        val metadata = mapOf("userId" to "user1", "tenant" to "acme")
+
+        val conversation = dao.createChatConversation(metadata)
+
+        // Try to delete with wrong metadata
+        val deleted = factory.deleteConversation(conversation.chatId, metadata = mapOf("userId" to "user2"))
+        assertFalse(deleted, "Delete should fail with non-matching metadata")
+
+        // Verify conversation still exists
+        val retrieved = factory.getConversation(conversation.chatId, metadata = metadata)
+        assertNotNull(retrieved, "Conversation should still exist")
+    }
+
+    @Test
+    fun `factory with interceptor receives metadata in delete scope`() {
+        val dao = AimoChatClientDaoMemory()
+        val capturedDeleteMetadata = mutableListOf<Map<String, Any>>()
+
+        val testInterceptor = object : ConversationInterceptor {
+            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                return chain.proceed(chatId, metadata)
+            }
+
+            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                capturedDeleteMetadata.add(metadata.toMap())
+                return chain.proceed(chatId, metadata)
+            }
+        }
+
+        val factory = ConversationFactoryImpl(dao).withInterceptor(testInterceptor)
+        val metadata = mapOf("userId" to "user1", "tenant" to "acme")
+
+        val conversation = dao.createChatConversation(metadata)
+        val deleted = factory.deleteConversation(conversation.chatId, metadata = metadata)
+
+        // Interceptor should have received the metadata
+        assertTrue(deleted, "Delete should succeed")
+        assertTrue(capturedDeleteMetadata.isNotEmpty(), "Interceptor should be called for delete")
+        assertTrue(capturedDeleteMetadata[0].containsKey("userId"), "Interceptor should receive userId in metadata")
+        assertEquals("user1", capturedDeleteMetadata[0]["userId"], "Delete metadata should be passed through")
+    }
+
+    @Test
+    fun `factory with interceptor can prevent delete`() {
+        val dao = AimoChatClientDaoMemory()
+
+        val blockingInterceptor = object : ConversationInterceptor {
+            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+                return chain.proceed(chatId, metadata)
+            }
+
+            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+                // Block delete
+                return false
+            }
+        }
+
+        val factory = ConversationFactoryImpl(dao).withInterceptor(blockingInterceptor)
+        val metadata = mapOf("userId" to "user1")
+
+        val conversation = dao.createChatConversation(metadata)
+
+        // Try to delete - interceptor should block it
+        val deleted = factory.deleteConversation(conversation.chatId, metadata = metadata)
+        assertFalse(deleted, "Delete should be blocked by interceptor")
+
+        // Verify conversation still exists
+        val retrieved = factory.getConversation(conversation.chatId, metadata = metadata)
+        assertNotNull(retrieved, "Conversation should still exist after blocked delete")
+    }
 }
-
-
