@@ -23,9 +23,10 @@ val client = builder
     .build()
 
 val response = client.chat(
-    systemMessages = listOf(...),
-    userMessage = "What is the weather?",
-    tools = availableTools
+    AimoChatRequest(
+        prompt = "What is the weather?",
+        context = emptyMap()
+    )
 )
 ```
 
