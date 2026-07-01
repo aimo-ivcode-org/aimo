@@ -6,7 +6,6 @@ import java.util.UUID
 
 data class ChatConversationEntity (
     val chatId: UUID,
-    val userId: String? = null,  // Null = no owner (admin visibility); String = owned by that userId
     val metadata: Map<String, Any>
 )
 

@@ -64,7 +64,7 @@ interface Conversation {
      * @param property the property name to retrieve
      * @return the property value from durable storage, or `null` if not present
      */
-    fun getChatProperty(property: String): Any?
+    fun  getChatProperty(property: String): Any?
 
 
     /**

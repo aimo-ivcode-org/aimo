@@ -66,7 +66,8 @@ internal class DeepSeekMessageTransformer : MessageTransformer {
             val out = StringBuilder()
             var index = 0
             while (index < text.length) {
-                val markerMatch = findNextMarker(text, index) ?: run {
+                val markerMatch = findNextMarker(text, index)
+                if (markerMatch == null) {
                     val tail = text.substring(index)
                     val split = splitCarryTail(tail)
                     out.append(split.first)

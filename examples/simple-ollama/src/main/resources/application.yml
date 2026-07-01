@@ -9,9 +9,6 @@ aimo:
   # Path where chat conversations and requests are persisted (file-based DAO)
   data-dir: ./data/conversations
 
-  # Global user ID used when accessing conversations in single-user mode
-  global-user-id: ollama-user2
-
   model:
     ollama:
       gpt-oss:
