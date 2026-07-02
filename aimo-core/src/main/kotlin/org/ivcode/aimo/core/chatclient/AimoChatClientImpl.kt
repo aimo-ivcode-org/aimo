@@ -15,8 +15,8 @@ import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoPromptBudgeterType
-import org.ivcode.aimo.core.model.AimoToolCallback
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.ToolCallback
+import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CHAT_ID
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CONVERSATION
 import org.ivcode.aimo.core.util.CONTEXT_KEY__REQUEST_ID
@@ -70,10 +70,10 @@ internal class AimoChatClientImpl (
 ) : AimoChatClient {
 
     // Map tool callbacks by name for O(1) lookup during tool invocation
-    private val toolCallbacks: Map<String, AimoToolCallback> = chatScope.tools.associateBy { it.toolDefinition.name }
+    private val toolCallbacks: Map<String, ToolCallback> = chatScope.tools.associateBy { it.toolDefinition.name }
 
     // Tool definitions sent to the model (extracted from callbacks)
-    private val toolDefinitions: List<AimoToolDefinition> = chatScope.tools.map { it.toolDefinition }
+    private val toolDefinitions: List<ToolDefinition> = chatScope.tools.map { it.toolDefinition }
 
     // System messages from the scope
     private val systemMessages: List<SystemMessageCallback> = chatScope.systemMessages

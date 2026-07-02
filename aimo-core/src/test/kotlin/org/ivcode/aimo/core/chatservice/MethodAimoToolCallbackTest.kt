@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core.chatservice
 
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.ToolDefinition
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -14,10 +14,11 @@ class MethodAimoToolCallbackTest {
     @Test
     fun `call returns string result unchanged`() {
         val controller = TestToolController()
-        val callback = MethodAimoToolCallback(
+        val callback = MethodToolCallback(
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("echo", String::class.java),
             toolDefinition = toolDefinition("echo"),
+            scopes = emptySet(),
             objectMapper = objectMapper,
         )
 
@@ -29,10 +30,11 @@ class MethodAimoToolCallbackTest {
     @Test
     fun `call injects context and serializes object response`() {
         val controller = TestToolController()
-        val callback = MethodAimoToolCallback(
+        val callback = MethodToolCallback(
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("describe", String::class.java, Map::class.java),
             toolDefinition = toolDefinition("describe"),
+            scopes = emptySet(),
             objectMapper = objectMapper,
         )
 
@@ -47,10 +49,11 @@ class MethodAimoToolCallbackTest {
     @Test
     fun `call fails when required argument is missing`() {
         val controller = TestToolController()
-        val callback = MethodAimoToolCallback(
+        val callback = MethodToolCallback(
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("echo", String::class.java),
             toolDefinition = toolDefinition("echo"),
+            scopes = emptySet(),
             objectMapper = objectMapper,
         )
 
@@ -64,10 +67,11 @@ class MethodAimoToolCallbackTest {
     @Test
     fun `call binds deeply nested complex argument object`() {
         val controller = TestToolController()
-        val callback = MethodAimoToolCallback(
+        val callback = MethodToolCallback(
             target = controller,
             method = TestToolController::class.java.getDeclaredMethod("summarizeProfile", ProfileRequest::class.java),
             toolDefinition = toolDefinition("summarizeProfile"),
+            scopes = emptySet(),
             objectMapper = objectMapper,
         )
 
@@ -109,10 +113,11 @@ class MethodAimoToolCallbackTest {
         val controller = TestToolController()
 
         val error = assertFailsWith<IllegalArgumentException> {
-            MethodAimoToolCallback(
+            MethodToolCallback(
                 target = controller,
                 method = TestToolController::class.java.getDeclaredMethod("notATool", String::class.java),
                 toolDefinition = toolDefinition("not_a_tool"),
+                scopes = emptySet(),
                 objectMapper = objectMapper,
             )
         }
@@ -123,7 +128,7 @@ class MethodAimoToolCallbackTest {
         )
     }
 
-    private fun toolDefinition(name: String): AimoToolDefinition = AimoToolDefinition(
+    private fun toolDefinition(name: String): ToolDefinition = ToolDefinition(
         name = name,
         description = "test tool",
         inputSchema = inputSchema,

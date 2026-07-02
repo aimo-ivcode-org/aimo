@@ -4,7 +4,7 @@
 
 Provide a core provider abstraction for chat services so annotated callbacks and future adapter-backed callbacks can be assembled uniformly and scope-built dynamically.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Chat service providers are first-class core abstractions
 The system SHALL define a `ChatServiceProvider` abstraction in `aimo-core` that exposes provider identity, provider scopes, tool callbacks, and system message callbacks.

@@ -4,7 +4,7 @@
 
 Provide a dedicated MCP client module that discovers tools from configured MCP servers, exposes them through the existing AIMO callback model, and keeps discovery/refresh behavior isolated from core runtime code.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: YAML-configured MCP servers
 The system SHALL configure MCP servers from `aimo.mcp.*` YAML properties and SHALL fail fast when the configuration is invalid or a configured server cannot be reached at startup.

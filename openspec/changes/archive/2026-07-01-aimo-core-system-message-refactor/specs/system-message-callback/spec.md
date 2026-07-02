@@ -4,7 +4,7 @@
 
 Normalize system message callbacks so the callback itself owns its stable name, matching how tool callbacks carry their own identity.
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: System message callbacks expose their own name
 The system SHALL require every `SystemMessageCallback` implementation to expose a stable `name` property.

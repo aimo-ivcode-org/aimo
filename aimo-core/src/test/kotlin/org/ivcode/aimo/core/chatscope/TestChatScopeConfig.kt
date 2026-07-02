@@ -1,18 +1,17 @@
 package org.ivcode.aimo.core.chatscope
 
 import org.ivcode.aimo.core.chatservice.ChatServiceEntity
-import org.ivcode.aimo.core.chatservice.ScopedSystemMessageCallbackWithName
-import org.ivcode.aimo.core.chatservice.ScopedToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
-import org.ivcode.aimo.core.chatservice.toAimoToolCallbacks
+import org.ivcode.aimo.core.chatservice.toToolCallbacks
 import org.ivcode.aimo.core.chatservice.toSystemMessageCallbacks
-import org.ivcode.aimo.core.model.AimoToolCallback
+import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.properties.AimoProperties
 import org.springframework.beans.factory.getBeansWithAnnotation
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.beans.factory.annotation.Qualifier
 import tools.jackson.databind.ObjectMapper
 import org.ivcode.aimo.core.chatservice.ChatService
 
@@ -43,7 +42,7 @@ class TestChatScopeConfig {
                 name = beanName,
                 clazz = chatService.javaClass,
                 instance = chatService,
-                tools = toAimoToolCallbacks(chatService, objectMapper, parentServiceScopes),
+                tools = toToolCallbacks(chatService, objectMapper, parentServiceScopes),
                 systemMessages = toSystemMessageCallbacks(chatService, parentServiceScopes),
             ))
         }
@@ -52,55 +51,37 @@ class TestChatScopeConfig {
     }
 
     @Bean
-    fun createToolCallbacks(chatServices: List<ChatServiceEntity>): List<AimoToolCallback> {
-        return chatServices.flatMap { it.tools.map { scoped -> scoped.callback } }
-    }
-
-    @Bean
-    fun createScopedToolCallbacks(chatServices: List<ChatServiceEntity>): List<ScopedToolCallback> {
+    fun createToolCallbacks(chatServices: List<ChatServiceEntity>): List<ToolCallback> {
         return chatServices.flatMap { it.tools }
     }
 
     @Bean
-    fun createToolScopeMap(scopedTools: List<ScopedToolCallback>): Map<String, Set<String>> {
-        return scopedTools.associate { scoped ->
-            scoped.callback.toolDefinition.name to scoped.scopes
+    fun createToolScopeMap(tools: List<ToolCallback>): Map<String, Set<String>> {
+        return tools.associate { tool ->
+            tool.toolDefinition.name to tool.scopes
         }
     }
 
     @Bean
     fun createSystemMessageCallbacks(chatServices: List<ChatServiceEntity>): List<SystemMessageCallback> {
-        return chatServices.flatMap { it.systemMessages.map { scoped -> scoped.callback } }
-    }
-
-    @Bean
-    fun createScopedSystemMessageCallbacks(chatServices: List<ChatServiceEntity>): List<ScopedSystemMessageCallbackWithName> {
         return chatServices.flatMap { it.systemMessages }
     }
 
     @Bean
-    fun createSystemMessageScopeMap(scopedSystemMessages: List<ScopedSystemMessageCallbackWithName>): Map<String, Set<String>> {
-        return scopedSystemMessages.associate { scoped ->
-            scoped.name to scoped.scopes
+    fun createSystemMessageScopeMap(systemMessages: List<SystemMessageCallback>): Map<String, Set<String>> {
+        return systemMessages.associate { message ->
+            message.name to message.scopes
         }
     }
 
     @Bean
     fun createChatScopeProvider(
-        scopedTools: List<ScopedToolCallback>,
-        scopedSystemMessages: List<ScopedSystemMessageCallbackWithName>,
-        tools: List<AimoToolCallback>,
+        tools: List<ToolCallback>,
         systemMessages: List<SystemMessageCallback>,
+        @Qualifier("createToolScopeMap") toolScopeMap: Map<String, Set<String>>,
+        @Qualifier("createSystemMessageScopeMap") systemMessageScopeMap: Map<String, Set<String>>,
         properties: AimoProperties
     ): ChatScopeProvider {
-        val toolScopeMap = scopedTools.associate { scoped ->
-            scoped.callback.toolDefinition.name to scoped.scopes
-        }
-
-        val systemMessageScopeMap = scopedSystemMessages.associate { scoped ->
-            scoped.name to scoped.scopes
-        }
-
         // Build predefined scopes from YAML configuration
         val predefinedScopes = buildPredefinedScopesForTest(
             scopeConfigs = properties.scope,
@@ -108,59 +89,47 @@ class TestChatScopeConfig {
             allSystemMessages = systemMessages,
             toolScopeMap = toolScopeMap,
             systemMessageScopeMap = systemMessageScopeMap,
-            scopedSystemMessages = scopedSystemMessages
         )
 
-         return ChatScopeProviderImpl(
-             allTools = tools,
-             allSystemMessages = scopedSystemMessages,
-             predefinedScopes = predefinedScopes,
-             toolScopeMap = toolScopeMap,
-             systemMessageScopeMap = systemMessageScopeMap
-         )
+        return ChatScopeProviderImpl(
+            allTools = tools,
+            allSystemMessages = systemMessages,
+            predefinedScopes = predefinedScopes,
+            toolScopeMap = toolScopeMap,
+            systemMessageScopeMap = systemMessageScopeMap
+        )
     }
 
     private fun buildPredefinedScopesForTest(
         scopeConfigs: Map<String, org.ivcode.aimo.core.properties.AimoChatScopeProperties>,
-        allTools: List<AimoToolCallback>,
+        allTools: List<ToolCallback>,
         allSystemMessages: List<SystemMessageCallback>,
         toolScopeMap: Map<String, Set<String>>,
-        systemMessageScopeMap: Map<String, Set<String>>,
-        scopedSystemMessages: List<ScopedSystemMessageCallbackWithName>
+        systemMessageScopeMap: Map<String, Set<String>>
     ): Map<String, ChatScope> {
-        // Build a map from callback to name for system messages
-        val callbackToName = mutableMapOf<SystemMessageCallback, String>()
-        for (scoped in scopedSystemMessages) {
-            callbackToName[scoped.callback] = scoped.name
-        }
-
         // Return scopes based on YAML config
         val result = mutableMapOf<String, ChatScope>()
         for ((scopeId, config) in scopeConfigs) {
             // Collect tools for this scope
-            val scopedTools = mutableListOf<AimoToolCallback>()
+            val scopedTools = mutableListOf<ToolCallback>()
 
             // 1. Add global tools if inheritGlobal is true
             if (config.inheritGlobal) {
                 scopedTools.addAll(allTools.filter { tool ->
-                    val toolScopes = toolScopeMap[tool.toolDefinition.name] ?: emptySet()
-                    // Global tool: no scope restriction
-                    toolScopes.isEmpty()
+                    tool.scopes.isEmpty()
                 })
             }
 
             // 2. Add tools that explicitly declare this scope (from annotations)
             scopedTools.addAll(allTools.filter { tool ->
-                val toolScopes = toolScopeMap[tool.toolDefinition.name] ?: emptySet()
-                // Tool declared for this specific scope
-                toolScopes.contains(scopeId)
+                tool.scopes.contains(scopeId)
             })
 
-             // 3. Add tools explicitly referenced in config (toolRefs)
-             // tool-refs act as an override: explicitly include these tools regardless of their scope restrictions
-             scopedTools.addAll(allTools.filter { tool ->
-                 config.toolRefs.contains(tool.toolDefinition.name)
-             })
+            // 3. Add tools explicitly referenced in config (toolRefs)
+            // tool-refs act as an override: explicitly include these tools regardless of their scope restrictions
+            scopedTools.addAll(allTools.filter { tool ->
+                config.toolRefs.contains(tool.toolDefinition.name)
+            })
 
             // Remove duplicates by tool name
             val uniqueTools = scopedTools
@@ -173,31 +142,24 @@ class TestChatScopeConfig {
             // 1. Add global system messages if inheritGlobal is true
             if (config.inheritGlobal) {
                 systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
-                    val msgName = callbackToName[msg] ?: return@filter false
-                    val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
-                    // Global message: no scope restriction
-                    msgScopes.isEmpty()
+                    msg.scopes.isEmpty()
                 })
             }
 
             // 2. Add messages that explicitly declare this scope (from annotations)
             systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
-                val msgName = callbackToName[msg] ?: return@filter false
-                val msgScopes = systemMessageScopeMap[msgName] ?: emptySet()
-                // Message declared for this specific scope
-                msgScopes.contains(scopeId)
+                msg.scopes.contains(scopeId)
             })
 
-             // 3. Add messages explicitly referenced in config (systemMessageRefs)
-             // system-message-refs act as an override: explicitly include these messages regardless of their scope restrictions
-             systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
-                 val msgName = callbackToName[msg] ?: return@filter false
-                 config.systemMessageRefs.contains(msgName)
-             })
+            // 3. Add messages explicitly referenced in config (systemMessageRefs)
+            // system-message-refs act as an override: explicitly include these messages regardless of their scope restrictions
+            systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
+                config.systemMessageRefs.contains(msg.name)
+            })
 
             // Remove duplicates by name
             val uniqueSystemMessages = systemMessagesForScope
-                .distinctBy { callbackToName[it] }
+                .distinctBy { it.name }
 
             // Create inline system message callbacks from YAML system-messages field
             val inlineSystemMessages = config.systemMessages.map { (msgId, msgText) ->
@@ -221,8 +183,10 @@ class TestChatScopeConfig {
 
     private class InlineSystemMessageCallback(
         val id: String,
-        val messageText: String
+        val messageText: String,
+        override val scopes: Set<String> = emptySet()
     ) : SystemMessageCallback {
+        override val name: String = id
         override fun call(context: org.ivcode.aimo.core.chatservice.SystemMessageContext): String? = messageText
     }
 }

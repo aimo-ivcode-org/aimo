@@ -8,7 +8,7 @@ import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoPrompt
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.ollama.client.ChatRequest
 import org.ivcode.aimo.ollama.client.ChatResponse
 import org.ivcode.aimo.ollama.client.Function
@@ -185,7 +185,7 @@ private fun AimoChatMessage.toMessage(): Message {
     )
 }
 
-private fun AimoToolDefinition.toTool(): Tool =
+private fun ToolDefinition.toTool(): Tool =
     Tool(function = Function(
         name        = name,
         description = description,

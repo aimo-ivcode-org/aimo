@@ -1,7 +1,7 @@
 package org.ivcode.aimo.core.chatservice
 
-import org.ivcode.aimo.core.model.AimoToolCallback
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.ToolCallback
+import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.core.model.DEFAULT_JSON_SCHEMA_DIALECT
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
@@ -12,31 +12,6 @@ import kotlin.reflect.full.memberProperties
 import kotlin.reflect.jvm.javaType
 import kotlin.reflect.jvm.kotlinFunction
 
-/**
- * Wrapper associating a tool callback with its scope restrictions.
- *
- * @property callback The actual tool callback (method invocation logic)
- * @property scopes Set of scope IDs this tool is available in (computed after validation).
- *                  Empty set means available to all scopes.
- */
-data class ScopedToolCallback(
-    val callback: AimoToolCallback,
-    val scopes: Set<String>
-)
-
-/**
- * Wrapper associating a system message callback with its scope restrictions and name.
- *
- * @property callback The actual system message callback
- * @property name Stable identifier for this system message (explicit or auto-generated)
- * @property scopes Set of scope IDs this system message is available in (computed after validation).
- *                  Empty set means available to all scopes.
- */
-data class ScopedSystemMessageCallbackWithName(
-    val callback: SystemMessageCallback,
-    val name: String,
-    val scopes: Set<String>
-)
 
 /**
  * Compute actual scopes for a tool/system message based on parent service scopes and declared scopes.
@@ -84,12 +59,12 @@ internal fun computeActualScopes(
     return intersection
 }
 
-internal fun toAimoToolCallbacks(
+internal fun toToolCallbacks(
     controller: Any,
     objectMapper: ObjectMapper,
     parentServiceScopes: Set<String> = emptySet()
-): List<ScopedToolCallback> {
-    val callbacks = mutableListOf<ScopedToolCallback>()
+): List<ToolCallback> {
+    val callbacks = mutableListOf<ToolCallback>()
     var type: Class<*>? = controller::class.java
 
     while (type != null && type != Any::class.java) {
@@ -103,8 +78,8 @@ internal fun toAimoToolCallbacks(
                 // Compute actual scopes with validation
                 val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "tool '$toolName'")
 
-                val callback = toAimoToolCallback(controller, method, objectMapper)
-                callbacks += ScopedToolCallback(callback, actualScopes)
+                val callback = toToolCallback(controller, method, objectMapper, actualScopes)
+                callbacks += callback
             }
 
         type = type.superclass
@@ -113,30 +88,32 @@ internal fun toAimoToolCallbacks(
     return callbacks
 }
 
-internal fun toAimoToolCallback(
+internal fun toToolCallback(
     controller: Any,
     method: Method,
     objectMapper: ObjectMapper,
-): MethodAimoToolCallback {
+    scopes: Set<String> = emptySet(),
+): MethodToolCallback {
     val tool = method.getAnnotation(Tool::class.java)
         ?: throw IllegalArgumentException(
             "Method ${method.name} on ${method.declaringClass.name} must be annotated with @Tool"
         )
 
-    return MethodAimoToolCallback(
+    return MethodToolCallback(
         target = controller,
         method = method,
-        toolDefinition = AimoToolDefinition(
+        toolDefinition = ToolDefinition(
             name = tool.name.takeIf { it.isNotBlank() } ?: method.name,
             description = tool.description.takeIf { it.isNotBlank() },
-            inputSchema = createAimoToolInputSchema(method, objectMapper),
+            inputSchema = createToolInputSchema(method, objectMapper),
             schemaDialect = DEFAULT_JSON_SCHEMA_DIALECT,
         ),
+        scopes = scopes,
         objectMapper = objectMapper,
     )
 }
 
-private fun createAimoToolInputSchema(method: Method, objectMapper: ObjectMapper): JsonNode {
+private fun createToolInputSchema(method: Method, objectMapper: ObjectMapper): JsonNode {
     val function = method.kotlinFunction
         ?: throw IllegalArgumentException(
             "Method ${method.name} on ${method.declaringClass.name} is not a Kotlin function"
@@ -148,7 +125,7 @@ private fun createAimoToolInputSchema(method: Method, objectMapper: ObjectMapper
 
     function.parameters
         .filter { it.kind == KParameter.Kind.VALUE }
-        .filterNot { isAimoToolContextParameter(it, objectMapper) }
+        .filterNot { isToolContextParameter(it, objectMapper) }
         .forEach { parameter ->
             val parameterName = parameter.name
                 ?: throw IllegalStateException(
@@ -157,7 +134,7 @@ private fun createAimoToolInputSchema(method: Method, objectMapper: ObjectMapper
 
             properties.set(
                 parameterName,
-                createAimoToolParameterSchema(parameter, objectMapper)
+                createToolParameterSchema(parameter, objectMapper)
             )
 
             if (!parameter.isOptional && !parameter.type.isMarkedNullable) {
@@ -173,16 +150,16 @@ private fun createAimoToolInputSchema(method: Method, objectMapper: ObjectMapper
     return schema
 }
 
-private fun isAimoToolContextParameter(parameter: KParameter, objectMapper: ObjectMapper): Boolean {
+private fun isToolContextParameter(parameter: KParameter, objectMapper: ObjectMapper): Boolean {
     val rawClass = objectMapper.typeFactory.constructType(parameter.type.javaType).rawClass
     return parameter.name == "context" && Map::class.java.isAssignableFrom(rawClass)
 }
 
-private fun createAimoToolParameterSchema(parameter: KParameter, objectMapper: ObjectMapper): JsonNode {
+private fun createToolParameterSchema(parameter: KParameter, objectMapper: ObjectMapper): JsonNode {
     val type = parameter.type.javaType
     val rawClass = objectMapper.typeFactory.constructType(type).rawClass
     val schema = objectMapper.createObjectNode()
-    schema.put("type", rawClass.toAimoJsonSchemaType())
+    schema.put("type", rawClass.toJsonSchemaType())
 
     // Include description from @ToolParam annotation if present
     parameter.findAnnotation<ToolParam>()?.let { toolParam ->
@@ -194,7 +171,7 @@ private fun createAimoToolParameterSchema(parameter: KParameter, objectMapper: O
     return schema
 }
 
-private fun Class<*>.toAimoJsonSchemaType(): String {
+private fun Class<*>.toJsonSchemaType(): String {
     return when {
         this == String::class.java || this == Char::class.java || this.isEnum -> "string"
         this == Boolean::class.java || this == java.lang.Boolean::class.java -> "boolean"
@@ -212,7 +189,7 @@ private fun Class<*>.toAimoJsonSchemaType(): String {
 
 /**
  * Scan the given controller instance and return callbacks for fields and methods
- * annotated with @SystemMessage, along with their names and scope restrictions.
+ * annotated with @SystemMessage, with embedded scope restrictions.
  *
  * Rules:
  * - Fields annotated with @SystemMessage will be used as-is (their toString() is returned).
@@ -220,14 +197,14 @@ private fun Class<*>.toAimoJsonSchemaType(): String {
  * - Methods annotated with @SystemMessage must return String? and either take no parameters
  *   or a single parameter of type SystemMessageContext.
  * - Names are extracted from @SystemMessage.name, or auto-generated from method/field/property name
- * - Scope restrictions are validated against parent @ChatService scopes
+ * - Scope restrictions are validated against parent @ChatService scopes and embedded in the callback
  * - Duplicate names within this controller will throw an error
  */
 internal fun toSystemMessageCallbacks(
     controller: Any,
     parentServiceScopes: Set<String> = emptySet()
-): List<ScopedSystemMessageCallbackWithName> {
-    val callbacks = mutableListOf<ScopedSystemMessageCallbackWithName>()
+): List<SystemMessageCallback> {
+    val callbacks = mutableListOf<SystemMessageCallback>()
     val observedNames = mutableSetOf<String>()
     val clazz = controller::class.java
 
@@ -249,11 +226,7 @@ internal fun toSystemMessageCallbacks(
             
             // attempt to make field accessible; ignore failure (may be blocked by module system)
             trySetAccessible(field)
-            callbacks += ScopedSystemMessageCallbackWithName(
-                FieldSystemMessageCallback(controller, field),
-                name,
-                actualScopes
-            )
+            callbacks += FieldSystemMessageCallback(controller, field, name, actualScopes)
         }
     }
 
@@ -272,11 +245,7 @@ internal fun toSystemMessageCallbacks(
         val declaredScopes = annotation.scope.toSet()
         val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
         
-        callbacks += ScopedSystemMessageCallbackWithName(
-            PropertySystemMessageCallback(controller, property),
-            name,
-            actualScopes
-        )
+        callbacks += PropertySystemMessageCallback(controller, property, name, actualScopes)
     }
 
     // Methods
@@ -321,11 +290,7 @@ internal fun toSystemMessageCallbacks(
         val declaredScopes = annotation.scope.toSet()
         val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
 
-        callbacks += ScopedSystemMessageCallbackWithName(
-            MethodSystemMessageCallback(controller, method, isContextual),
-            name,
-            actualScopes
-        )
+        callbacks += MethodSystemMessageCallback(controller, method, isContextual, name, actualScopes)
     }
 
     return callbacks

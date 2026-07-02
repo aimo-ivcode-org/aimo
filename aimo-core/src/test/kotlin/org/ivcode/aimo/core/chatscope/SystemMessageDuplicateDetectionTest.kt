@@ -1,9 +1,8 @@
 package org.ivcode.aimo.core.chatscope
 
 import org.ivcode.aimo.core.chatservice.ChatService
-import org.ivcode.aimo.core.chatservice.ScopedSystemMessageCallbackWithName
-import org.ivcode.aimo.core.chatservice.SystemMessage
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
+import org.ivcode.aimo.core.chatservice.SystemMessage
 import org.ivcode.aimo.core.chatservice.SystemMessageContext
 import org.ivcode.aimo.core.chatservice.Tool
 import org.ivcode.aimo.core.chatservice.ToolParam
@@ -55,24 +54,24 @@ class SystemMessageDuplicateDetectionTest {
         )
     }
 
-    @Test
-    fun `unique system message names are accepted`() {
-        // Setup: Single service with unique system message names
-        val messages = toSystemMessageCallbacks(ServiceWithUniqueNames(), emptySet())
+     @Test
+     fun `unique system message names are accepted`() {
+         // Setup: Single service with unique system message names
+         val messages = toSystemMessageCallbacks(ServiceWithUniqueNames(), emptySet())
 
-        assertEquals(2, messages.size)
-        val names = messages.map { it.name }
-        assertEquals(setOf("prompt1", "prompt2"), names.toSet())
-    }
+         assertEquals(2, messages.size)
+         val names = messages.map { it.name }
+         assertEquals(setOf("prompt1", "prompt2"), names.toSet())
+     }
 
-    @Test
-    fun `single system message with unique name is accepted`() {
-        // Setup: Single service with one system message
-        val messages = toSystemMessageCallbacks(ServiceWithSingleMessage(), emptySet())
+     @Test
+     fun `single system message with unique name is accepted`() {
+         // Setup: Single service with one system message
+         val messages = toSystemMessageCallbacks(ServiceWithSingleMessage(), emptySet())
 
-        assertEquals(1, messages.size)
-        assertEquals("system_prompt", messages[0].name)
-    }
+         assertEquals(1, messages.size)
+         assertEquals("system_prompt", messages[0].name)
+     }
 
     @Test
     fun `system messages with different scopes but same name are still duplicates within service`() {
@@ -112,21 +111,21 @@ class SystemMessageDuplicateDetectionTest {
         assertTrue(exception.message?.contains("Duplicate") == true, "Error message should identify the issue")
     }
 
-    // Helper to build registry (extracted from AimoConfig logic)
-    private fun buildSystemMessageNameRegistry(
-        scopedSystemMessages: List<ScopedSystemMessageCallbackWithName>
-    ): Map<String, SystemMessageCallback> {
-        val registry = mutableMapOf<String, SystemMessageCallback>()
+     // Helper to build registry (extracted from AimoConfig logic)
+     private fun buildSystemMessageNameRegistry(
+         scopedSystemMessages: List<SystemMessageCallback>
+     ): Map<String, SystemMessageCallback> {
+         val registry = mutableMapOf<String, SystemMessageCallback>()
 
-        for (scoped in scopedSystemMessages) {
-            require(!registry.containsKey(scoped.name)) {
-                "Duplicate system message name '${scoped.name}' detected. System message names must be unique."
-            }
-            registry[scoped.name] = scoped.callback
-        }
+         for (message in scopedSystemMessages) {
+             require(!registry.containsKey(message.name)) {
+                 "Duplicate system message name '${message.name}' detected. System message names must be unique."
+             }
+             registry[message.name] = message
+         }
 
-        return registry
-    }
+         return registry
+     }
 
     // Test classes
 
@@ -178,6 +177,9 @@ class SystemMessageDuplicateDetectionTest {
         fun justATool(): String = "Tool"
     }
 }
+
+
+
 
 
 

@@ -91,7 +91,7 @@ data class AimoChatOptions (
  * `null`, callers are deferring entirely to the model's configured defaults.
  */
 data class AimoPrompt (
-    val tools: List<AimoToolDefinition> = emptyList(),
+    val tools: List<ToolDefinition> = emptyList(),
     val systemMessages: List<SystemMessageCallback> = emptyList(),
     val options: AimoChatOptions? = null,
     val messages: List<AimoChatMessage>,
@@ -100,19 +100,25 @@ data class AimoPrompt (
 /**
  * Aimo-owned tool callback contract for runtime tool invocation.
  *
+ * Each tool callback carries its scope restrictions as a first-class property.
+ * Scopes are computed at callback creation time from @Tool annotations and parent
+ * @ChatService scopes. An empty [scopes] set indicates the tool is available to
+ * all scopes (global tool).
+ *
  * Current parsing contract for `argumentsJson`:
  * 1) Parse the raw JSON string into a JSON tree/object.
  * 2) Bind/coerce values into typed arguments for the callback implementation.
  * 3) Fail fast for binding/runtime issues (for example missing required arguments,
  *    nullability violations, or type conversion errors).
  *
- * Note: JSON Schema validation against [AimoToolDefinition.inputSchema] and
- * [AimoToolDefinition.schemaDialect] is not currently enforced by this interface.
+ * Note: JSON Schema validation against [ToolDefinition.inputSchema] and
+ * [ToolDefinition.schemaDialect] is not currently enforced by this interface.
  * Implementations may add validation, but callers must not assume schema validation
  * occurs unless explicitly documented by the concrete implementation.
  */
-interface AimoToolCallback {
-    val toolDefinition: AimoToolDefinition
+interface ToolCallback {
+    val toolDefinition: ToolDefinition
+    val scopes: Set<String>
     fun call(argumentsJson: String, context: Map<String, Any>): String
 }
 
@@ -133,7 +139,7 @@ const val DEFAULT_JSON_SCHEMA_DIALECT: String = "https://json-schema.org/draft/2
  * conversations, because downstream code can serialize/validate the same schema document
  * without lossy type conversions.
  */
-data class AimoToolDefinition (
+data class ToolDefinition (
     val name: String,
     val description: String? = null,
     val inputSchema: JsonNode,

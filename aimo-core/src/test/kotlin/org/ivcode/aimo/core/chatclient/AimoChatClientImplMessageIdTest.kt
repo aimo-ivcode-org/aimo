@@ -9,7 +9,7 @@ import org.ivcode.aimo.core.AimoToolCall
 import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatservice.Tool
-import org.ivcode.aimo.core.chatservice.toAimoToolCallbacks
+import org.ivcode.aimo.core.chatservice.toToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatEngine
@@ -87,7 +87,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )
@@ -219,7 +219,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )
@@ -258,7 +258,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )
@@ -397,7 +397,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )

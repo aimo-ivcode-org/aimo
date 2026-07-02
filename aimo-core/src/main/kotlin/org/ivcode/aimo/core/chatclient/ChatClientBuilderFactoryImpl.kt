@@ -5,7 +5,7 @@ import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
-import org.ivcode.aimo.core.model.AimoToolCallback
+import org.ivcode.aimo.core.model.ToolCallback
 
 /**
  * Factory for creating chat client builders.
@@ -21,7 +21,7 @@ import org.ivcode.aimo.core.model.AimoToolCallback
  */
 class ChatClientBuilderFactoryImpl(
     private val modelProviderFactories: Map<String, AimoChatModelProviderFactory>,
-    private val toolCallbacks: List<AimoToolCallback>,
+    private val toolCallbacks: List<ToolCallback>,
     private val systemMessages: List<SystemMessageCallback>,
     private val chatScopeProvider: ChatScopeProvider,
     private val defaultInterceptors: List<ChatClientInterceptor> = emptyList(),

@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core.chatscope
 
-import org.ivcode.aimo.core.model.AimoToolCallback
+import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 
 /**
@@ -19,7 +19,7 @@ data class ChatScope(
     val id: String,
     val displayName: String,
     val description: String,
-    val tools: List<AimoToolCallback>,
+    val tools: List<ToolCallback>,
     val systemMessages: List<SystemMessageCallback>
 )
 
