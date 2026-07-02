@@ -1,8 +1,9 @@
 package org.ivcode.aimo.core.client.chat
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoToolCall
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoToolCall
+
 
 internal fun createUserMessage (
     messageId: Int,

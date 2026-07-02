@@ -1,9 +1,9 @@
 package org.ivcode.aimo.server.service
 
-import org.ivcode.aimo.core.AimoChatRequest
 import org.ivcode.aimo.core.chatclient.AimoChatClient
 import org.ivcode.aimo.core.chatclient.ChatClientBuilderFactory
 import org.ivcode.aimo.core.conversation.ConversationFactory
+import org.ivcode.aimo.core.model.AimoChatRequest
 import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.server.model.ChatRequest
 import org.ivcode.aimo.server.model.ChatResponse

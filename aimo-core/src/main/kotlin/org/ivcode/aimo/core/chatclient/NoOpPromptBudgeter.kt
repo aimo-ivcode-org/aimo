@@ -1,7 +1,7 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatResponse
 import org.ivcode.aimo.core.model.ToolCallback
 
 /**

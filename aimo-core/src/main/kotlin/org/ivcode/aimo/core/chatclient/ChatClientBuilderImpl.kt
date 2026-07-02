@@ -1,11 +1,11 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatRequest
-import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.model.AimoChatModelConfig
+import org.ivcode.aimo.core.model.AimoChatRequest
+import org.ivcode.aimo.core.model.AimoChatResponse
 import java.util.UUID
 
 /**

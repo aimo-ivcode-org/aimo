@@ -1,10 +1,10 @@
 package org.ivcode.aimo.server.service
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoPromptCacheUsage
-import org.ivcode.aimo.core.AimoUsage
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoPromptCacheUsage
+import org.ivcode.aimo.core.model.AimoUsage
 import tools.jackson.databind.ObjectMapper
 import java.time.Instant
 import java.util.UUID

@@ -1,7 +1,7 @@
 package org.ivcode.aimo.ui.extentions
 
-import org.ivcode.aimo.core.AimoConversationInfo
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.model.AimoConversationInfo
 import org.ivcode.aimo.ui.model.ConversationTitle
 import java.util.UUID
 

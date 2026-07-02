@@ -1,13 +1,13 @@
 package org.ivcode.aimo.ollama.model
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoToolCall
-import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.model.AimoChatEngine
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoChatOptions
+import org.ivcode.aimo.core.model.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoPrompt
+import org.ivcode.aimo.core.model.AimoToolCall
+import org.ivcode.aimo.core.model.AimoUsage
 import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.ollama.client.ChatRequest
 import org.ivcode.aimo.ollama.client.ChatResponse
@@ -104,23 +104,23 @@ internal class OllamaChatEngineImpl(
         val toolCalls = msg.toolCalls
             ?.map { tc ->
                 AimoToolCall(
-                    id        = tc.id?.takeIf { it.isNotBlank() }
+                    id = tc.id?.takeIf { it.isNotBlank() }
                         ?: stableToolCallId(tc.function.name, tc.function.arguments),
-                    name      = tc.function.name,
+                    name = tc.function.name,
                     arguments = mapper.writeValueAsString(tc.function.arguments),
                 )
             }
             ?.takeIf { it.isNotEmpty() }
 
         val aimoMessage = AimoChatMessage(
-            messageId  = messageId,
-            type       = AimoChatMessageType.ASSISTANT,
-            content    = msg.content,
-            thinking   = msg.thinking?.takeIf { it.isNotBlank() },
-            toolName   = msg.toolName,
+            messageId = messageId,
+            type = AimoChatMessageType.ASSISTANT,
+            content = msg.content,
+            thinking = msg.thinking?.takeIf { it.isNotBlank() },
+            toolName = msg.toolName,
             toolCallId = null,
-            toolCalls  = toolCalls,
-            done       = done,
+            toolCalls = toolCalls,
+            done = done,
         )
 
         val promptEvalCount = response.promptEvalCount

@@ -1,6 +1,5 @@
 package org.ivcode.aimo.core.model
 
-import org.ivcode.aimo.core.AimoChatResponse
 import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test

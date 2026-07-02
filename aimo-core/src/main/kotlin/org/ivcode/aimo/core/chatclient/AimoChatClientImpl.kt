@@ -1,10 +1,5 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatRequest
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageContext
@@ -12,9 +7,14 @@ import org.ivcode.aimo.core.client.chat.createSystemMessage
 import org.ivcode.aimo.core.client.chat.createToolMessage
 import org.ivcode.aimo.core.client.chat.createUserMessage
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoChatModelConfig
+import org.ivcode.aimo.core.model.AimoChatRequest
+import org.ivcode.aimo.core.model.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoPromptBudgeterType
+import org.ivcode.aimo.core.model.AimoUsage
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CHAT_ID
@@ -22,6 +22,7 @@ import org.ivcode.aimo.core.util.CONTEXT_KEY__CONVERSATION
 import org.ivcode.aimo.core.util.CONTEXT_KEY__REQUEST_ID
 import java.time.Instant
 import java.util.UUID
+import kotlin.collections.orEmpty
 
 /**
  * Implementation of [AimoChatClient] responsible for orchestrating chat interactions.

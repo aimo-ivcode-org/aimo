@@ -1,9 +1,10 @@
 package org.ivcode.aimo.core.conversation
 
-import org.ivcode.aimo.core.AimoChatMessage
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.dao.ChatMessageEntity
 import org.ivcode.aimo.core.dao.ChatRequestEntity
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import java.time.Instant
 import java.util.UUID
 
@@ -85,7 +86,7 @@ class ConversationImpl(
 private fun ChatMessageEntity.toAimoChatMessage(): AimoChatMessage {
     return AimoChatMessage(
         messageId = this.messageId,
-        type = org.ivcode.aimo.core.AimoChatMessageType.valueOf(this.type),
+        type = AimoChatMessageType.valueOf(this.type),
         content = this.content,
         thinking = this.thinking,
         toolName = this.toolName,

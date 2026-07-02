@@ -1,7 +1,5 @@
 package org.ivcode.aimo.core.model
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import tools.jackson.databind.JsonNode
 

@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core
+package org.ivcode.aimo.core.model
 
 import java.time.Instant
 import java.util.UUID

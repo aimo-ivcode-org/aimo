@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoChatResponse
 
 /**
  * Interceptor for chat client (request-level) operations.

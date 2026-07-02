@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core.dao
 
-import org.ivcode.aimo.core.AimoToolCall
+import org.ivcode.aimo.core.model.AimoToolCall
 import java.time.Instant
 import java.util.UUID
 

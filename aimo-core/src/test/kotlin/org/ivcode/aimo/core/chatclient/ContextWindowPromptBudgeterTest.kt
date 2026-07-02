@@ -1,8 +1,10 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatResponse
+import java.time.Instant
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -129,10 +131,10 @@ class ContextWindowPromptBudgeterTest {
                 assertEquals(null, result[0].thinking)
                 assertEquals(null, result[1].thinking)
                 AimoChatResponse(
-                    chatId = java.util.UUID.randomUUID(),
-                    responseId = java.util.UUID.randomUUID(),
+                    chatId = UUID.randomUUID(),
+                    responseId = UUID.randomUUID(),
                     messages = emptyList(),
-                    createdAt = java.time.Instant.now(),
+                    createdAt = Instant.now(),
                 )
             }
         )
