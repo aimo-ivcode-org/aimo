@@ -4,6 +4,10 @@ import org.ivcode.aimo.core.chatservice.ChatServiceEntity
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.toToolCallbacks
 import org.ivcode.aimo.core.chatservice.toSystemMessageCallbacks
+import org.ivcode.aimo.core.chatservice.ChatService
+import org.ivcode.aimo.core.chatservice.AnnotatedChatServiceProvider
+import org.ivcode.aimo.core.chatservice.ChatServiceProviderManager
+import org.ivcode.aimo.core.chatservice.ChatServiceProviderManagerImpl
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.properties.AimoProperties
 import org.springframework.beans.factory.getBeansWithAnnotation
@@ -13,7 +17,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.beans.factory.annotation.Qualifier
 import tools.jackson.databind.ObjectMapper
-import org.ivcode.aimo.core.chatservice.ChatService
 
 /**
  * Minimal Spring configuration for ChatScope testing in aimo-core.
@@ -56,47 +59,46 @@ class TestChatScopeConfig {
     }
 
     @Bean
-    fun createToolScopeMap(tools: List<ToolCallback>): Map<String, Set<String>> {
-        return tools.associate { tool ->
-            tool.toolDefinition.name to tool.scopes
-        }
-    }
-
-    @Bean
     fun createSystemMessageCallbacks(chatServices: List<ChatServiceEntity>): List<SystemMessageCallback> {
         return chatServices.flatMap { it.systemMessages }
     }
 
     @Bean
-    fun createSystemMessageScopeMap(systemMessages: List<SystemMessageCallback>): Map<String, Set<String>> {
-        return systemMessages.associate { message ->
-            message.name to message.scopes
+    fun createChatServiceProviders(
+        chatServices: List<ChatServiceEntity>
+    ): List<org.ivcode.aimo.core.chatservice.ChatServiceProvider> {
+        return chatServices.map { entity ->
+            AnnotatedChatServiceProvider(entity)
         }
+    }
+
+    @Bean
+    fun createChatServiceProviderManager(
+        providers: List<org.ivcode.aimo.core.chatservice.ChatServiceProvider>
+    ): ChatServiceProviderManager {
+        return ChatServiceProviderManagerImpl(providers)
     }
 
     @Bean
     fun createChatScopeProvider(
         tools: List<ToolCallback>,
         systemMessages: List<SystemMessageCallback>,
-        @Qualifier("createToolScopeMap") toolScopeMap: Map<String, Set<String>>,
-        @Qualifier("createSystemMessageScopeMap") systemMessageScopeMap: Map<String, Set<String>>,
-        properties: AimoProperties
+        properties: AimoProperties,
+        providerManager: ChatServiceProviderManager
     ): ChatScopeProvider {
         // Build predefined scopes from YAML configuration
-        val predefinedScopes = buildPredefinedScopesForTest(
+        val predefinedScopes = buildPredefinedScopesForTest (
             scopeConfigs = properties.scope,
             allTools = tools,
             allSystemMessages = systemMessages,
-            toolScopeMap = toolScopeMap,
-            systemMessageScopeMap = systemMessageScopeMap,
+            providerManager = providerManager,
         )
 
         return ChatScopeProviderImpl(
             allTools = tools,
             allSystemMessages = systemMessages,
             predefinedScopes = predefinedScopes,
-            toolScopeMap = toolScopeMap,
-            systemMessageScopeMap = systemMessageScopeMap
+            providerManager = providerManager
         )
     }
 
@@ -104,8 +106,7 @@ class TestChatScopeConfig {
         scopeConfigs: Map<String, org.ivcode.aimo.core.properties.AimoChatScopeProperties>,
         allTools: List<ToolCallback>,
         allSystemMessages: List<SystemMessageCallback>,
-        toolScopeMap: Map<String, Set<String>>,
-        systemMessageScopeMap: Map<String, Set<String>>
+        providerManager: ChatServiceProviderManager
     ): Map<String, ChatScope> {
         // Return scopes based on YAML config
         val result = mutableMapOf<String, ChatScope>()
@@ -173,6 +174,7 @@ class TestChatScopeConfig {
                 id = scopeId,
                 displayName = config.displayName,
                 description = config.description,
+                providers = providerManager.getProviders(),
                 tools = uniqueTools,
                 systemMessages = allScopedSystemMessages
             )

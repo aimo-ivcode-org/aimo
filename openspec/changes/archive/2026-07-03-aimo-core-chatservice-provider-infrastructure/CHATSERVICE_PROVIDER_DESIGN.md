@@ -6,7 +6,7 @@ This document demonstrates what the `ChatServiceProvider` abstraction will look 
 
 The provider abstraction separates **tool/system message discovery** from **scope building**. Currently, discovery is embedded in `AimoConfig` as reflection-based bean scanning. With providers, any source (annotations, MCP servers, external APIs) can contribute tools and messages in a uniform way.
 
-**Design Improvement:** Scope information (`scopes: Set<String>`) is added directly to `AimoToolCallback` and `SystemMessageCallback` interfaces, eliminating the need for wrapper classes (`ScopedToolCallback` / `ScopedSystemMessageCallback`). This reflects the fact that `@Tool` and `@SystemMessage` annotations already carry scope metadata—the callback objects should inherently carry it too.
+**Note:** Scope information (`scopes: Set<String>`) is already embedded directly on the `ToolCallback` and `SystemMessageCallback` interfaces (done by the prior `aimo-core-refactor-callbacks` and `aimo-core-system-message-refactor` changes) — there are no `ScopedToolCallback`/`ScopedSystemMessageCallback` wrapper classes in the codebase, and this change does not reintroduce them. What's new here is a *provider-level* `scopes: Set<String>` on `ChatServiceProvider` itself (see §1), which is ANDed with each callback's own `scopes` when a scope is built (see capability spec for exact semantics).
 
 ---
 
@@ -36,19 +36,32 @@ interface ChatServiceProvider {
     val displayName: String
 
     /**
+     * Provider-level scope restriction. Empty set = unrestricted (this provider
+     * contributes to every scope, subject to each callback's own `scopes`).
+     * A non-empty set restricts this whole provider to only those scope ids,
+     * regardless of what individual callbacks declare.
+     *
+     * `AnnotatedChatServiceProvider` always reports an empty set here, since it
+     * aggregates beans from many independently-scoped `@ChatService` classes —
+     * restriction for annotated tools/messages is fully handled by each
+     * callback's own `scopes`, not by the provider.
+     */
+    val scopes: Set<String>
+
+    /**
      * Get all tools available from this provider.
      *
-     * Each tool callback includes its scope restrictions (empty set = global/unrestricted).
+     * Each tool callback includes its own scope restrictions (empty set = global/unrestricted).
      * Tools are discovered lazily or cached, depending on provider implementation.
      *
      * @return List of tool callbacks; empty if no tools are available
      */
-    fun getTools(): List<AimoToolCallback>
+    fun getTools(): List<ToolCallback>
 
     /**
      * Get all system messages available from this provider.
      *
-     * Each message callback includes its scope restrictions.
+     * Each message callback includes its own scope restrictions.
      *
      * @return List of system message callbacks; empty if none are available
      */
@@ -76,54 +89,26 @@ interface ChatServiceProvider {
 
 ---
 
-## 1a. Updated Base Interfaces: `AimoToolCallback` and `SystemMessageCallback`
+## 1a. Existing Base Interfaces (unchanged): `ToolCallback` and `SystemMessageCallback`
 
-These interfaces now carry scope information directly, eliminating wrapper classes.
+These interfaces already carry scope information directly (landed in the prior `aimo-core-refactor-callbacks` and `aimo-core-system-message-refactor` changes). This change does not modify them — shown here only for reference.
 
 ```kotlin
 package org.ivcode.aimo.core.model
 
-/**
- * Callback representing an LLM-callable tool.
- *
- * The tool includes its scope restrictions, which determine which
- * ChatScopes can access this tool. Empty scopes means global (available to all scopes).
- *
- * @property toolDefinition Metadata: name, description, JSON schema
- * @property scopes Set of scope IDs this tool is available in (empty = global)
- */
-interface AimoToolCallback {
-    val toolDefinition: AimoToolDefinition
-    val scopes: Set<String>  // NEW: scope info built in
-    
-    /**
-     * Invoke the tool with the given arguments.
-     *
-     * @param argumentsJson JSON string of named arguments
-     * @param context Runtime context (chatId, conversationClient, etc.)
-     * @return JSON string result (or raw String if tool returns String)
-     */
+interface ToolCallback {
+    val toolDefinition: ToolDefinition
+    val scopes: Set<String>
     fun call(argumentsJson: String, context: Map<String, Any>): String
 }
+```
 
-/**
- * Callback representing a system message.
- *
- * The message includes its scope restrictions, just like tools.
- *
- * @property name Stable identifier for this message
- * @property scopes Set of scope IDs this message is available in (empty = global)
- */
+```kotlin
+package org.ivcode.aimo.core.chatservice
+
 interface SystemMessageCallback {
     val name: String
-    val scopes: Set<String>  // NEW: scope info built in
-    
-    /**
-     * Generate the system message text.
-     *
-     * @param context Runtime context (chatId, conversation metadata, etc.)
-     * @return Message text, or null to skip this message
-     */
+    val scopes: Set<String>
     fun call(context: SystemMessageContext): String?
 }
 ```
@@ -132,72 +117,39 @@ interface SystemMessageCallback {
 
 ## 2. Implementation: `AnnotatedChatServiceProvider`
 
-Wraps the current Spring annotation-based discovery logic. Now directly returns callbacks with scopes embedded.
+Wraps the `ChatServiceEntity` list already assembled by `AimoConfig.createControllerEntities` (existing bean discovery + `toToolCallbacks`/`toSystemMessageCallbacks` assembly is reused as-is, not re-implemented). Always reports an empty provider-level `scopes` (global/unrestricted) since it aggregates beans from many independently-scoped `@ChatService` classes — restriction stays entirely at the callback level, unchanged from today.
 
 ```kotlin
 package org.ivcode.aimo.core.chatservice
 
-import org.springframework.core.annotation.AnnotationUtils
-import org.springframework.beans.factory.getBeansWithAnnotation
-import org.springframework.context.ApplicationContext
-import org.ivcode.aimo.core.model.AimoToolCallback
-import tools.jackson.databind.ObjectMapper
+import org.ivcode.aimo.core.model.ToolCallback
 
 /**
- * Provider that discovers tools and system messages from @ChatService-annotated beans.
+ * Provider that exposes tools and system messages discovered from @ChatService-annotated
+ * beans. Wraps the existing ChatServiceEntity list (built by AimoConfig) rather than
+ * re-scanning the ApplicationContext, so discovery logic has a single source of truth.
  *
- * This implementation replaces the current inline discovery in AimoConfig.
- * It maintains backward compatibility: all existing annotated services work unchanged.
+ * This implementation maintains backward compatibility: all existing annotated services
+ * and their scope behavior work unchanged.
  */
 class AnnotatedChatServiceProvider(
-    private val applicationContext: ApplicationContext,
-    private val objectMapper: ObjectMapper,
+    private val chatServiceEntities: List<ChatServiceEntity>,
     override val id: String = "annotated",
     override val displayName: String = "Annotated Chat Services",
+    override val scopes: Set<String> = emptySet(), // always unrestricted at the provider level
 ) : ChatServiceProvider {
 
-    private var cachedTools: List<AimoToolCallback>? = null
-    private var cachedSystemMessages: List<SystemMessageCallback>? = null
+    override fun getTools(): List<ToolCallback> =
+        chatServiceEntities.flatMap { it.tools }
 
-    override fun getTools(): List<AimoToolCallback> {
-        if (cachedTools != null) return cachedTools!!
-
-        val result = mutableListOf<AimoToolCallback>()
-
-        applicationContext.getBeansWithAnnotation<ChatService>().forEach { (beanName, chatService) ->
-            val annotation = AnnotationUtils.getAnnotation(chatService.javaClass, ChatService::class.java)!!
-            val parentScopes = annotation.scope.toSet()
-
-            // Existing utility now returns callbacks with scopes already embedded
-            result.addAll(toAimoToolCallbacks(chatService, objectMapper, parentScopes))
-        }
-
-        cachedTools = result
-        return result
-    }
-
-    override fun getSystemMessages(): List<SystemMessageCallback> {
-        if (cachedSystemMessages != null) return cachedSystemMessages!!
-
-        val result = mutableListOf<SystemMessageCallback>()
-
-        applicationContext.getBeansWithAnnotation<ChatService>().forEach { (beanName, chatService) ->
-            val annotation = AnnotationUtils.getAnnotation(chatService.javaClass, ChatService::class.java)!!
-            val parentScopes = annotation.scope.toSet()
-
-            // Existing utility now returns callbacks with scopes already embedded
-            result.addAll(toSystemMessageCallbacks(chatService, parentScopes))
-        }
-
-        cachedSystemMessages = result
-        return result
-    }
+    override fun getSystemMessages(): List<SystemMessageCallback> =
+        chatServiceEntities.flatMap { it.systemMessages }
 
     override fun initialize() {
-        // Pre-populate caches during startup for eager validation
-        getTools()
-        getSystemMessages()
-        logger.info("AnnotatedChatServiceProvider initialized with ${cachedTools!!.size} tools, ${cachedSystemMessages!!.size} system messages")
+        logger.info(
+            "AnnotatedChatServiceProvider initialized with ${getTools().size} tools, " +
+            "${getSystemMessages().size} system messages"
+        )
     }
 }
 ```
@@ -222,7 +174,7 @@ package org.ivcode.aimo.core.chatservice
 class ChatServiceProviderManager(
     private val providers: List<ChatServiceProvider> = emptyList(),
 ) {
-    private lateinit var allTools: List<AimoToolCallback>
+    private lateinit var allTools: List<ToolCallback>
     private lateinit var allSystemMessages: List<SystemMessageCallback>
 
     /**
@@ -244,7 +196,7 @@ class ChatServiceProviderManager(
         }
 
         // Aggregate tools from all providers
-        val toolList = mutableListOf<AimoToolCallback>()
+        val toolList = mutableListOf<ToolCallback>()
         for (provider in providers) {
             toolList.addAll(provider.getTools())
         }
@@ -285,7 +237,7 @@ class ChatServiceProviderManager(
      * Get all tools from all providers.
      * Must be called after initialize().
      */
-    fun getAllTools(): List<AimoToolCallback> {
+    fun getAllTools(): List<ToolCallback> {
         require(::allTools.isInitialized) { "Provider manager not initialized" }
         return allTools
     }
@@ -324,36 +276,36 @@ class ChatServiceProviderManager(
 
 ## 4. Integration: Refactored `AimoConfig`
 
-Shows how configuration wires providers and uses the manager.
+Shows how configuration wires providers alongside the existing static beans (which are kept, per tasks.md, for other consumers like `ChatClientBuilderFactoryImpl`).
 
 ```kotlin
 package org.ivcode.aimo.core.conf
 
+import org.ivcode.aimo.core.chatservice.ChatServiceEntity
 import org.ivcode.aimo.core.chatservice.ChatServiceProvider
 import org.ivcode.aimo.core.chatservice.AnnotatedChatServiceProvider
 import org.ivcode.aimo.core.chatservice.ChatServiceProviderManager
-import org.ivcode.aimo.core.chatservice.ScopedToolCallback
-import org.ivcode.aimo.core.chatservice.ScopedSystemMessageCallback
-import org.ivcode.aimo.core.model.AimoToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
-import org.springframework.context.ApplicationContext
+import org.ivcode.aimo.core.model.ToolCallback
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import tools.jackson.databind.ObjectMapper
 
 @Configuration
 class AimoConfig {
 
+    // ... existing createControllerEntities / createToolCallbacks / createSystemMessageCallbacks
+    // beans unchanged (see current AimoConfig.kt) ...
+
     /**
-     * Wire up the annotated chat service provider.
-     * In Phase 2, additional providers (e.g., MCP server provider) would be registered similarly.
+     * Wire up the annotated chat service provider from the already-assembled
+     * ChatServiceEntity list. In Phase 2, additional providers (e.g., an MCP
+     * server provider) would be registered similarly.
      */
     @Bean
     fun createAnnotatedChatServiceProvider(
-        applicationContext: ApplicationContext,
-        objectMapper: ObjectMapper,
+        chatServiceEntities: List<ChatServiceEntity>,
     ): ChatServiceProvider {
-        return AnnotatedChatServiceProvider(applicationContext, objectMapper)
+        return AnnotatedChatServiceProvider(chatServiceEntities)
     }
 
     /**
@@ -363,75 +315,30 @@ class AimoConfig {
     @Bean
     fun createChatServiceProviderManager(
         providers: List<ChatServiceProvider>,
-    ): ChatServiceProviderManager {  
+    ): ChatServiceProviderManager {
         val manager = ChatServiceProviderManager(providers)
         manager.initialize()  // Initialize all providers at startup
         return manager
     }
 
     /**
-     * Expose unified tool list from all providers.
-     * Replaces the old bean that read directly from ChatServiceEntity.
-     */
-    @Bean
-    fun createScopedToolCallbacks(manager: ChatServiceProviderManager): List<ScopedToolCallback> {
-        return manager.getAllTools()
-    }
-
-    /**
-     * Expose unified system message list from all providers.
-     */
-    @Bean
-    fun createScopedSystemMessageCallbacks(manager: ChatServiceProviderManager): List<ScopedSystemMessageCallback> {
-        return manager.getAllSystemMessages()
-    }
-
-    /**
-     * Flatten scoped tools to simple callbacks for tools not yet scoped.
-     * (Unchanged behavior; kept for backward compatibility)
-     */
-    @Bean
-    fun createToolCallbacks(scopedTools: List<ScopedToolCallback>): List<AimoToolCallback> {
-        return scopedTools.map { it.callback }
-    }
-
-    /**
-     * Flatten scoped system messages to simple callbacks for backward compatibility.
-     */
-    @Bean
-    fun createSystemMessageCallbacks(scopedMessages: List<ScopedSystemMessageCallback>): List<SystemMessageCallback> {
-        return scopedMessages.map { it.callback }
-    }
-
-    /**
-     * ChatScopeProvider now uses the aggregated provider results.
-     * Scope building logic remains the same; it just reads from the unified lists.
+     * ChatScopeProvider now resolves scopes dynamically via the provider manager
+     * instead of the static tool/message lists it used before. Filtering applies
+     * the two-condition AND described in the capability spec: a callback is
+     * included only when both its owning provider's `scopes` and the callback's
+     * own `scopes` allow the requested scope id.
      */
     @Bean
     fun createChatScopeProvider(
-        scopedTools: List<ScopedToolCallback>,
-        scopedSystemMessages: List<ScopedSystemMessageCallback>,
-        tools: List<AimoToolCallback>,
-        systemMessages: List<SystemMessageCallback>,
-        properties: AimoProperties
+        providerManager: ChatServiceProviderManager,
+        properties: AimoProperties,
     ): ChatScopeProvider {
-        // Same scope building logic as before, but sourcing from providers
         return ChatScopeProviderImpl(
-            allTools = tools,
-            allSystemMessages = scopedSystemMessages,
-            predefinedScopes = buildPredefinedScopes(
-                scopeConfigs = properties.scope,
-                allTools = tools,
-                allSystemMessages = systemMessages,
-                toolScopeMap = scopedTools.associate { it.callback.toolDefinition.name to it.scopes },
-                systemMessageScopeMap = scopedSystemMessages.associate { it.callback.name to it.scopes },
-                scopedSystemMessages = scopedSystemMessages
-            ),
-            // ... other params unchanged
+            providerManager = providerManager,
+            predefinedScopeConfigs = properties.scope,
+            // ... other params unchanged ...
         )
     }
-
-    // ... rest of beans unchanged ...
 }
 ```
 
@@ -454,7 +361,9 @@ class McpProviderConfiguration {
     fun createMcpToolsProvider(
         mcpClientManager: McpClientManager,
     ): ChatServiceProvider {
-        // Example of a future provider for MCP tools
+        // Example of a future provider for MCP tools. Unlike AnnotatedChatServiceProvider,
+        // this could report a non-empty provider-level `scopes` if, e.g., a whole MCP
+        // server's tools should only ever appear in one specific scope.
         return McpChatServiceProvider(
             id = "mcp-client",
             displayName = "MCP Tools Provider",
@@ -503,8 +412,9 @@ Example of how providers make testing easier:
 class MockChatServiceProvider(
     override val id: String = "mock",
     override val displayName: String = "Mock Provider",
-    private val mockTools: List<ScopedToolCallback> = emptyList(),
-    private val mockMessages: List<ScopedSystemMessageCallback> = emptyList(),
+    override val scopes: Set<String> = emptySet(),
+    private val mockTools: List<ToolCallback> = emptyList(),
+    private val mockMessages: List<SystemMessageCallback> = emptyList(),
 ) : ChatServiceProvider {
     override fun getTools() = mockTools
     override fun getSystemMessages() = mockMessages
@@ -513,10 +423,9 @@ class MockChatServiceProvider(
 // Usage in tests:
 @Test
 fun testWithCustomTools() {
+    // testToolCallback already carries its own `scopes` (e.g., setOf("test-scope"))
     val mockProvider = MockChatServiceProvider(
-        mockTools = listOf(
-            ScopedToolCallback(testToolCallback, setOf("test-scope"))
-        )
+        mockTools = listOf(testToolCallback)
     )
     
     val manager = ChatServiceProviderManager(listOf(mockProvider))

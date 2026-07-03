@@ -52,4 +52,3 @@ fun Conversation.setTitle(title: String, source: String = DEFAULT_TITLE_SOURCE):
 fun getTitle(chatId: UUID, metadata: Map<String, Any>): ConversationTitle? {
     return toConversationTitle(metadata[PROPERTY_NAME__TITLE], chatId)
 }
-

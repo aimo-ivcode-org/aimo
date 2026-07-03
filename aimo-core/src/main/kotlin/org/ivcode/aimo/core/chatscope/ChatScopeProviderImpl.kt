@@ -2,6 +2,7 @@ package org.ivcode.aimo.core.chatscope
 
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
+import org.ivcode.aimo.core.chatservice.ChatServiceProviderManager
 
 /**
  * Default implementation of ChatScopeProvider.
@@ -10,18 +11,21 @@ import org.ivcode.aimo.core.chatservice.SystemMessageCallback
  * Constructs the global scope with only unrestricted tools and system messages.
  * Supports optional interceptor chain for access control (Phase 3).
  *
- * @property allTools All registered tools globally
- * @property allSystemMessages All registered system messages globally
+ * Now builds scopes dynamically from a provider manager, allowing runtime discovery
+ * of tools and system messages. Filtering applies a two-condition AND:
+ * - The provider's own scope set must allow the requested scope id (empty = allows all)
+ * - AND the callback's own scope set must allow the requested scope id (empty = allows all)
+ *
+ * @property allTools All registered tools globally (for backwards compatibility)
+ * @property allSystemMessages All registered system messages globally (for backwards compatibility)
  * @property predefinedScopes Map of scope ID → ChatScope for configured scopes
- * @property toolScopeMap Map of tool name → set of scope IDs it's restricted to
- * @property systemMessageScopeMap Map of system message name → set of scope IDs it's restricted to
+ * @property providerManager Manager for accessing current providers
  */
 class ChatScopeProviderImpl(
     private val allTools: List<ToolCallback>,
     private val allSystemMessages: List<SystemMessageCallback>,
     private val predefinedScopes: Map<String, ChatScope> = emptyMap(),
-    private val toolScopeMap: Map<String, Set<String>>,
-    private val systemMessageScopeMap: Map<String, Set<String>>,
+    private val providerManager: ChatServiceProviderManager,
     private val interceptors: List<ChatScopeProviderInterceptor> = emptyList()
 ) : ChatScopeProvider {
 
@@ -42,6 +46,7 @@ class ChatScopeProviderImpl(
             id = "global",
             displayName = "Global",
             description = "Default scope with unrestricted tools and system messages",
+            providers = listOfNotNull(providerManager.getProvider("annotated")),
             tools = globalTools,
             systemMessages = globalMessages
         )
