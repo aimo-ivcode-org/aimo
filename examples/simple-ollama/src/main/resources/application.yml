@@ -28,3 +28,24 @@ aimo:
       enabled: true
       level: DEBUG  # DEBUG, INFO, WARN, ERROR
 
+  # MCP Client Configuration
+  mcp:
+    enabled: true                                 # Enable/disable MCP client module
+    required: false                               # Allow startup without configured servers
+    discovery-interval-minutes: 0                 # Disabled (set to >0 to enable periodic refresh)
+    servers: []                                   # Add MCP servers here
+    # Example MCP servers:
+    # servers:
+    #   - id: my-stdio-server
+    #     transport:
+    #       type: stdio
+    #       command: /path/to/mcp-server
+    #       args: []
+    #     scope: []                                # Empty = available in global scope
+    #   - id: my-sse-server
+    #     transport:
+    #       type: sse
+    #       url: http://example.com/mcp
+    #       auth-token: ${MCP_TOKEN}
+    #     scope: [research, admin]
+

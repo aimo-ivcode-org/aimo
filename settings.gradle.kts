@@ -21,6 +21,7 @@ rootProject.name = "aimo"
 
 // --== Modules ==-- //
 include("aimo-core")
+include("aimo-mcp-client")
 include("aimo-model-ollama")
 include("aimo-model-bedrock")
 include("aimo-server")

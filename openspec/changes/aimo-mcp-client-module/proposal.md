@@ -1,10 +1,19 @@
 ## Why
 
-The codebase needs a dedicated MCP client module that can discover tools from configured MCP servers, cache them, and expose them to the existing AIMO tool pipeline without adding MCP knowledge to core runtime code.
+The codebase needs a dedicated MCP client module that implements the MCP protocol directly (not via SDK) to discover tools from configured MCP servers and expose them to the existing AIMO tool pipeline. Direct protocol implementation provides two key benefits:
+
+1. **Foundation for server implementation**: A reusable protocol layer enables a future MCP server that exposes AIMO's own tools through MCP while maintaining full control over Spring/OpenAPI integration (SDKs cannot generate OpenAPI docs for dynamically registered MCP server capabilities).
+2. **Consistency**: Both client and server use the same protocol implementation, reducing complexity and maintenance burden.
 
 ## What Changes
 
-Create an `aimo-mcp-client` module that reads MCP server configuration from YAML, connects to each server, discovers tools, wraps them as existing AIMO callbacks, supports refresh via both manual and scheduled re-discovery, and documents how to configure and use the module.
+Create an `aimo-mcp-client` module that:
+- Implements the MCP protocol directly (JSON-RPC 2.0 data layer + transport layer)
+- Reads MCP server configuration from YAML with optional startup bypass
+- Connects to each server (stdio transport first; SSE HTTP added later)
+- Discovers tools, wraps them as existing AIMO callbacks, and caches results
+- Supports refresh via both manual endpoint and scheduled re-discovery (in-place replacement)
+- Establishes a reusable protocol foundation for future MCP server implementation
 
 ## Capabilities
 
