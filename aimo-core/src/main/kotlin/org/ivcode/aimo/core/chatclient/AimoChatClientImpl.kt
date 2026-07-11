@@ -70,14 +70,16 @@ internal class AimoChatClientImpl (
     private val chatScope: ChatScope,
 ) : AimoChatClient {
 
-    // Map tool callbacks by name for O(1) lookup during tool invocation
-    private val toolCallbacks: Map<String, ToolCallback> = chatScope.tools.associateBy { it.toolDefinition.name }
+    // Map tool callbacks by name for O(1) lookup during tool invocation.
+    // Uses getAllTools() (not the static `tools` field) so provider-sourced tools
+    // (e.g. MCP server tools) are included alongside statically registered ones.
+    private val toolCallbacks: Map<String, ToolCallback> = chatScope.getAllTools().associateBy { it.toolDefinition.name }
 
     // Tool definitions sent to the model (extracted from callbacks)
-    private val toolDefinitions: List<ToolDefinition> = chatScope.tools.map { it.toolDefinition }
+    private val toolDefinitions: List<ToolDefinition> = chatScope.getAllTools().map { it.toolDefinition }
 
-    // System messages from the scope
-    private val systemMessages: List<SystemMessageCallback> = chatScope.systemMessages
+    // System messages from the scope (includes provider-sourced messages)
+    private val systemMessages: List<SystemMessageCallback> = chatScope.getAllSystemMessages()
 
     // Prompt budgeter selected based on model configuration
     // Responsible for filtering history to fit the model's context window
@@ -174,7 +176,7 @@ internal class AimoChatClientImpl (
                  history = history.orEmpty(),
                  execute = { promptMessages ->
                     // Build the final prompt with budgeted history
-                    val prompt = AimoPrompt(
+                    val prompt = AimoPrompt (
                         tools = toolDefinitions,
                         systemMessages = this.systemMessages,
                         options = null,

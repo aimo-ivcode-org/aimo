@@ -1,6 +1,6 @@
 package org.ivcode.aimo.mcpclient.controller
 
-import org.ivcode.aimo.mcpclient.config.McpToolRegistry
+import org.ivcode.aimo.mcpclient.client.McpClientManager
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PostMapping
@@ -13,16 +13,16 @@ import org.slf4j.LoggerFactory
  */
 @RestController
 @RequestMapping("/aimo-api/admin/mcp-servers")
-@ConditionalOnBean(McpToolRegistry::class)
+@ConditionalOnBean(McpClientManager::class)
 class McpAdminController(
-    private val mcpToolRegistry: McpToolRegistry,
+    private val mcpClientManager: McpClientManager,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     @PostMapping("/refresh")
     fun refresh(): ResponseEntity<Map<String, Any>> {
         return try {
-            mcpToolRegistry.refresh()
+            mcpClientManager.refresh()
             log.info("MCP servers refreshed")
             ResponseEntity.ok(mapOf(
                 "success" to true,

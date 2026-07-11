@@ -341,7 +341,7 @@ internal class ContextWindowPromptBudgeter(
             )
         }
 
-        val promptMessages = systemMessages + historyForPrompt + prompt + taskMessages
+        val promptMessages = historyForPrompt + prompt + taskMessages
         val normalizedPromptMessages = promptMessages
             .let { messages ->
                 if (!excludeThinking) messages

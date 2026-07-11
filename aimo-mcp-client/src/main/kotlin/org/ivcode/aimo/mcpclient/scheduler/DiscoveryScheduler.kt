@@ -1,6 +1,6 @@
 package org.ivcode.aimo.mcpclient.scheduler
 
-import org.ivcode.aimo.mcpclient.config.McpToolRegistry
+import org.ivcode.aimo.mcpclient.client.McpClientManager
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.annotation.Scheduled
@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 @Service
 @EnableScheduling
 class DiscoveryScheduler(
-    private val mcpToolRegistry: McpToolRegistry,
+    private val mcpClientManager: McpClientManager,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -18,7 +18,7 @@ class DiscoveryScheduler(
     fun refreshTools() {
         try {
             log.debug("Running periodic MCP discovery refresh")
-            mcpToolRegistry.refresh()
+            mcpClientManager.refresh()
             log.debug("Periodic MCP refresh completed")
         } catch (e: Exception) {
             log.warn("Periodic MCP refresh failed", e)

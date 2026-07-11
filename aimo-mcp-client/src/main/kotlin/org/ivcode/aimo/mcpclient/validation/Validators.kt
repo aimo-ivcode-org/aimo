@@ -25,6 +25,10 @@ class ConfigurationValidator(private val definedScopes: Set<String>) {
                 val sse = server.transport as McpServerConfig.Transport.SseTransport
                 if (sse.url.isBlank()) throw IllegalArgumentException("SSE URL cannot be blank")
             }
+            is McpServerConfig.Transport.HttpTransport -> {
+                val http = server.transport as McpServerConfig.Transport.HttpTransport
+                if (http.url.isBlank()) throw IllegalArgumentException("HTTP URL cannot be blank")
+            }
         }
 
         for (scope in server.scope) {

@@ -30,10 +30,10 @@ aimo:
           args: ["--config", "file.json"]         # Optional arguments
         scope: []                                 # Empty = available in global scope
       
-      - id: my-sse-server
+      - id: my-http-server
         transport:
-          type: sse
-          url: http://example.com/mcp             # URL (required for sse)
+          type: http                              # HTTP with Server-Sent Events
+          url: https://example.com/mcp/           # URL (required for http)
           auth-token: ${MCP_TOKEN}                # Optional; supports property placeholders
         scope: [research, admin]                  # Restricted to named scopes
 ```
@@ -46,10 +46,10 @@ aimo:
 | `aimo.mcp.required` | boolean | `true` | Fail startup if servers unreachable; `false` allows graceful degradation |
 | `aimo.mcp.discovery-interval-minutes` | integer | `5` | Interval for periodic tool re-discovery in minutes; `0` disables scheduler |
 | `aimo.mcp.servers[].id` | string | — | Unique server identifier (used in tool name prefix) |
-| `aimo.mcp.servers[].transport.type` | enum | — | `stdio` or `sse` |
+| `aimo.mcp.servers[].transport.type` | enum | — | `stdio` or `http` |
 | `aimo.mcp.servers[].transport.command` | string | — | Executable path (required for `stdio`) |
 | `aimo.mcp.servers[].transport.args` | list | `[]` | Optional command arguments |
-| `aimo.mcp.servers[].transport.url` | string | — | Server URL (required for `sse`) |
+| `aimo.mcp.servers[].transport.url` | string | — | Server URL (required for `http`) |
 | `aimo.mcp.servers[].transport.auth-token` | string | — | Optional bearer token (supports property placeholders) |
 | `aimo.mcp.servers[].scope` | list | `[]` | Scope list; empty = unrestricted (global scope) |
 
@@ -187,7 +187,9 @@ The MCP client module is organized in layers:
 
 - **JSON-RPC 2.0 Messaging**: Request/response/notification types with proper ID tracking
 - **MCP Lifecycle Management**: Initialize, capabilities negotiation, and connection termination
-- **Transport Abstraction**: Pluggable transport implementations (stdio MVP; HTTP/SSE future)
+- **Transport Abstraction**: Pluggable transport implementations
+  - **Stdio** (stable): Local process spawning with JSON Lines framing
+  - **HTTP/SSE** (experimental): Remote HTTP servers with Server-Sent Events streaming
 - **Tool Schema Conversion**: MCP OpenRPC tool schemas → AIMO `AimoToolDefinition` (JSON Schema Draft 2020-12)
 
 ### Client Integration Layer
@@ -213,7 +215,7 @@ The module uses MCP protocol version `"2024-11-05"`.
 
 ### Request/Response Pairing
 
-Requests are tracked by unique ID using `ConcurrentHashMap`, with a 30-second timeout for responses. Responses are matched to requests and delivered to waiting callers.
+Requests are tracked by unique ID using `ConcurrentHashMap`, with a configurable timeout (default 60 seconds) for responses. Responses are matched to requests and delivered to waiting callers.
 
 ### Message Framing
 
@@ -229,7 +231,64 @@ When tools are refreshed, the scope cache is invalidated to ensure the next requ
 
 ## Future Work
 
-- **HTTP/SSE Transport**: Implement network-based transport for remote MCP servers
+- **HTTP/SSE Transport**: Network-based transport for remote MCP servers (in progress - Stdio MVP stable)
 - **Server Implementation**: Build MCP server support using the same protocol layer for symmetric implementation
 - **Resource Support**: Extend tool discovery to include resources (reading/listing)
 - **Prompt Templates**: Support MCP prompt templates in future versions
+
+## HTTP/SSE Transport Status (Experimental)
+
+The HTTP/SSE transport is currently implemented but requires proper server configuration to function. This section documents known limitations and troubleshooting.
+
+### Supported Servers
+
+- **Stdio**: ✅ Stable - Local process spawning with JSON Lines framing
+- **HTTP/SSE**: ⚠️ Experimental - Remote servers using HTTP with Server-Sent Events
+
+### HTTP Transport Known Issues
+
+1. **SSE Parsing**: The transport now properly filters SSE metadata lines (`event:`, `id:`, `retry:`, comments) before JSON deserialization, resolving "Unrecognized token" errors.
+
+2. **Message Sending**: Some HTTP/SSE servers may not accept POST messages after the initial connection is established. This can manifest as HTTP 400 errors. Possible causes:
+   - Missing or invalid authentication token
+   - Server expects bidirectional communication via a different mechanism
+   - Server only supports one-way events (client receives only)
+
+3. **Authentication**: HTTP transports support bearer token authentication via the `auth-token` configuration property. Tokens can be provided via environment variables using `${ENV_VAR}` syntax.
+
+### Troubleshooting HTTP Transport
+
+If you encounter HTTP 400 errors with the `type: http` transport:
+
+1. **Verify Auth Token**
+   ```yaml
+   aimo:
+     mcp:
+       servers:
+         - id: github-mcp
+           transport:
+             type: http
+             url: https://api.githubcopilot.com/mcp/
+             auth-token: ${GITHUB_MCP_TOKEN}  # Ensure env var is set
+   ```
+   Check that the environment variable is set and valid.
+
+2. **Check Server Logs**
+   Look for detailed error messages in the server response body, which will be logged at ERROR level.
+
+3. **Fallback to Stdio**
+   For local servers, use the `type: stdio` transport instead:
+   ```yaml
+   - id: local-mcp
+     transport:
+       type: stdio
+       command: /path/to/mcp-server
+   ```
+
+4. **Optional Startup**
+   To allow the application to start even if HTTP transport fails:
+   ```yaml
+   aimo:
+     mcp:
+       required: false  # Don't fail startup if servers unreachable
+   ```

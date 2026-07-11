@@ -51,7 +51,10 @@ class LifecycleManager(
 }
 
 data class ClientInfo(val name: String, val version: String)
-data class ClientCapabilities(val sampling: Map<String, Any>? = null, val experimental: Map<String, Any>? = null)
+data class ClientCapabilities(
+    val sampling: Map<String, Any> = emptyMap(),
+    val experimental: Map<String, Any> = emptyMap()
+)
 data class ServerInfo(val protocolVersion: String, val serverInfo: ServerDetails, val capabilities: ServerCapabilities)
 data class ServerDetails(val name: String, val version: String)
 data class ServerCapabilities(val tools: ToolsCapability? = null, val resources: Map<String, Any>? = null, val prompts: Map<String, Any>? = null, val experimental: Map<String, Any>? = null)

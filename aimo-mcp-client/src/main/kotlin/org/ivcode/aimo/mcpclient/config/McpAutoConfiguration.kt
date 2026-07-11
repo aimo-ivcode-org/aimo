@@ -1,12 +1,12 @@
 package org.ivcode.aimo.mcpclient.config
 
-import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.model.ToolCallback
+import org.ivcode.aimo.core.chatservice.ChatServiceProvider
+import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.mcpclient.client.McpClientManager
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 
@@ -25,53 +25,37 @@ class McpClientAutoConfiguration(
     }
 
     @Bean
-    fun mcpToolRegistry(mcpClientManager: McpClientManager): McpToolRegistry {
-        return McpToolRegistry(mcpClientManager)
+    fun mcpChatServiceProvider(mcpClientManager: McpClientManager): ChatServiceProvider {
+        return McpChatServiceProvider(mcpClientManager)
     }
 }
 
 /**
- * Registry that provides MCP tools to the AIMO tool pipeline.
+ * Registers MCP tools as a ChatServiceProvider for AIMO's tool discovery.
  */
-@Component
-class McpToolRegistry(
+class McpChatServiceProvider(
     private val mcpClientManager: McpClientManager,
-) : AimoToolRegistry {
+) : ChatServiceProvider {
     private val log = LoggerFactory.getLogger(javaClass)
-    private var initialized = false
 
     init {
         try {
             mcpClientManager.initializeAll()
-            initialized = true
-            log.info("MCP tool registry initialized")
+            log.info("MCP ChatServiceProvider initialized")
         } catch (e: Exception) {
-            log.error("Failed to initialize MCP client manager", e)
-            throw e
+            log.warn("Failed to initialize MCP client manager (will continue without MCP tools): ${e.message}")
+            // Don't throw - allow app to start without MCP if connection fails
         }
     }
+
+    override val id: String = "mcp"
+    override val scopes: Set<String> = emptySet()
 
     override fun getTools(): List<ToolCallback> {
-        return if (initialized) {
-            mcpClientManager.getAllCallbacks()
-        } else {
-            emptyList()
-        }
+        return mcpClientManager.getAllCallbacks()
     }
 
-    override fun getToolsByScope(scope: String): List<ToolCallback> {
-        return mcpClientManager.getAllCallbacks().filter { it.scopes.isEmpty() || it.scopes.contains(scope) }
+    override fun getSystemMessages(): List<SystemMessageCallback> {
+        return emptyList()
     }
-
-    fun refresh() {
-        mcpClientManager.refresh()
-    }
-}
-
-/**
- * Interface that tool registries must implement.
- */
-interface AimoToolRegistry {
-    fun getTools(): List<ToolCallback>
-    fun getToolsByScope(scope: String): List<ToolCallback>
 }

@@ -46,7 +46,11 @@ class ChatScopeProviderImpl(
             id = "global",
             displayName = "Global",
             description = "Default scope with unrestricted tools and system messages",
-            providers = listOfNotNull(providerManager.getProvider("annotated")),
+            // Include ALL registered providers (annotated, MCP, etc). ChatScope.getAllTools()/
+            // getAllSystemMessages() already apply per-provider and per-callback scope filtering,
+            // so passing every provider here is safe and ensures dynamically-registered providers
+            // (e.g. MCP servers) are not silently excluded from the global scope.
+            providers = providerManager.getProviders(),
             tools = globalTools,
             systemMessages = globalMessages
         )

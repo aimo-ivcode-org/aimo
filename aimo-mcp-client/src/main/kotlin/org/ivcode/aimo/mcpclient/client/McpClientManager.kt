@@ -7,6 +7,7 @@ import org.ivcode.aimo.mcpclient.protocol.lifecycle.ClientCapabilities
 import org.ivcode.aimo.mcpclient.protocol.lifecycle.ClientInfo
 import org.ivcode.aimo.mcpclient.protocol.lifecycle.LifecycleManager
 import org.ivcode.aimo.mcpclient.protocol.transport.StdioTransport
+import org.ivcode.aimo.mcpclient.protocol.transport.HttpTransport
 import org.ivcode.aimo.mcpclient.protocol.transport.ProtocolTransport
 import org.slf4j.LoggerFactory
 import tools.jackson.databind.ObjectMapper
@@ -60,7 +61,13 @@ class McpClientManager(
                 val stdio = server.transport as McpServerConfig.Transport.StdioTransport
                 StdioTransport(stdio.command, stdio.args)
             }
-            else -> throw IllegalArgumentException("Unsupported transport type: ${server.transport.type}")
+            is McpServerConfig.Transport.HttpTransport -> {
+                val http = server.transport as McpServerConfig.Transport.HttpTransport
+                HttpTransport(http.url, http.authToken, objectMapper)
+            }
+            is McpServerConfig.Transport.SseTransport -> {
+                throw IllegalArgumentException("SSE transport not yet implemented")
+            }
         }
 
         val protocolClient = ProtocolClient(transport, objectMapper)

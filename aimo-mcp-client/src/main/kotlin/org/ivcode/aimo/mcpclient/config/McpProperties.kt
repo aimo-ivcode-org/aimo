@@ -17,8 +17,17 @@ data class McpProperties(
 
 data class ServerProperties(
     val id: String,
-    val transport: TransportProperties,
+    val transport: TransportConfig,
     val scope: List<String> = emptyList(),
+)
+
+// Non-sealed intermediate class for YAML binding
+data class TransportConfig(
+    val type: String,
+    val command: String? = null,
+    val args: List<String> = emptyList(),
+    val url: String? = null,
+    val authToken: String? = null,
 )
 
 sealed class TransportProperties(open val type: String) {
@@ -30,6 +39,12 @@ sealed class TransportProperties(open val type: String) {
 
     data class SseProperties(
         override val type: String = "sse",
+        val url: String,
+        val authToken: String? = null,
+    ) : TransportProperties(type)
+
+    data class HttpProperties(
+        override val type: String = "http",
         val url: String,
         val authToken: String? = null,
     ) : TransportProperties(type)
@@ -59,6 +74,12 @@ data class McpServerConfig(
             val url: String,
             val authToken: String? = null,
         ) : Transport(type)
+
+        data class HttpTransport(
+            override val type: String = "http",
+            val url: String,
+            val authToken: String? = null,
+        ) : Transport(type)
     }
 }
 
@@ -70,19 +91,41 @@ fun McpProperties.toServerConfig(): McpServerConfig {
         servers = servers.map { serverProps ->
             McpServerConfig.Server(
                 id = serverProps.id,
-                transport = when (serverProps.transport) {
-                    is TransportProperties.StdioProperties -> {
-                        val stdio = serverProps.transport as TransportProperties.StdioProperties
-                        McpServerConfig.Transport.StdioTransport(command = stdio.command, args = stdio.args)
-                    }
-                    is TransportProperties.SseProperties -> {
-                        val sse = serverProps.transport as TransportProperties.SseProperties
-                        McpServerConfig.Transport.SseTransport(url = sse.url, authToken = sse.authToken)
-                    }
-                    else -> throw IllegalArgumentException("Unknown transport type: ${serverProps.transport.type}")
-                },
+                transport = serverProps.transport.toTransportProperties().toServerTransport(),
                 scope = serverProps.scope,
             )
         }
     )
+}
+
+fun TransportConfig.toTransportProperties(): TransportProperties {
+    return when (type) {
+        "stdio" -> {
+            require(!command.isNullOrBlank()) { "Stdio transport requires 'command'" }
+            TransportProperties.StdioProperties(command = command, args = args)
+        }
+        "sse" -> {
+            require(!url.isNullOrBlank()) { "SSE transport requires 'url'" }
+            TransportProperties.SseProperties(url = url, authToken = authToken)
+        }
+        "http" -> {
+            require(!url.isNullOrBlank()) { "HTTP transport requires 'url'" }
+            TransportProperties.HttpProperties(url = url, authToken = authToken)
+        }
+        else -> throw IllegalArgumentException("Unknown transport type: $type")
+    }
+}
+
+fun TransportProperties.toServerTransport(): McpServerConfig.Transport {
+    return when (this) {
+        is TransportProperties.StdioProperties -> {
+            McpServerConfig.Transport.StdioTransport(command = command, args = args)
+        }
+        is TransportProperties.SseProperties -> {
+            McpServerConfig.Transport.SseTransport(url = url, authToken = authToken)
+        }
+        is TransportProperties.HttpProperties -> {
+            McpServerConfig.Transport.HttpTransport(url = url, authToken = authToken)
+        }
+    }
 }
