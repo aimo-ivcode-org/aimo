@@ -31,4 +31,4 @@ include("aimo-ui")
 // --== Examples ==-- //
 include(":examples:simple-ollama")
 include(":examples:simple-bedrock")
-// include(":examples:simple-scope-demo")
+include(":examples:mcp-client-ollama")

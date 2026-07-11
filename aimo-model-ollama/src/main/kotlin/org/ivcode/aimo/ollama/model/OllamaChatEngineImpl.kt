@@ -180,7 +180,7 @@ private fun AimoChatMessage.toMessage(): Message {
         AimoChatMessageType.ASSISTANT -> "assistant"
         AimoChatMessageType.TOOL      -> "tool"
     }
-    val ollemaToolCalls = toolCalls?.map { tc ->
+    val ollamaToolCalls = toolCalls?.map { tc ->
         ToolCall(
             id = tc.id,
             function = ToolCallFunction(
@@ -193,7 +193,7 @@ private fun AimoChatMessage.toMessage(): Message {
         role      = role,
         content   = content.orEmpty(),
         thinking  = thinking,
-        toolCalls = ollemaToolCalls,
+        toolCalls = ollamaToolCalls,
         toolName  = toolName,
     )
 }
