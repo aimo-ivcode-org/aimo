@@ -4,12 +4,14 @@ import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.chatservice.ChatServiceProvider
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.mcpclient.client.McpClientManager
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import tools.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
+import tools.jackson.databind.ObjectMapper
 
+@ConditionalOnProperty(prefix = "aimo.mcp", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 @Configuration
 @EnableConfigurationProperties(McpProperties::class)
 class McpClientAutoConfiguration(
@@ -39,13 +41,8 @@ class McpChatServiceProvider(
     private val log = LoggerFactory.getLogger(javaClass)
 
     init {
-        try {
-            mcpClientManager.initializeAll()
-            log.info("MCP ChatServiceProvider initialized")
-        } catch (e: Exception) {
-            log.warn("Failed to initialize MCP client manager (will continue without MCP tools): ${e.message}")
-            // Don't throw - allow app to start without MCP if connection fails
-        }
+        mcpClientManager.initializeAll()
+        log.info("MCP ChatServiceProvider initialized")
     }
 
     override val id: String = "mcp"

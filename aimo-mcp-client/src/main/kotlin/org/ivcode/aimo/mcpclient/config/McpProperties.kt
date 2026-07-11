@@ -89,6 +89,7 @@ data class McpServerConfig(
 fun McpProperties.toServerConfig(): McpServerConfig {
     return McpServerConfig(
         servers = servers.map { serverProps ->
+            require(serverProps.id.isNotBlank()) { "MCP server id cannot be blank" }
             McpServerConfig.Server(
                 id = serverProps.id,
                 transport = serverProps.transport.toTransportProperties().toServerTransport(),
