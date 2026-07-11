@@ -15,7 +15,7 @@ aimo:
         base-url: http://localhost:11434
         primary: true
         context:
-          size: 20000
+          size: 10000
           excludeThinking: true
         options:
           model: gpt-oss:20b
@@ -27,28 +27,3 @@ aimo:
     logging:
       enabled: true
       level: DEBUG  # DEBUG, INFO, WARN, ERROR
-
-  # MCP Client Configuration
-  mcp:
-    enabled: true                                 # Enable/disable MCP client module
-    required: false                               # Allow startup without configured servers
-    discovery-interval-minutes: 0                 # Disabled (set to >0 to enable periodic refresh)
-    servers:
-      - id: auth-server
-        transport:
-          type: http
-          url: https://mcpplaygroundonline.com/mcp-auth-server
-          auth-token: auth_0f756b89ca948bef388fed320a60c86a49754d916a3f538d15cc424ed2ce26dc
-        scope: []                                 # Empty = available in global scope
-      - id: error-server
-        transport:
-          type: http
-          url: https://mcpplaygroundonline.com/mcp-error-server
-          auth-token: error_70d24d62319c9659763ade76cf997632f0b4ba1e736c1785d961aae0ec6f22c6
-        scope: [ ]                                 # Empty = available in global scope
-      - id: complex-server
-        transport:
-          type: http
-          url: https://mcpplaygroundonline.com/mcp-complex-server
-          auth-token: complex_fab5f2aa4002790684fa71d20531d241077407cf3c3c3e122526a3a1372d24f1
-        scope: [ ]                                 # Empty = available in global scope
