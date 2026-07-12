@@ -112,11 +112,21 @@ class McpClientManager(
     fun refresh(): Map<String, RefreshResult> {
         val results = mutableMapOf<String, RefreshResult>()
 
-        for ((serverId, connection) in serverClients) {
+        for (server in serverConfig.servers) {
+            val serverId = server.id
+            val connection = serverClients[serverId]
+
             try {
-                val toolDefinitions = connection.discovery.discoverTools()
-                val callbacks = toolDefinitions.map { connection.callbackFactory.createCallback(it) }
-                connection.cachedCallbacks = callbacks
+                val callbacks = if (connection == null) {
+                    // Server wasn't initialized (e.g. optional startup failure) — try to initialize now.
+                    initializeServer(server)
+                } else {
+                    val toolDefinitions = connection.discovery.discoverTools()
+                    val refreshed = toolDefinitions.map { connection.callbackFactory.createCallback(it) }
+                    connection.cachedCallbacks = refreshed
+                    refreshed
+                }
+
                 results[serverId] = RefreshResult.Success(callbacks.size)
                 log.info("Server '$serverId' refreshed: ${callbacks.size} tools")
             } catch (e: Exception) {

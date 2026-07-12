@@ -27,12 +27,12 @@ class ToolDiscovery(
             
             if (!toolsNode.isArray) throw DiscoveryException("tools field is not an array")
 
-            return toolsNode.mapNotNull { toolNode ->
+            return toolsNode.map { toolNode ->
                 try {
                     convertToToolDefinition(toolNode)
                 } catch (e: Exception) {
-                    log.warn("Failed to convert tool: ${e.message}", e)
-                    null
+                    val toolName = toolNode.get("name")?.asText() ?: "<unknown>"
+                    throw DiscoveryException("Failed to convert discovered MCP tool '$toolName'", e)
                 }
             }
         } catch (e: DiscoveryException) {

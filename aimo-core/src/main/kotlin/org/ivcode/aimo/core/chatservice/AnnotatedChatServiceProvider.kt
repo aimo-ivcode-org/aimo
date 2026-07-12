@@ -15,10 +15,9 @@ import org.ivcode.aimo.core.model.ToolCallback
  * ## Scope Inheritance and Validation
  *
  * **AnnotatedChatServiceProvider always has empty provider-level scopes** (unrestricted/global).
- * This is by design because:
- * - The single provider aggregates many independently-scoped @ChatService beans
- * - Each bean's scopes were validated at annotation processing time (in ControllerHelpers.computeActualScopes)
- * - Callbacks already carry validated, inherited scopes embedded
+ * This is by design because scope restriction for annotated tools and system messages is
+ * enforced entirely through each callback's own [scopes], validated at annotation-processing
+ * time (in ControllerHelpers.computeActualScopes).
  *
  * **For future providers (MCP servers, adapters with non-empty provider.scopes):**
  * - Provider.scopes defines which scope IDs the provider can contribute to

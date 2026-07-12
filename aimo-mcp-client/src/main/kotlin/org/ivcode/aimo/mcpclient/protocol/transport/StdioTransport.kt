@@ -46,8 +46,17 @@ class StdioTransport(
         try {
             writer?.close()
             reader?.close()
-            process?.waitFor()
-            process?.destroy()
+
+            process?.let { p ->
+                // Avoid hanging indefinitely during shutdown.
+                if (!p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    p.destroy()
+                    if (!p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                        p.destroyForcibly()
+                    }
+                }
+            }
+
             log.info("Stdio transport disconnected")
         } catch (e: Exception) {
             log.error("Error during stdio disconnect", e)
