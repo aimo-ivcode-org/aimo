@@ -151,38 +151,51 @@ class McpClientManager(
 
         log.debug("Starting refresh of failed servers (only retrying placeholders)")
 
-        for ((serverId, connection) in serverClients) {
-            try {
-                // Only retry servers that failed to initialize (placeholders)
-                // Healthy servers rely on tools/listChanged notifications from their background message reader
-                if (connection.protocolClient == null || connection.discovery == null) {
-                    log.debug("Retrying initialization of placeholder server '$serverId' (protocolClient=${connection.protocolClient}, discovery=${connection.discovery})")
-                    val server = serverConfigMap[serverId]
+         for (server in serverConfig.servers) {
+             val serverId = server.id
+             val connection = serverClients[serverId]
 
-                    if (server == null) {
-                        results[serverId] = RefreshResult.Failure("Server config not found")
-                        log.warn("Server config not found for '$serverId', cannot retry")
-                    } else {
-                        try {
-                            log.debug("Attempting to initialize server '$serverId'...")
-                            val callbacks = initializeServer(server)
-                            results[serverId] = RefreshResult.Success(callbacks.size)
-                            log.info("✓ Server '$serverId' successfully initialized on retry with ${callbacks.size} tools")
-                        } catch (retryException: Exception) {
-                            log.warn("✗ Failed to initialize server '$serverId' on retry: ${retryException.message}", retryException)
-                            results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
-                            // Don't rethrow - keep the placeholder for next retry
-                        }
-                    }
-                } else {
-                    // Server is healthy - skip refresh since it relies on tools/listChanged notifications
-                    log.debug("Skipping already-healthy server '$serverId' (will use tools/listChanged notifications)")
-                }
-            } catch (e: Exception) {
-                results[serverId] = RefreshResult.Failure(e.message ?: "Unknown error")
-                log.error("Unexpected error during refresh of server '$serverId'", e)
-            }
-        }
+             try {
+                 if (connection == null) {
+                     // Server wasn't initialized (e.g. optional startup failure) — try to initialize now.
+                     log.debug("Retrying initialization of uninitialized server '$serverId'...")
+                     try {
+                         val callbacks = initializeServer(server)
+                         results[serverId] = RefreshResult.Success(callbacks.size)
+                         log.info("✓ Server '$serverId' successfully initialized on retry with ${callbacks.size} tools")
+                     } catch (retryException: Exception) {
+                         results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
+                         log.warn("✗ Failed to initialize server '$serverId' on retry: ${retryException.message}", retryException)
+                     }
+                 } else if (connection.protocolClient == null || connection.discovery == null) {
+                     // Placeholder exists - try to initialize from config
+                     log.debug("Retrying initialization of placeholder server '$serverId'...")
+                     val serverConfig = serverConfigMap[serverId]
+
+                     if (serverConfig == null) {
+                         results[serverId] = RefreshResult.Failure("Server config not found")
+                         log.warn("Server config not found for '$serverId', cannot retry")
+                     } else {
+                         try {
+                             log.debug("Attempting to initialize server '$serverId'...")
+                             val callbacks = initializeServer(serverConfig)
+                             results[serverId] = RefreshResult.Success(callbacks.size)
+                             log.info("✓ Server '$serverId' successfully initialized on retry with ${callbacks.size} tools")
+                         } catch (retryException: Exception) {
+                             log.warn("✗ Failed to initialize server '$serverId' on retry: ${retryException.message}", retryException)
+                             results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
+                             // Don't rethrow - keep the placeholder for next retry
+                         }
+                     }
+                 } else {
+                     // Server is healthy - skip refresh since it relies on tools/listChanged notifications
+                     log.debug("Skipping already-healthy server '$serverId' (will use tools/listChanged notifications)")
+                 }
+             } catch (e: Exception) {
+                 results[serverId] = RefreshResult.Failure(e.message ?: "Unknown error")
+                 log.error("Unexpected error during refresh of server '$serverId'", e)
+             }
+         }
 
         val healthyCount = serverClients.count { it.value.protocolClient != null && it.value.discovery != null }
         val failedCount = serverClients.size - healthyCount
