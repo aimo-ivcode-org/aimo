@@ -7,7 +7,6 @@ import org.ivcode.aimo.core.chatclient.ErrorHandlingInterceptor
 import org.ivcode.aimo.core.chatclient.LoggingInterceptor
 import org.ivcode.aimo.core.chatclient.TracingInterceptor
 import org.springframework.core.annotation.AnnotationUtils
-import org.springframework.beans.factory.annotation.Qualifier
 
 import org.ivcode.aimo.core.chatservice.ChatService
 import org.ivcode.aimo.core.chatservice.ChatServiceEntity
@@ -28,13 +27,16 @@ import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.properties.AimoProperties
+import org.ivcode.aimo.core.chatservice.ChatServiceProviderRegistry
 import org.ivcode.aimo.core.properties.AimoChatScopeProperties
+import org.springframework.beans.factory.support.GenericBeanDefinition
 import org.springframework.beans.factory.getBeansWithAnnotation
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.support.GenericApplicationContext
 import tools.jackson.databind.ObjectMapper
 
 @Configuration
@@ -76,20 +78,42 @@ class AimoConfig {
     }
 
     @Bean
-    fun createChatServiceProviders(
+    fun annotatedChatServiceProviderRegistry(
         chatServices: List<ChatServiceEntity>
-    ): List<ChatServiceProvider> {
-        return chatServices.map { entity ->
-            AnnotatedChatServiceProvider(entity)
+    ): ChatServiceProviderRegistry {
+        val log = org.slf4j.LoggerFactory.getLogger(javaClass)
+        log.debug("Creating annotated ChatServiceProviderRegistry with ${chatServices.size} service(s)")
+
+        return object : ChatServiceProviderRegistry {
+            override fun getProviders(): List<ChatServiceProvider> {
+                val providers = chatServices.map { entity ->
+                    AnnotatedChatServiceProvider(entity).also {
+                        log.debug("Created annotated provider: id=${it.id}")
+                    }
+                }
+                log.debug("Annotated registry returning ${providers.size} provider(s)")
+                return providers
+            }
         }
     }
 
     @Bean
     fun createChatServiceProviderManager(
-        providers: List<ChatServiceProvider>
+        registries: List<ChatServiceProviderRegistry>
     ): ChatServiceProviderManager {
-        // All annotated providers plus future MCP/adapter providers
-        return ChatServiceProviderManagerImpl(providers)
+        // Flatten all providers from all registry sources
+        val log = org.slf4j.LoggerFactory.getLogger(javaClass)
+        log.debug("ChatServiceProviderManager: injected ${registries.size} registries")
+
+        val allProviders = mutableListOf<ChatServiceProvider>()
+        registries.forEachIndexed { idx, registry ->
+            val registryProviders = registry.getProviders()
+            log.debug("Registry[$idx]: ${registryProviders.size} provider(s) - ${registryProviders.map { it.id }}")
+            allProviders.addAll(registryProviders)
+        }
+
+        log.debug("ChatServiceProviderManager: total ${allProviders.size} provider(s) - ${allProviders.map { it.id }}")
+        return ChatServiceProviderManagerImpl(allProviders)
     }
 
       @Bean

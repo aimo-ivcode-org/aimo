@@ -1,31 +1,44 @@
 package org.ivcode.aimo.mcpclient.scheduler
 
 import org.ivcode.aimo.mcpclient.client.McpClientManager
+import org.ivcode.aimo.mcpclient.config.McpProperties
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.util.concurrent.TimeUnit
 
 @Service
-@EnableScheduling
 @ConditionalOnProperty(prefix = "aimo.mcp", name = ["enabled"], havingValue = "true", matchIfMissing = true)
-@ConditionalOnExpression("\${aimo.mcp.discovery-interval-minutes:5} > 0")
 class DiscoveryScheduler(
     private val mcpClientManager: McpClientManager,
+    private val mcpProperties: McpProperties,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
-    @Scheduled(fixedRateString = "\${aimo.mcp.discovery-interval-minutes:5}", timeUnit = TimeUnit.MINUTES)
+    /**
+     * Periodically refresh MCP server tool discovery and retry failed servers.
+     *
+     * Configuration via aimo.mcp.discovery-interval-minutes:
+     * - Positive value (e.g., 5): refresh every N minutes
+     * - Zero (0): use default 5 minutes (enables retries, good for development)
+     * - Negative value (e.g., -1): disable automatic refresh/retries
+     *
+     * Default: 5 minutes (discovery-interval-minutes: 0 or not specified)
+     */
+    @Scheduled(fixedDelayString = "\${aimo.mcp.discovery-interval-minutes:5}", timeUnit = TimeUnit.MINUTES, initialDelayString = "1")
     fun refreshTools() {
+        // Allow users to completely disable refresh by setting a negative value
+        if (mcpProperties.discoveryIntervalMinutes < 0) {
+            return
+        }
+
         try {
-            log.debug("Running periodic MCP discovery refresh")
+            log.debug("Running MCP server refresh (discovery/retry)")
             mcpClientManager.refresh()
-            log.debug("Periodic MCP refresh completed")
+            log.debug("MCP refresh completed")
         } catch (e: Exception) {
-            log.warn("Periodic MCP refresh failed", e)
+            log.warn("MCP refresh failed", e)
         }
     }
 }

@@ -10,11 +10,13 @@ import tools.jackson.databind.ObjectMapper
  */
 class McpToolCallbackFactory(
     private val serverId: String,
-    private val protocolClient: org.ivcode.aimo.mcpclient.protocol.ProtocolClient,
+    private val protocolClient: org.ivcode.aimo.mcpclient.protocol.ProtocolClient?,
     private val objectMapper: ObjectMapper,
     private val scopes: Set<String> = emptySet(),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
+
+    fun getScopes(): Set<String> = scopes
 
     fun createCallback(toolDefinition: ToolDefinition): ToolCallback {
         val namespacedName = "$serverId:${toolDefinition.name}"
@@ -35,7 +37,7 @@ class McpToolCallback(
     override val toolDefinition: ToolDefinition,
     private val serverId: String,
     private val toolName: String,
-    private val protocolClient: org.ivcode.aimo.mcpclient.protocol.ProtocolClient,
+    private val protocolClient: org.ivcode.aimo.mcpclient.protocol.ProtocolClient?,
     private val objectMapper: ObjectMapper,
     override val scopes: Set<String>,
 ) : ToolCallback {
@@ -43,6 +45,10 @@ class McpToolCallback(
 
     override fun call(argumentsJson: String, context: Map<String, Any>): String {
         return try {
+            if (protocolClient == null) {
+                return "Error: Server '$serverId' is not yet initialized"
+            }
+
             val argsNode = objectMapper.readTree(argumentsJson)
             val params = objectMapper.createObjectNode().apply {
                 set("name", objectMapper.valueToTree(toolName))

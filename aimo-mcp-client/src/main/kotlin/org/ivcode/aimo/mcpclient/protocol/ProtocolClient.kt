@@ -52,6 +52,8 @@ class ProtocolClient(
         log.info("Protocol client disconnected")
     }
 
+    fun isConnected(): Boolean = running
+
     private fun readMessages() {
         while (running) {
             try {
