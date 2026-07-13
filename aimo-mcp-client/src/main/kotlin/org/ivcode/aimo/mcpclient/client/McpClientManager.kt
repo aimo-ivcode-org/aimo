@@ -91,6 +91,27 @@ class McpClientManager(
         log.debug("Created placeholder for server '${server.id}' (waiting for successful initialization on refresh)")
     }
 
+    /**
+     * Register notification handlers for a connected server.
+     */
+    private fun registerNotificationHandlers(server: McpServerConfig.Server, connection: ServerConnection) {
+        val protocolClient = connection.protocolClient ?: return
+        val discovery = connection.discovery ?: return
+        val callbackFactory = connection.callbackFactory
+
+        protocolClient.onNotification("tools/listChanged") { params ->
+            try {
+                log.debug("Received tools/listChanged notification for server '${server.id}'")
+                val newToolDefinitions = discovery.discoverTools()
+                val newCallbacks = newToolDefinitions.map { callbackFactory.createCallback(it) }
+                connection.cachedCallbacks = newCallbacks
+                log.info("✓ Server '${server.id}' tools updated via notification: ${newCallbacks.size} tools")
+            } catch (e: Exception) {
+                log.error("Failed to process tools/listChanged notification for server '${server.id}'", e)
+            }
+        }
+    }
+
     private fun initializeServer(server: McpServerConfig.Server): List<ToolCallback> {
         val transport: ProtocolTransport = when (server.transport) {
             is McpServerConfig.Transport.StdioTransport -> {
@@ -142,6 +163,9 @@ class McpClientManager(
 
         serverClients[server.id] = connection
 
+        // Register notification handlers for tool changes
+        registerNotificationHandlers(server, connection)
+
         return callbacks
     }
 
@@ -186,16 +210,13 @@ class McpClientManager(
                              results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
                              // Don't rethrow - keep the placeholder for next retry
                          }
-                     }
-} else {
-    // Server is healthy - re-discover tools and replace cached callbacks in-place
-    val toolDefinitions = connection.discovery.discoverTools()
-    val callbacks = toolDefinitions.map { connection.callbackFactory.createCallback(it) }
-    connection.cachedCallbacks = callbacks
-    results[serverId] = RefreshResult.Success(callbacks.size)
-    log.info("✓ Server '$serverId' refreshed with ${callbacks.size} tools")
-}
-             } catch (e: Exception) {
+                      }
+                  } else {
+                      // Server is healthy - skip; tool changes are handled via notifications
+                      log.debug("Server '$serverId' is healthy, skipping refresh (tool changes handled via notifications)")
+                      results[serverId] = RefreshResult.Success(connection.cachedCallbacks.size)
+                  }
+              } catch (e: Exception) {
                  results[serverId] = RefreshResult.Failure(e.message ?: "Unknown error")
                  log.error("Unexpected error during refresh of server '$serverId'", e)
              }

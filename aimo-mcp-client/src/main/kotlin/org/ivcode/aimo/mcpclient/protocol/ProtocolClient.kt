@@ -24,6 +24,8 @@ class ProtocolClient(
     @Volatile
     private var running = false
 
+    private val notificationHandlers = ConcurrentHashMap<String, (JsonNode?) -> Unit>()
+
     fun connect() {
         try {
             transport.connect()
@@ -53,6 +55,16 @@ class ProtocolClient(
     }
 
     fun isConnected(): Boolean = running
+
+    fun onNotification(method: String, handler: (JsonNode?) -> Unit) {
+        notificationHandlers[method] = handler
+        log.debug("Registered notification handler for method: $method")
+    }
+
+    fun removeNotificationHandler(method: String) {
+        notificationHandlers.remove(method)
+        log.debug("Removed notification handler for method: $method")
+    }
 
     private fun readMessages() {
         while (running) {
@@ -102,7 +114,21 @@ class ProtocolClient(
             }
         } else {
             // Message without ID - this is a server notification
-            log.debug("Received server notification: ${jsonNode.get("method")?.asText() ?: "unknown"}")
+            val method = jsonNode.get("method")?.asText() ?: "unknown"
+            val params = jsonNode.get("params")
+            log.debug("Received server notification: $method")
+
+            val handler = notificationHandlers[method]
+            if (handler != null) {
+                try {
+                    handler(params)
+                    log.debug("Notification handler for $method completed successfully")
+                } catch (e: Exception) {
+                    log.error("Error handling notification for method=$method", e)
+                }
+            } else {
+                log.debug("No handler registered for notification method: $method")
+            }
         }
     }
 
