@@ -205,7 +205,7 @@ For detailed ChatScope documentation and examples, see:
 
 **Problem**: Current implementation only supports scope configuration via YAML or annotation discovery. There's no programmatic way to:
 - Build custom scopes at runtime from scratch
-- Add `AimoToolCallback` instances to scopes dynamically
+- Add `ToolCallback` instances to scopes dynamically
 - Parse annotated classes and extract tools/system messages programmatically
 - Create scopes from MCP server definitions at runtime
 

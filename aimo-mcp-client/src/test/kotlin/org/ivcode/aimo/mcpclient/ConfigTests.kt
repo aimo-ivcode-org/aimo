@@ -2,11 +2,9 @@ package org.ivcode.aimo.mcpclient
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.ivcode.aimo.mcpclient.client.ToolDiscovery
 import org.ivcode.aimo.mcpclient.config.McpServerConfig
 import org.ivcode.aimo.mcpclient.validation.ConfigurationValidator
 import tools.jackson.databind.ObjectMapper
-import tools.jackson.databind.node.ObjectNode
 import kotlin.test.assertEquals
 
 class ConfigurationValidatorTest {

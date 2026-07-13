@@ -33,7 +33,7 @@ aimo:
   mcp:
     enabled: true                                 # Enable/disable MCP client module
     required: false                               # Allow startup without configured servers
-    discovery-interval-minutes: 1                 # Disabled (set to >0 to enable periodic refresh)
+    discovery-interval-minutes: 1                 # Refresh every 1 minute (0 = disabled)
     servers:
       # MCP Playground Online: https://mcpplaygroundonline.com/mcp-test-client
 

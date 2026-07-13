@@ -21,15 +21,19 @@ class DiscoveryScheduler(
      *
      * Configuration via aimo.mcp.discovery-interval-minutes:
      * - Positive value (e.g., 5): refresh every N minutes
-     * - Zero (0): use default 5 minutes (enables retries, good for development)
+     * - Zero (0): disable automatic refresh/retries
      * - Negative value (e.g., -1): disable automatic refresh/retries
      *
-     * Default: 5 minutes (discovery-interval-minutes: 0 or not specified)
+     * Default: 5 minutes when not specified
      */
-    @Scheduled(fixedDelayString = "\${aimo.mcp.discovery-interval-minutes:5}", timeUnit = TimeUnit.MINUTES, initialDelayString = "1")
+    @Scheduled(
+        fixedDelayString = "#{T(java.lang.Math).max(1, \${aimo.mcp.discovery-interval-minutes:5})}",
+        timeUnit = TimeUnit.MINUTES,
+        initialDelayString = "1"
+    )
     fun refreshTools() {
-        // Allow users to completely disable refresh by setting a negative value
-        if (mcpProperties.discoveryIntervalMinutes < 0) {
+        // Disable refresh when discovery-interval-minutes <= 0
+        if (mcpProperties.discoveryIntervalMinutes <= 0) {
             return
         }
 
