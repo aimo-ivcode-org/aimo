@@ -187,10 +187,14 @@ class McpClientManager(
                              // Don't rethrow - keep the placeholder for next retry
                          }
                      }
-                 } else {
-                     // Server is healthy - skip refresh since it relies on tools/listChanged notifications
-                     log.debug("Skipping already-healthy server '$serverId' (will use tools/listChanged notifications)")
-                 }
+} else {
+    // Server is healthy - re-discover tools and replace cached callbacks in-place
+    val toolDefinitions = connection.discovery.discoverTools()
+    val callbacks = toolDefinitions.map { connection.callbackFactory.createCallback(it) }
+    connection.cachedCallbacks = callbacks
+    results[serverId] = RefreshResult.Success(callbacks.size)
+    log.info("✓ Server '$serverId' refreshed with ${callbacks.size} tools")
+}
              } catch (e: Exception) {
                  results[serverId] = RefreshResult.Failure(e.message ?: "Unknown error")
                  log.error("Unexpected error during refresh of server '$serverId'", e)

@@ -110,9 +110,8 @@ class HttpTransport(
 
             if (response.statusCode() >= 400) {
                 val body = response.body().bufferedReader().use { it.readText() }
-                log.error("HTTP POST failed with status ${response.statusCode()}")
-                log.error("Response body: $body")
-                log.error("Message attempted: $message")
+log.error("HTTP POST failed with status ${response.statusCode()}: ${body.take(2000)}")
+log.debug("HTTP POST request payload (truncated): ${message.take(2000)}")
 
                 if (response.statusCode() == 401 || response.statusCode() == 403) {
                     throw IllegalStateException("HTTP authentication failed (status ${response.statusCode()}). " +

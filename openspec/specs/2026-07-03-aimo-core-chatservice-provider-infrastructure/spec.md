@@ -15,13 +15,13 @@ An empty provider-level `scopes` set means the provider itself is unrestricted (
 - **AND** it can obtain tool callbacks and system message callbacks (each already carrying their own `scopes`) from the same provider interface
 
 ### Requirement: Annotated chat services are wrapped as providers
-The system SHALL wrap annotated `@ChatService` beans in a single `AnnotatedChatServiceProvider` so annotated tools and system messages are exposed through the provider abstraction, reusing the existing bean discovery and callback assembly (`ChatServiceEntity`, `toToolCallbacks`, `toSystemMessageCallbacks`) rather than re-implementing discovery.
+The system SHALL wrap each annotated `@ChatService` bean in an `AnnotatedChatServiceProvider` so annotated tools and system messages are exposed through the provider abstraction, reusing the existing bean discovery and callback assembly (`ChatServiceEntity`, `toToolCallbacks`, `toSystemMessageCallbacks`) rather than re-implementing discovery.
 
-Because a single `AnnotatedChatServiceProvider` aggregates beans from many independently-scoped `@ChatService` classes, it SHALL always report an empty provider-level `scopes` set (global/unrestricted at the provider level). Per-scope restriction for annotated tools and system messages continues to be enforced entirely through each callback's own `scopes`, exactly as today.
+Because an `AnnotatedChatServiceProvider` represents annotated callbacks whose per-scope restriction is enforced entirely through each callback's own `scopes`, it SHALL always report an empty provider-level `scopes` set (global/unrestricted at the provider level).
 
 #### Scenario: An annotated chat service is discovered
 - **WHEN** Spring discovers a `@ChatService` bean
-- **THEN** the bean's callbacks are represented through the single `AnnotatedChatServiceProvider`
+- **THEN** the bean's callbacks are represented through an `AnnotatedChatServiceProvider`
 - **AND** its annotated callbacks remain available through the provider API, unchanged from their current scope behavior
 - **AND** the provider's own `scopes` set is empty
 
