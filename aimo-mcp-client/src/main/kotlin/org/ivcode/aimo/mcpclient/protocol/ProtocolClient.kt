@@ -1,8 +1,10 @@
 package org.ivcode.aimo.mcpclient.protocol
 
 import org.ivcode.aimo.mcpclient.protocol.transport.ProtocolTransport
+import org.ivcode.aimo.mcpclient.protocol.jsonrpc.JsonRpcRequest
+import org.ivcode.aimo.mcpclient.protocol.jsonrpc.JsonRpcResponse
+import org.ivcode.aimo.mcpclient.protocol.jsonrpc.JsonRpcNotification
 import org.slf4j.LoggerFactory
-import com.fasterxml.jackson.annotation.JsonInclude
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.util.*
@@ -171,40 +173,6 @@ class ProtocolClient(
     }
 }
 
-sealed class JsonRpcMessage {
-    data class Request(val request: JsonRpcRequest) : JsonRpcMessage()
-    data class Notification(val notification: JsonRpcNotification) : JsonRpcMessage()
-}
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
-data class JsonRpcRequest(
-    val jsonrpc: String = "2.0",
-    val method: String,
-    val params: JsonNode? = null,
-    val id: String? = null,
-)
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
-data class JsonRpcResponse(
-    val jsonrpc: String = "2.0",
-    val result: JsonNode? = null,
-    val error: JsonRpcError? = null,
-    val id: String,
-)
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
-data class JsonRpcError(
-    val code: Int,
-    val message: String,
-    val data: JsonNode? = null,
-)
-
-@JsonInclude(JsonInclude.Include.NON_NULL)
-data class JsonRpcNotification(
-    val jsonrpc: String = "2.0",
-    val method: String,
-    val params: JsonNode? = null,
-)
 
 class McpProtocolException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
