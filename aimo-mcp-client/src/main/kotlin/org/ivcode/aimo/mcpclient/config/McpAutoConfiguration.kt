@@ -2,8 +2,10 @@ package org.ivcode.aimo.mcpclient.config
 
 import org.ivcode.aimo.core.chatservice.ChatServiceProvider
 import org.ivcode.aimo.core.chatservice.ChatServiceProviderRegistry
+import org.ivcode.aimo.core.properties.AimoProperties
 import org.ivcode.aimo.mcpclient.client.McpClientManager
 import org.ivcode.aimo.mcpclient.scheduler.DiscoveryScheduler
+import org.ivcode.aimo.mcpclient.validation.ConfigurationValidator
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -20,6 +22,7 @@ import tools.jackson.databind.ObjectMapper
 @EnableConfigurationProperties(McpProperties::class)
 class McpClientAutoConfiguration(
     private val mcpProperties: McpProperties,
+    private val aimoProperties: AimoProperties,
     private val objectMapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -27,6 +30,13 @@ class McpClientAutoConfiguration(
     @Bean
     fun mcpClientManager(): McpClientManager {
         val config = mcpProperties.toServerConfig()
+
+        // Validate MCP server scopes against defined scopes
+        val definedScopes = aimoProperties.scope.keys
+        val validator = ConfigurationValidator(definedScopes)
+        validator.validate(config)
+
+        log.info("MCP server configuration validated successfully")
         return McpClientManager(config, objectMapper, mcpProperties.required)
     }
 
