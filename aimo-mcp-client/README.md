@@ -70,15 +70,98 @@ Scopes control which tools are available in a conversation:
 | `scope: [research, admin]` | Available **only** in the `research` and `admin` scopes; **excluded** from global scope |
 | `scope: [global]` | Available **only** in a scope named `"global"` (if defined); **excluded** from the built-in global scope |
 
-### Example: Scope Configuration
+## Prompt (System Message) Discovery
+
+MCP servers can expose prompts (templates) that become AIMO system messages. Prompts are discovered using the `prompts/list` RPC and included in chat requests to provide context and instructions to the LLM.
+
+### Prompt Naming
+
+MCP prompts are named using the `"{serverId}:{promptName}"` convention to avoid collisions:
+
+- Local system message: `security-policy` → `/aimo-api/chat/{chatId}` sees `security-policy` (from `@SystemMessage` annotation)
+- MCP prompt from `my-server`: `research-guidelines` → `/aimo-api/chat/{chatId}` sees `my-server:research-guidelines`
+
+### Prompt Scope Visibility
+
+Prompts follow the same scope rules as tools:
+
+| Server Scope | Visibility |
+|---|---|
+| `scope: []` (empty) | Available in the **global scope** and all unrestricted contexts |
+| `scope: [research, admin]` | Available **only** in the `research` and `admin` scopes |
+
+### Example: Prompts with Scope Configuration
+
+```yaml
+aimo:
+  scope:
+    research:
+      system-message-refs: 
+        - research-guidelines     # Annotated system message
+        - research-server:citation-instructions  # MCP prompt
+    admin:
+      system-message-refs:
+        - admin-policy
+        - admin-server:admin-guidelines  # MCP prompt
+
+  mcp:
+    servers:
+      - id: research-server
+        transport:
+          type: stdio
+          command: /path/to/research-mcp
+        scope: [research]  # Prompts visible only in research scope
+      
+      - id: admin-server
+        transport:
+          type: stdio
+          command: /path/to/admin-mcp
+        scope: [admin]     # Prompts visible only in admin scope
+```
+
+### Prompt Invocation
+
+When a chat request is made in a specific scope:
+1. All prompts with matching scope are discovered
+2. Each prompt is fetched via `prompts/get` RPC (with optional arguments)
+3. Prompts are prepended to the chat message sequence as system messages
+4. LLM uses prompts as context for generating responses
+
+### Example: Prompt Arguments
+
+If a prompt accepts arguments, pass them via context:
+
+```kotlin
+val context = SystemMessageContext(
+    context = mapOf(
+        "research-server:dataset-summary:args" to mapOf(
+            "dataset_name" to "my_dataset",
+            "rows" to 1000
+        )
+    ),
+    chatScopeId = "research"
+)
+```
+
+## Scope Visibility Rules
+
+Scopes control which tools and prompts are available in a conversation.
+
+### Example: Tool and Prompt Scope Configuration
 
 ```yaml
 aimo:
   scope:
     research:
       tool-refs: [research-tool, server-a:research-search]    # Both annotated and MCP tools
+      system-message-refs:
+        - research-guidelines
+        - server-a:citation-instructions                       # MCP prompt
     admin:
       tool-refs: [admin-tool, server-b:admin-action]
+      system-message-refs:
+        - admin-policy
+        - server-b:admin-guidelines                            # MCP prompt
 
   mcp:
     servers:
@@ -225,16 +308,106 @@ The stdio transport uses JSONL (JSON Lines) framing: one JSON object per line. T
 
 Tool invocation calls (via `tools/call` RPC) have a reasonable timeout. If a tool call does not complete within the timeout window, the error is returned to the caller and may trigger connection recovery.
 
+### Prompt (System Message) Discovery
+
+MCP prompts are discovered using the `prompts/list` RPC method and converted to AIMO `SystemMessageCallback` instances. Each prompt:
+
+- Gets a namespaced name: `{serverId}:{promptName}` to avoid collisions
+- Inherits the server's scope restrictions (empty `scope: []` = global, named scopes = restricted)
+- Is invoked via `prompts/get` RPC when needed in a chat request
+- Can accept optional arguments passed through the context map
+
+Prompts are cached per server and updated via `prompts/listChanged` notifications (if supported by the server).
+
 ### Scope Cache Invalidation
 
-When tools are refreshed, the scope cache is invalidated to ensure the next request sees the updated tool set. Scope cache is rebuilt on-demand.
+When tools or prompts are refreshed, the scope cache is invalidated to ensure the next request sees the updated tool/prompt set. Scope cache is rebuilt on-demand.
+
+## MCP Specification Compliance Matrix
+
+This section documents which features from the [MCP 2025-11-25 Specification](MCP-SPECIFICATION-2025-11-25-COMPLETE.md) are implemented, partial, or not yet implemented.
+
+### Core Protocol
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Transports** | | |
+| Stdio Transport | ✅ Implemented | Full support for spawning local MCP servers via JSON Lines |
+| HTTP/Streamable Transport | ⚠️ Partial | Implemented but may have edge cases; HTTP error handling needs improvement |
+| Custom Transports | ❌ Not Implemented | Extensible framework not yet provided |
+| **Lifecycle** | | |
+| Initialization Phase | ✅ Implemented | Full capability negotiation and version handling |
+| Operation Phase | ✅ Implemented | Normal request/response routing |
+| Shutdown Phase | ✅ Implemented | Graceful process termination for stdio; connection closure for HTTP |
+| **Capability Negotiation** | ✅ Implemented | Client declares supported capabilities; server capabilities negotiated |
+| **JSON-RPC 2.0** | ✅ Implemented | Proper request/response/notification handling with ID tracking |
+
+### Server Features (Client receives these)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Tools** | | |
+| tools/list | ✅ Implemented | Full discovery with pagination support |
+| tools/call | ✅ Implemented | Tool invocation with proper timeout handling |
+| tools/listChanged Notification | ✅ Implemented | Server list updates trigger cache invalidation |
+| **Resources** | | |
+| resources/list | ❌ Not Implemented | Discovery not yet wired to tool registry |
+| resources/read | ❌ Not Implemented | Content fetching not implemented |
+| resources/templates/list | ❌ Not Implemented | Parameterized resource templates not supported |
+| resources/subscribe | ❌ Not Implemented | Resource subscriptions not implemented |
+| resources/listChanged Notification | ❌ Not Implemented | No resource change notification handling |
+| resources/updated Notification | ❌ Not Implemented | No resource update notification handling |
+| **Prompts** | | |
+| prompts/list | ✅ Implemented | Full discovery with pagination support |
+| prompts/get | ✅ Implemented | Prompts fetched and converted to SystemMessageCallback |
+| prompts/listChanged Notification | ✅ Implemented | Server list updates trigger cache invalidation |
+
+### Client Features (Server can request these)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Roots** | ❌ Not Implemented | Filesystem boundary exposure not yet supported |
+| **Sampling** | ❌ Not Implemented | Server-initiated LLM interactions not supported |
+| **Elicitation** | ❌ Not Implemented | Server-initiated user information requests not supported |
+
+### Utilities & Advanced Features
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Pagination** | ✅ Implemented | Cursor-based pagination for list operations (tools, prompts) |
+| **Progress Tracking** | ❌ Not Implemented | Progress notifications not handled |
+| **Cancellation** | ❌ Not Implemented | Request cancellation not yet supported |
+| **Logging** | ❌ Not Implemented | Server logging not captured/displayed |
+| **Completion** | ❌ Not Implemented | Argument autocompletion not implemented |
+| **Tasks** | ❌ Not Implemented | Task-augmented operations not supported |
+
+### Integration Features
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Scope-Aware Tool Exposure** | ✅ Implemented | MCP tools respect AIMO chat scopes (same as annotated tools) |
+| **Tool Naming Convention** | ✅ Implemented | `{serverId}:{toolName}` prevents collisions |
+| **Prompt Naming Convention** | ✅ Implemented | `{serverId}:{promptName}` prevents collisions |
+| **Scope Cache Invalidation** | ✅ Implemented | Cache refreshed when tools/prompts change |
+| **Optional Server Startup** | ✅ Implemented | `aimo.mcp.required: false` allows graceful degradation |
+| **Manual Refresh Endpoint** | ✅ Implemented | `/aimo-api/admin/mcp-servers/refresh` allows on-demand discovery |
+| **Periodic Auto-Refresh** | ✅ Implemented | Configurable `discovery-interval-minutes` for automatic rediscovery |
+
+### Summary
+
+- **Implemented**: 16 features
+- **Partial**: 1 feature
+- **Not Implemented**: 20 features
+
+The module currently focuses on the **core client integration pattern**: discovering and invoking MCP tools, and consuming MCP prompts as system messages. This covers the primary use case of extending AIMO's capabilities with MCP servers. Resources, roots, sampling, and advanced utilities remain for future phases.
 
 ## Future Work
 
-- **HTTP/SSE Transport**: Network-based transport for remote MCP servers (in progress - Stdio MVP stable)
+- **HTTP/SSE Transport**: Improve edge case handling and error reporting for HTTP transport stability
+- **Resource Support**: Implement resource discovery, reading, templates, and subscriptions to expose MCP resource data
+- **Client Capabilities**: Add support for roots, sampling, and elicitation to enable server-initiated interactions
+- **Advanced Utilities**: Support progress tracking, cancellation, logging, and task-augmented operations
 - **Server Implementation**: Build MCP server support using the same protocol layer for symmetric implementation
-- **Resource Support**: Extend tool discovery to include resources (reading/listing)
-- **Prompt Templates**: Support MCP prompt templates in future versions
 
 ## HTTP/SSE Transport Status (Experimental)
 

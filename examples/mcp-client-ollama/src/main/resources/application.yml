@@ -63,3 +63,9 @@ aimo:
           url: https://mcpplaygroundonline.com/mcp-complex-server
           auth-token: ${MCP_COMPLEX}              # generate key at mcp playground online
         scope: []                                 # Empty = available in global scope
+
+      - id: mcp_apps
+        transport:
+          type: http
+          url: https://mcpplaygroundonline.com/mcp-apps-server
+        scope: []                                 # Empty = available in global scope

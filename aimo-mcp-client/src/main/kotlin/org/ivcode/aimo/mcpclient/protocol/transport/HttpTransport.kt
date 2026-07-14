@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * HTTP-based MCP transport implementing the "Streamable HTTP" transport from the
- * MCP spec (2025-03-26). Unlike a persistent connection, every JSON-RPC message is
+ * MCP spec (2025-11-25). Unlike a persistent connection, every JSON-RPC message is
  * sent as its own POST request. The response to that POST is either:
  *   - `Content-Type: application/json` — a single JSON-RPC response body, or
  *   - `Content-Type: text/event-stream` — an SSE stream scoped to *this* request,
@@ -19,10 +19,14 @@ import java.util.concurrent.TimeUnit
  *
  * A session may be established during `initialize`; if the server returns an
  * `Mcp-Session-Id` header, it is captured and sent on all subsequent requests.
+ *
+ * Per spec, the `MCP-Protocol-Version` header is sent on all HTTP requests to indicate
+ * the protocol version being used.
  */
 class HttpTransport(
     private val url: String,
     private val authToken: String? = null,
+    private val protocolVersion: String = "2025-11-25",
     private val objectMapper: ObjectMapper = ObjectMapper(),
     private val connectTimeoutSeconds: Long = 10,
     private val messageTimeoutSeconds: Long = 60,
@@ -56,6 +60,7 @@ class HttpTransport(
                 val requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(java.time.Duration.ofSeconds(connectTimeoutSeconds))
+                    .header("MCP-Protocol-Version", protocolVersion)
                     .header("Mcp-Session-Id", sid)
                     .DELETE()
 
@@ -82,6 +87,7 @@ class HttpTransport(
                 .timeout(java.time.Duration.ofSeconds(requestTimeoutSeconds))  // Use request timeout instead of connect timeout
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json, text/event-stream")
+                .header("MCP-Protocol-Version", protocolVersion)
                 .POST(HttpRequest.BodyPublishers.ofString(message))
 
             if (!authToken.isNullOrBlank()) {

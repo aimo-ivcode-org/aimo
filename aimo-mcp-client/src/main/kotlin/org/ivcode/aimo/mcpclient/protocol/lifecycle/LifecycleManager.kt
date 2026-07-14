@@ -18,7 +18,7 @@ class LifecycleManager(
         log.info("Initializing MCP client: name=${clientInfo.name} version=${clientInfo.version}")
         
         val params = objectMapper.createObjectNode().apply {
-            put("protocolVersion", "2024-11-05")
+            put("protocolVersion", "2025-11-25")
             set("clientInfo", objectMapper.valueToTree(clientInfo))
             set("capabilities", objectMapper.valueToTree(capabilities))
         }
@@ -42,8 +42,8 @@ class LifecycleManager(
     fun terminate() {
         try {
             log.info("Terminating MCP client")
-            protocolClient.sendNotification("close", null)
-            Thread.sleep(100)
+            // Per spec, shutdown is handled at transport level, not via RPC notification
+            protocolClient.disconnect()
         } catch (e: Exception) {
             log.warn("Error during terminate", e)
         }

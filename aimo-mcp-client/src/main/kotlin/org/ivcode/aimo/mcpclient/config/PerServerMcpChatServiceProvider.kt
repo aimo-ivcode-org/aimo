@@ -12,10 +12,10 @@ import org.slf4j.LoggerFactory
  * Each server is represented as its own provider with:
  * - Unique id based on the server id
  * - Scopes from the server configuration
- * - Tools/system messages from that server only
+ * - Tools and system messages (prompts) from that server only
  *
  * This allows proper scope-aware filtering at the provider level, ensuring
- * tools from a scoped server (e.g., "admin-tools") only appear in allowed scopes.
+ * tools and prompts from a scoped server (e.g., "admin-tools") only appear in allowed scopes.
  */
 class PerServerMcpChatServiceProvider(
     private val serverId: String,
@@ -32,8 +32,7 @@ class PerServerMcpChatServiceProvider(
     }
 
     override fun getSystemMessages(): List<SystemMessageCallback> {
-        // MCP tools-only for now; no system messages from MCP
-        return emptyList()
+        return mcpClientManager.getSystemMessagesForServer(serverId)
     }
 }
 

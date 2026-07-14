@@ -1,6 +1,7 @@
 package org.ivcode.aimo.mcpclient.client
 
 import org.ivcode.aimo.core.model.ToolCallback
+import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.mcpclient.config.McpServerConfig
 import org.ivcode.aimo.mcpclient.protocol.ProtocolClient
 import org.ivcode.aimo.mcpclient.protocol.lifecycle.ClientCapabilities
@@ -15,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Manages one persistent protocol client per configured MCP server.
- * Handles discovery, tool wrapping, and refresh.
+ * Handles discovery of both tools and prompts (system messages), tool/prompt wrapping, and refresh.
  */
 class McpClientManager(
     private val serverConfig: McpServerConfig,
@@ -29,9 +30,12 @@ class McpClientManager(
         val serverId: String,
         val protocolClient: ProtocolClient?,
         val lifecycleManager: LifecycleManager?,
-        val discovery: ToolDiscovery?,
-        val callbackFactory: McpToolCallbackFactory,
+        val toolDiscovery: ToolDiscovery?,
+        val promptDiscovery: PromptDiscovery?,
+        val toolCallbackFactory: McpToolCallbackFactory,
+        val promptCallbackFactory: McpSystemMessageCallbackFactory,
         var cachedCallbacks: List<ToolCallback> = emptyList(),
+        var cachedSystemMessages: List<SystemMessageCallback> = emptyList(),
     )
 
     fun initializeAll(): Map<String, List<ToolCallback>> {
@@ -41,9 +45,9 @@ class McpClientManager(
         for (server in serverConfig.servers) {
             try {
                 log.debug("Initializing server '${server.id}' from config...")
-                val callbacks = initializeServer(server)
-                allCallbacks[server.id] = callbacks
-                log.info("✓ Server '${server.id}' initialized with ${callbacks.size} tools")
+                val (tools, prompts) = initializeServer(server)
+                allCallbacks[server.id] = tools
+                log.info("✓ Server '${server.id}' initialized with ${tools.size} tools and ${prompts.size} prompts")
             } catch (e: Exception) {
                 if (mcpRequired) {
                     log.error("✗ Failed to initialize required server '${server.id}'", e)
@@ -69,9 +73,15 @@ class McpClientManager(
      * This allows the server to be included in provider discovery and retried on refresh.
      */
     private fun createFailedServerPlaceholder(server: McpServerConfig.Server) {
-        // Create a minimal connection that can be retried on refresh
-        // We store the server config so refresh can try full initialization later
-        val callbackFactory = McpToolCallbackFactory(
+        // Create minimal factories that can be retried on refresh
+        val toolCallbackFactory = McpToolCallbackFactory(
+            serverId = server.id,
+            protocolClient = null,  // Will be created on successful initialization
+            objectMapper = objectMapper,
+            scopes = server.scope.toSet(),
+        )
+
+        val promptCallbackFactory = McpSystemMessageCallbackFactory(
             serverId = server.id,
             protocolClient = null,  // Will be created on successful initialization
             objectMapper = objectMapper,
@@ -82,9 +92,12 @@ class McpClientManager(
             serverId = server.id,
             protocolClient = null,  // Placeholder
             lifecycleManager = null,  // Placeholder
-            discovery = null,  // Placeholder
-            callbackFactory = callbackFactory,
+            toolDiscovery = null,  // Placeholder
+            promptDiscovery = null,  // Placeholder
+            toolCallbackFactory = toolCallbackFactory,
+            promptCallbackFactory = promptCallbackFactory,
             cachedCallbacks = emptyList(),
+            cachedSystemMessages = emptyList(),
         )
 
         serverClients[server.id] = connection
@@ -96,23 +109,37 @@ class McpClientManager(
      */
     private fun registerNotificationHandlers(server: McpServerConfig.Server, connection: ServerConnection) {
         val protocolClient = connection.protocolClient ?: return
-        val discovery = connection.discovery ?: return
-        val callbackFactory = connection.callbackFactory
+        val toolDiscovery = connection.toolDiscovery ?: return
+        val promptDiscovery = connection.promptDiscovery ?: return
+        val toolCallbackFactory = connection.toolCallbackFactory
+        val promptCallbackFactory = connection.promptCallbackFactory
 
         protocolClient.onNotification("tools/listChanged") { params ->
             try {
                 log.debug("Received tools/listChanged notification for server '${server.id}'")
-                val newToolDefinitions = discovery.discoverTools()
-                val newCallbacks = newToolDefinitions.map { callbackFactory.createCallback(it) }
+                val newToolDefinitions = toolDiscovery.discoverTools()
+                val newCallbacks = newToolDefinitions.map { toolCallbackFactory.createCallback(it) }
                 connection.cachedCallbacks = newCallbacks
                 log.info("✓ Server '${server.id}' tools updated via notification: ${newCallbacks.size} tools")
             } catch (e: Exception) {
                 log.error("Failed to process tools/listChanged notification for server '${server.id}'", e)
             }
         }
+
+        protocolClient.onNotification("prompts/listChanged") { params ->
+            try {
+                log.debug("Received prompts/listChanged notification for server '${server.id}'")
+                val newPromptDefinitions = promptDiscovery.discoverPrompts()
+                val newSystemMessages = newPromptDefinitions.map { promptCallbackFactory.createCallback(it) }
+                connection.cachedSystemMessages = newSystemMessages
+                log.info("✓ Server '${server.id}' prompts updated via notification: ${newSystemMessages.size} prompts")
+            } catch (e: Exception) {
+                log.error("Failed to process prompts/listChanged notification for server '${server.id}'", e)
+            }
+        }
     }
 
-    private fun initializeServer(server: McpServerConfig.Server): List<ToolCallback> {
+    private fun initializeServer(server: McpServerConfig.Server): Pair<List<ToolCallback>, List<SystemMessageCallback>> {
         val transport: ProtocolTransport = when (server.transport) {
             is McpServerConfig.Transport.StdioTransport -> {
                 val stdio = server.transport as McpServerConfig.Transport.StdioTransport
@@ -120,7 +147,7 @@ class McpClientManager(
             }
             is McpServerConfig.Transport.HttpTransport -> {
                 val http = server.transport as McpServerConfig.Transport.HttpTransport
-                HttpTransport(http.url, http.authToken, objectMapper)
+                HttpTransport(http.url, http.authToken, "2025-11-25", objectMapper)
             }
             is McpServerConfig.Transport.SseTransport -> {
                 throw IllegalArgumentException("SSE transport not yet implemented")
@@ -141,32 +168,54 @@ class McpClientManager(
             throw e
         }
 
-        val discovery = ToolDiscovery(protocolClient, objectMapper)
-        val callbackFactory = McpToolCallbackFactory(
+        val toolDiscovery = ToolDiscovery(protocolClient, objectMapper)
+        val promptDiscovery = PromptDiscovery(protocolClient, objectMapper)
+
+        val toolCallbackFactory = McpToolCallbackFactory(
             serverId = server.id,
             protocolClient = protocolClient,
             objectMapper = objectMapper,
             scopes = server.scope.toSet(),
         )
 
-        val toolDefinitions = discovery.discoverTools()
-        val callbacks = toolDefinitions.map { callbackFactory.createCallback(it) }
+        val promptCallbackFactory = McpSystemMessageCallbackFactory(
+            serverId = server.id,
+            protocolClient = protocolClient,
+            objectMapper = objectMapper,
+            scopes = server.scope.toSet(),
+        )
+
+        // Discover tools
+        val toolDefinitions = toolDiscovery.discoverTools()
+        val toolCallbacks = toolDefinitions.map { toolCallbackFactory.createCallback(it) }
+
+        // Discover prompts (system messages)
+        val promptDefinitions = try {
+            promptDiscovery.discoverPrompts()
+        } catch (e: Exception) {
+            log.warn("Failed to discover prompts for server '${server.id}': ${e.message}")
+            emptyList()
+        }
+        val systemMessageCallbacks = promptDefinitions.map { promptCallbackFactory.createCallback(it) }
 
         val connection = ServerConnection(
             serverId = server.id,
             protocolClient = protocolClient,
             lifecycleManager = lifecycleManager,
-            discovery = discovery,
-            callbackFactory = callbackFactory,
-            cachedCallbacks = callbacks,
+            toolDiscovery = toolDiscovery,
+            promptDiscovery = promptDiscovery,
+            toolCallbackFactory = toolCallbackFactory,
+            promptCallbackFactory = promptCallbackFactory,
+            cachedCallbacks = toolCallbacks,
+            cachedSystemMessages = systemMessageCallbacks,
         )
 
         serverClients[server.id] = connection
 
-        // Register notification handlers for tool changes
+        // Register notification handlers for tool and prompt changes
         registerNotificationHandlers(server, connection)
 
-        return callbacks
+        return Pair(toolCallbacks, systemMessageCallbacks)
     }
 
     fun refresh(): Map<String, RefreshResult> {
@@ -184,14 +233,14 @@ class McpClientManager(
                      // Server wasn't initialized (e.g. optional startup failure) — try to initialize now.
                      log.debug("Retrying initialization of uninitialized server '$serverId'...")
                      try {
-                         val callbacks = initializeServer(server)
-                         results[serverId] = RefreshResult.Success(callbacks.size)
-                         log.info("✓ Server '$serverId' successfully initialized on retry with ${callbacks.size} tools")
+                         val (tools, prompts) = initializeServer(server)
+                         results[serverId] = RefreshResult.Success(tools.size)
+                         log.info("✓ Server '$serverId' successfully initialized on retry with ${tools.size} tools and ${prompts.size} prompts")
                      } catch (retryException: Exception) {
                          results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
                          log.warn("✗ Failed to initialize server '$serverId' on retry: ${retryException.message}", retryException)
                      }
-                 } else if (connection.protocolClient == null || connection.discovery == null) {
+                 } else if (connection.protocolClient == null || connection.toolDiscovery == null) {
                      // Placeholder exists - try to initialize from config
                      log.debug("Retrying initialization of placeholder server '$serverId'...")
                      val serverConfig = serverConfigMap[serverId]
@@ -202,9 +251,9 @@ class McpClientManager(
                      } else {
                          try {
                              log.debug("Attempting to initialize server '$serverId'...")
-                             val callbacks = initializeServer(serverConfig)
-                             results[serverId] = RefreshResult.Success(callbacks.size)
-                             log.info("✓ Server '$serverId' successfully initialized on retry with ${callbacks.size} tools")
+                             val (tools, prompts) = initializeServer(serverConfig)
+                             results[serverId] = RefreshResult.Success(tools.size)
+                             log.info("✓ Server '$serverId' successfully initialized on retry with ${tools.size} tools and ${prompts.size} prompts")
                          } catch (retryException: Exception) {
                              log.warn("✗ Failed to initialize server '$serverId' on retry: ${retryException.message}", retryException)
                              results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
@@ -212,8 +261,8 @@ class McpClientManager(
                          }
                       }
                   } else {
-                      // Server is healthy - skip; tool changes are handled via notifications
-                      log.debug("Server '$serverId' is healthy, skipping refresh (tool changes handled via notifications)")
+                      // Server is healthy - skip; tool and prompt changes are handled via notifications
+                      log.debug("Server '$serverId' is healthy, skipping refresh (tool/prompt changes handled via notifications)")
                       results[serverId] = RefreshResult.Success(connection.cachedCallbacks.size)
                   }
               } catch (e: Exception) {
@@ -222,7 +271,7 @@ class McpClientManager(
              }
          }
 
-        val healthyCount = serverClients.count { it.value.protocolClient != null && it.value.discovery != null }
+        val healthyCount = serverClients.count { it.value.protocolClient != null && it.value.toolDiscovery != null }
         val failedCount = serverClients.size - healthyCount
         val retriedCount = results.size
         log.info("Refresh completed: retried $retriedCount failed server(s), skipped $healthyCount healthy server(s). Results: ${results.map { "${it.key}=${if (it.value is RefreshResult.Success) "OK(${(it.value as RefreshResult.Success).toolCount} tools)" else "FAILED: ${(it.value as RefreshResult.Failure).error}"}" }.joinToString(", ")}")
@@ -238,12 +287,20 @@ class McpClientManager(
         return serverClients[serverId]?.cachedCallbacks ?: emptyList()
     }
 
+    fun getAllSystemMessages(): List<SystemMessageCallback> {
+        return serverClients.values.flatMap { it.cachedSystemMessages }
+    }
+
+    fun getSystemMessagesForServer(serverId: String): List<SystemMessageCallback> {
+        return serverClients[serverId]?.cachedSystemMessages ?: emptyList()
+    }
+
     fun getServerIds(): List<String> {
         return serverClients.keys.toList()
     }
 
     fun getServerScopes(serverId: String): Set<String> {
-        return serverClients[serverId]?.callbackFactory?.getScopes() ?: emptySet()
+        return serverClients[serverId]?.toolCallbackFactory?.getScopes() ?: emptySet()
     }
 
     fun shutdown() {
