@@ -22,12 +22,11 @@ class McpAdminController(
     @PostMapping("/refresh")
     fun refresh(): ResponseEntity<Map<String, Any>> {
         return try {
-            mcpClientManager.refresh()
+            val results = mcpClientManager.refresh()
             log.info("MCP servers refreshed")
-            ResponseEntity.ok(mapOf(
-                "success" to true,
-                "message" to "MCP servers refreshed successfully"
-            ))
+            ResponseEntity.ok(
+                mapOf("success" to true, "results" to results)
+            )
         } catch (e: Exception) {
             log.error("MCP refresh failed", e)
             ResponseEntity.status(500).body(mapOf(

@@ -150,7 +150,9 @@ class McpClientManager(
                 HttpTransport(http.url, http.authToken, "2025-11-25", objectMapper)
             }
             is McpServerConfig.Transport.SseTransport -> {
-                throw IllegalArgumentException("SSE transport not yet implemented")
+                val sse = server.transport as McpServerConfig.Transport.SseTransport
+                // Treat SSE transport as Streamable HTTP with SSE response support.
+                HttpTransport(sse.url, sse.authToken, objectMapper)
             }
         }
 

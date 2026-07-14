@@ -122,19 +122,17 @@ The system SHALL validate tool references against the combined set of annotated 
 - **WHEN** a scope references a tool that does not exist in either source
 - **THEN** validation fails before the application serves chat requests
 
-### Requirement: Refreshable MCP discovery with in-place replacement
-The system SHALL support manual and periodic MCP tool re-discovery and SHALL replace tools in-place (not maintain old/new versions), invalidating cached scope state when discovered tools change.
+### Requirement: Refreshable MCP discovery / retry
+The system SHALL support manual and periodic MCP connectivity retry. Tool-set updates SHOULD be handled via MCP `tools/listChanged` notifications when supported by the server.
 
 #### Scenario: Admin refresh is invoked
 - **WHEN** an HTTP `POST` request is made to `/aimo-api/admin/mcp-servers/refresh`
-- **THEN** the module re-discovers tools from all configured MCP servers
-- **AND** replaces each server's cached tools in-place
-- **AND** invalidates cached scope data so the next request sees the new tool set
-- **AND** returns a response listing each server and whether its refresh succeeded
+- **THEN** the module attempts to (re)initialize any failed/unreachable MCP servers
+- **AND** returns a response listing each server and whether the refresh/retry succeeded
 
 #### Scenario: Scheduled refresh runs
 - **WHEN** the discovery scheduler executes (interval set by `aimo.mcp.discovery-interval-minutes`; disabled when set to `0`)
-- **THEN** the module re-discovers tools from configured servers using the same refresh path as the manual endpoint
+- **THEN** the module performs the same retry behavior as the manual refresh endpoint
 
 ### Requirement: MCP server scope configuration semantics
 The system SHALL apply the same scope rules to MCP servers that apply to annotated `@ChatService` beans. There are no wildcards; every entry in `scope` is treated as a literal scope name.

@@ -159,12 +159,17 @@ class AimoConfig {
            // Combine both sources (but exclude "global" - it's handled by ChatScopeProviderImpl)
            val allScopeIds = (discoveredAnnotationScopes + yamlDefinedScopes) - "global"
 
-           // Build set of available tool names for validation
-           val availableToolNames = allTools.map { it.toolDefinition.name }.toSet()
+            // Build set of available tool names for validation (annotated + provider-sourced)
+            val availableToolNames = (
+                allTools.map { it.toolDefinition.name } +
+                    providerManager.getProviders().flatMap { p -> p.getTools().map { it.toolDefinition.name } }
+            ).toSet()
 
-           // Build set of available system message names for validation
-           val availableSystemMessageNames = allSystemMessages.map { it.name }.toSet()
-
+            // Build set of available system message names for validation (annotated + provider-sourced)
+            val availableSystemMessageNames = (
+                allSystemMessages.map { it.name } +
+                    providerManager.getProviders().flatMap { p -> p.getSystemMessages().map { it.name } }
+            ).toSet()
            // Create ChatScope for each discovered/configured scope
            return allScopeIds.associateWith { scopeId ->
               val config = scopeConfigs[scopeId] ?: AimoChatScopeProperties(
