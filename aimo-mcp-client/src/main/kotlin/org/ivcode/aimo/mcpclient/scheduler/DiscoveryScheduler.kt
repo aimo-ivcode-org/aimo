@@ -1,8 +1,8 @@
 package org.ivcode.aimo.mcpclient.scheduler
 
 import org.ivcode.aimo.mcpclient.client.McpClientManager
-import org.ivcode.aimo.mcpclient.config.McpProperties
 import org.slf4j.LoggerFactory
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -10,10 +10,9 @@ import java.util.concurrent.TimeUnit
 
 @Service
 @ConditionalOnProperty(prefix = "aimo.mcp", name = ["enabled"], havingValue = "true", matchIfMissing = true)
-@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("\${aimo.mcp.discovery-interval-minutes:5} > 0")
+@ConditionalOnExpression("\${aimo.mcp.discovery-interval-minutes:5} > 0")
 class DiscoveryScheduler(
-    private val mcpClientManager: McpClientManager,
-    private val mcpProperties: McpProperties,
+    private val mcpClientManager: McpClientManager
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -33,11 +32,6 @@ class DiscoveryScheduler(
         initialDelayString = "1"
     )
     fun refreshTools() {
-        // Disable refresh when discovery-interval-minutes <= 0
-        if (mcpProperties.discoveryIntervalMinutes <= 0) {
-            return
-        }
-
         try {
             log.debug("Running MCP server refresh (discovery/retry)")
             mcpClientManager.refresh()

@@ -70,13 +70,17 @@ internal class AimoChatClientImpl (
     private val chatScope: ChatScope,
 ) : AimoChatClient {
 
-    // Map tool callbacks by name for O(1) lookup during tool invocation.
-    // Uses getAllTools() (not the static `tools` field) so provider-sourced tools
+    // Fetch all tools once to ensure consistency between toolCallbacks and toolDefinitions.
+    // Uses getAllTools() (not the static `tools` field) so  provider-sourced tools
     // (e.g. MCP server tools) are included alongside statically registered ones.
-    private val toolCallbacks: Map<String, ToolCallback> = chatScope.getAllTools().associateBy { it.toolDefinition.name }
+    // Called once at initialization to avoid concurrent changes creating inconsistencies.
+    private val allToolCallbacks: List<ToolCallback> = chatScope.getAllTools()
+
+    // Map tool callbacks by name for O(1) lookup during tool invocation.
+    private val toolCallbacks: Map<String, ToolCallback> = allToolCallbacks.associateBy { it.toolDefinition.name }
 
     // Tool definitions sent to the model (extracted from callbacks)
-    private val toolDefinitions: List<ToolDefinition> = chatScope.getAllTools().map { it.toolDefinition }
+    private val toolDefinitions: List<ToolDefinition> = allToolCallbacks.map { it.toolDefinition }
 
     // System messages from the scope (includes provider-sourced messages)
     private val systemMessages: List<SystemMessageCallback> = chatScope.getAllSystemMessages()
