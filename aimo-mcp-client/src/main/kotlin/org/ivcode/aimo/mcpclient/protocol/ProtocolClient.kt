@@ -80,10 +80,18 @@ class ProtocolClient(
                     // Continue reading even if parse fails
                 }
             } catch (e: java.io.IOException) {
-                // Expected when no message arrives within the poll timeout; keep listening.
-                // This is normal idle behavior when there are no pending requests.
-                if (running) {
-                    log.debug("No message received within timeout, continuing to listen...")
+                // HttpTransport uses IOException for idle receive timeouts; stdio I/O errors should stop the reader.
+                val isHttpIdleTimeout =
+                    transport is org.ivcode.aimo.mcpclient.protocol.transport.HttpTransport &&
+                        e.message?.startsWith("Timeout waiting for message") == true
+
+                if (running && isHttpIdleTimeout) {
+                    log.trace("No message received within timeout, continuing to listen...")
+                } else {
+                    if (running) {
+                        log.error("Transport I/O error while reading messages; stopping reader thread", e)
+                    }
+                    break
                 }
             } catch (e: Exception) {
                 if (running) {
