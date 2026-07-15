@@ -180,7 +180,7 @@ internal class AimoChatClientImpl (
                  history = history.orEmpty(),
                  execute = { promptMessages ->
                     // Build the final prompt with budgeted history
-                    val prompt = AimoPrompt (
+                    val prompt = AimoPrompt(
                         tools = toolDefinitions,
                         systemMessages = this.systemMessages,
                         options = null,
