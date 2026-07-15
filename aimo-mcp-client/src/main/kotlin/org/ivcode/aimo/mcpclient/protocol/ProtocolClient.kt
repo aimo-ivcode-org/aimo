@@ -109,6 +109,12 @@ class ProtocolClient(
 
     private fun closeReader() {
         running = false
+        try {
+            transport.disconnect()
+        } catch (e: Exception) {
+            log.debug("Error disconnecting transport after reader shutdown", e)
+        }
+
         val disconnectError = McpProtocolException("Reader thread stopped; connection lost")
         pendingRequests.forEach { (id, future) ->
             if (!future.isDone) {
