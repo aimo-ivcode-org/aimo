@@ -1,11 +1,9 @@
 package org.ivcode.aimo.core.chatservice
 
 /**
- * Default implementation of [ChatServiceProviderManager] that holds a mutable list
- * of providers.
+ * Default implementation of [ChatServiceProviderManager] backed by a fixed list of providers.
  *
- * This allows providers to be registered at startup (via Spring bean injection) and
- * accessed dynamically at runtime by scope-building code.
+ * Providers are registered at startup (via Spring bean injection) and can be queried at runtime.
  */
 class ChatServiceProviderManagerImpl(
     private val providers: List<ChatServiceProvider> = emptyList()
