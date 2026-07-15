@@ -7,6 +7,14 @@ class ConfigurationValidator(private val definedScopes: Set<String>) {
     private val log = LoggerFactory.getLogger(javaClass)
 
     fun validate(config: McpServerConfig) {
+        val duplicateIds = config.servers
+            .groupBy { it.id }
+            .filterValues { it.size > 1 }
+            .keys
+        require(duplicateIds.isEmpty()) {
+            "Duplicate MCP server ids are not allowed: ${duplicateIds.joinToString(", ")}"
+        }
+
         for (server in config.servers) {
             validateServer(server)
         }

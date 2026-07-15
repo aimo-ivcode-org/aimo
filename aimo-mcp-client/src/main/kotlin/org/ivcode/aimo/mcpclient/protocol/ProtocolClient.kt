@@ -103,9 +103,11 @@ class ProtocolClient(
     }
 
     private fun handleMessage(jsonNode: JsonNode) {
-        val id = jsonNode.get("id")?.let {
-            // Handle both string and numeric IDs
-            if (it.isTextual) it.asText() else it.toString()
+        val idNode = jsonNode.get("id")
+        val id = when {
+            idNode == null || idNode.isNull -> null
+            idNode.isTextual -> idNode.asText()
+            else -> idNode.toString()
         }
 
         if (id != null) {

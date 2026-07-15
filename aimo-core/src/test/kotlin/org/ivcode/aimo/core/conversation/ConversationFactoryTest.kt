@@ -131,7 +131,7 @@ class ConversationFactoryTest {
 
         val requestId = UUID.randomUUID()
         val messages = listOf(
-            AimoChatMessage (
+            AimoChatMessage(
                 messageId = 1,
                 type = AimoChatMessageType.USER,
                 content = "Test message",
