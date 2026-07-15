@@ -78,10 +78,13 @@ class McpSystemMessageCallback(
 
             if (response.error != null) {
                 log.error("Prompt call failed: serverId=$serverId prompt=$promptName error=${response.error.message}")
-                return "Error: ${response.error.message}"
+                return null
             }
 
-            val result = response.result ?: return "Prompt execution returned no result"
+            val result = response.result ?: run {
+                log.warn("Prompt execution returned no result: serverId=$serverId prompt=$promptName")
+                return null
+            }
 
             // MCP prompts/get returns { messages: [...] } where each message has text content
             val messages = result.get("messages")
@@ -94,7 +97,7 @@ class McpSystemMessageCallback(
             }
         } catch (e: Exception) {
             log.error("System message callback execution failed: serverId=$serverId prompt=$promptName", e)
-            "Error executing prompt: ${e.message}"
+            null
         }
     }
 }
