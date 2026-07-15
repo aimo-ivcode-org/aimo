@@ -152,7 +152,7 @@ class McpClientManager(
             is McpServerConfig.Transport.SseTransport -> {
                 val sse = server.transport as McpServerConfig.Transport.SseTransport
                 // Treat SSE transport as Streamable HTTP with SSE response support.
-                HttpTransport(sse.url, sse.authToken, objectMapper)
+                HttpTransport(sse.url, sse.authToken, "2025-11-25", objectMapper)
             }
         }
 

@@ -56,6 +56,7 @@ internal class OllamaChatEngineImpl(
 
     override fun call(prompt: AimoPrompt, callback: (AimoChatResponse) -> Unit): AimoChatResponse {
         val request = buildRequest(prompt, stream = true)
+        var messageId = 0
         val response = client.chat(request) { chunk ->
             callback(toAimoChatResponse(chunk, done = chunk.done, messageId = messageId++))
         }
