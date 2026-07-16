@@ -45,9 +45,9 @@ class ProtocolClient(
         }
     }
 
-    fun disconnect() {
-        running = false
-        transport.disconnect()
+fun disconnect() {
+        closeReader()
+        messageReaderThread?.interrupt()
         try {
             messageReaderThread?.join(5000)
         } catch (e: InterruptedException) {
@@ -167,12 +167,15 @@ class ProtocolClient(
         }
     }
 
-    fun sendRequest(method: String, params: JsonNode? = null, timeoutMs: Long = 60000): JsonRpcResponse {
+fun sendRequest(method: String, params: JsonNode? = null, timeoutMs: Long = 60000): JsonRpcResponse {
+        if (!running) {
+            throw McpProtocolException("Cannot send request '$method' because the protocol client is disconnected")
+        }
+
         val id = UUID.randomUUID().toString()
         val request = JsonRpcRequest(method = method, params = params, id = id)
         val future = CompletableFuture<JsonRpcResponse>()
         pendingRequests[id] = future
-
         return try {
             val requestJson = objectMapper.writeValueAsString(request)
             log.debug("Sending request: method=$method id=$id")

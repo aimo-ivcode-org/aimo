@@ -74,9 +74,10 @@ class StdioTransport(
         }
     }
 
-    override fun receive(): String {
-        val line = reader?.readLine() ?: throw IOException("Stdio reader closed unexpectedly")
-        if (line.isEmpty()) throw IOException("Empty message received")
-        return line
+override fun receive(): String {
+        while (true) {
+            val line = reader?.readLine() ?: throw IOException("Stdio reader closed unexpectedly")
+            if (line.isNotEmpty()) return line
+        }
     }
 }
