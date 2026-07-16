@@ -32,8 +32,8 @@ class StdioTransport(
             processBuilder.redirectErrorStream(true)
             process = processBuilder.start()
             
-            writer = BufferedWriter(OutputStreamWriter(process!!.outputStream))
-            reader = BufferedReader(InputStreamReader(process!!.inputStream))
+            writer = BufferedWriter(OutputStreamWriter(process!!.outputStream, Charsets.UTF_8))
+            reader = BufferedReader(InputStreamReader(process!!.inputStream, Charsets.UTF_8))
             
             log.info("Stdio transport connected: command=$command args=$args")
         } catch (e: Exception) {

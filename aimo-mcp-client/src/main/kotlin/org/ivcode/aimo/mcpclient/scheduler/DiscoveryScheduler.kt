@@ -32,8 +32,8 @@ class DiscoveryScheduler(
         initialDelayString = "1"
     )
     fun refreshTools() {
+        if (mcpClientManager.getServerIds().isEmpty()) return
         try {
-            log.debug("Running MCP server refresh (discovery/retry)")
             mcpClientManager.refresh()
             log.debug("MCP refresh completed")
         } catch (e: Exception) {

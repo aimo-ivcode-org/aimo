@@ -141,8 +141,7 @@ The system SHALL apply the same scope rules to MCP servers that apply to annotat
 |---|---|
 | `[]` (empty) | No restriction — tools are available in the built-in global scope and unrestricted contexts |
 | `["research", "admin"]` | Tools are available only in the named scopes listed; they are excluded from the built-in global scope |
-| `["global"]` | Tools are available only in a named scope called `"global"`, not in the built-in global scope |
-
+| `["global"]` | Invalid/reserved — `global` is the built-in scope id and cannot be referenced as a named scope; configuration should fail validation |
 #### Scenario: Empty scope list is configured
 - **WHEN** a server is configured with `scope: []`
 - **THEN** its tools are treated as unrestricted and appear in the built-in global scope

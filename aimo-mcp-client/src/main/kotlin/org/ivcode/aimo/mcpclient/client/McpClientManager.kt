@@ -61,9 +61,9 @@ class McpClientManager(
             }
         }
 
-        val successCount = allCallbacks.count { it.value.isNotEmpty() }
-        val failedCount = serverConfig.servers.size - successCount
-        log.info("MCP initialization complete: $successCount/${ serverConfig.servers.size} servers initialized, $failedCount will retry on refresh")
+        val successCount = serverClients.values.count { it.protocolClient != null }
+        val failedCount = serverClients.size - successCount
+        log.info("MCP initialization complete: $successCount/${serverConfig.servers.size} servers initialized, $failedCount will retry on refresh")
 
         return allCallbacks
     }
