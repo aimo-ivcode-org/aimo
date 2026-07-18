@@ -1,5 +1,6 @@
 package org.ivcode.aimo.mcpclient.validation
 
+import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.mcpclient.config.McpServerConfig
 import org.slf4j.LoggerFactory
 
@@ -40,6 +41,9 @@ class ConfigurationValidator(private val definedScopes: Set<String>) {
         }
 
         for (scope in server.scope) {
+            if (scope == ChatScopeProvider.GLOBAL_SCOPE_ID) {
+                throw IllegalArgumentException("Server '${server.id}' cannot use reserved scope '${ChatScopeProvider.GLOBAL_SCOPE_ID}' (built-in global scope is always available)")
+            }
             if (!definedScopes.contains(scope)) {
                 throw IllegalArgumentException("Server '${server.id}' references unknown scope '$scope'")
             }

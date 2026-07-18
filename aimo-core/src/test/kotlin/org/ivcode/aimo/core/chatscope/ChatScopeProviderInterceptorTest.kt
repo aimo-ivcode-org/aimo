@@ -100,7 +100,7 @@ class ChatScopeProviderInterceptorTest {
 
         val globalScope = provider.getGlobalScope()
 
-        assertEquals("global", globalScope.id)
+        assertEquals(ChatScopeProvider.GLOBAL_SCOPE_ID, globalScope.id)
     }
 
     // Helper classes and functions

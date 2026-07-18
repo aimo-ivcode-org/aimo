@@ -43,7 +43,7 @@ class ChatScopeProviderImpl(
             }
 
         ChatScope(
-            id = "global",
+            id = ChatScopeProvider.GLOBAL_SCOPE_ID,
             displayName = "Global",
             description = "Default scope with unrestricted tools and system messages",
             // Include ALL registered providers (annotated, MCP, etc). ChatScope.getAllTools()/
@@ -76,7 +76,7 @@ class ChatScopeProviderImpl(
     }
 
     override fun getScope(id: String, context: Map<String, Any>): ChatScope? {
-        val scope = if (id == "global") globalScope else predefinedScopes[id]
+        val scope = if (id == ChatScopeProvider.GLOBAL_SCOPE_ID) globalScope else predefinedScopes[id]
         if (scope == null) return null
 
         if (interceptors.isEmpty()) return scope

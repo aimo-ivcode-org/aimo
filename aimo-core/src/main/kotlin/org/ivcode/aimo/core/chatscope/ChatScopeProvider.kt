@@ -11,6 +11,10 @@ package org.ivcode.aimo.core.chatscope
  * messages with no scope restrictions (available to all scopes).
  */
 interface ChatScopeProvider {
+    companion object {
+        // Internal scope id for the built-in global scope (not exposed as a user-selectable scope name)
+        const val GLOBAL_SCOPE_ID = ""
+    }
     /**
      * Get all available scopes after applying any interceptors.
      *

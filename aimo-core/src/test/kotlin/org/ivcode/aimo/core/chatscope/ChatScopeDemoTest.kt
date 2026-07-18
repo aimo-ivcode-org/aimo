@@ -108,7 +108,7 @@ class ChatScopeDemoTest {
         val publicScope = chatScopeProvider.getScope("public")!!
         val adminScope = chatScopeProvider.getScope("admin")!!
         val researchScope = chatScopeProvider.getScope("research")!!
-        val globalScope = chatScopeProvider.getScope("global")!!
+        val globalScope = chatScopeProvider.getScope(ChatScopeProvider.GLOBAL_SCOPE_ID)!!
 
         val publicTools = publicScope.tools.map { it.toolDefinition.name }
         val adminTools = adminScope.tools.map { it.toolDefinition.name }
@@ -191,7 +191,7 @@ class ChatScopeDemoTest {
 
     @Test
     fun `system messages are defined for global scope`() {
-        val globalScope = chatScopeProvider.getScope("global")
+        val globalScope = chatScopeProvider.getScope(ChatScopeProvider.GLOBAL_SCOPE_ID)
         requireNotNull(globalScope) { "global scope should exist" }
 
         val systemMessages = globalScope.systemMessages
