@@ -123,16 +123,16 @@ The system SHALL validate tool references against the combined set of annotated 
 - **THEN** validation fails before the application serves chat requests
 
 ### Requirement: Refreshable MCP discovery / retry
-The system SHALL support manual and periodic MCP connectivity retry. Tool-set updates SHOULD be handled via MCP `tools/listChanged` notifications when supported by the server.
+The system SHALL support manual and periodic MCP connectivity retry via the `McpClientManager.refresh()` API. Tool-set updates SHOULD be handled via MCP `tools/listChanged` notifications when supported by the server. HTTP endpoint exposure for refresh is a server-layer concern and outside the scope of this client library.
 
-#### Scenario: Admin refresh is invoked
-- **WHEN** an HTTP `POST` request is made to `/aimo-api/admin/mcp-servers/refresh`
+#### Scenario: Refresh is called programmatically
+- **WHEN** `McpClientManager.refresh()` is invoked (by server layer or other client)
 - **THEN** the module attempts to (re)initialize any failed/unreachable MCP servers
-- **AND** returns a response listing each server and whether the refresh/retry succeeded
+- **AND** returns a map listing each server and whether the refresh/retry succeeded
 
 #### Scenario: Scheduled refresh runs
 - **WHEN** the discovery scheduler executes (interval set by `aimo.mcp.discovery-interval-minutes`; disabled when set to `0`)
-- **THEN** the module performs the same retry behavior as the manual refresh endpoint
+- **THEN** the module performs the same retry behavior as the programmatic refresh API
 
 ### Requirement: MCP server scope configuration semantics
 The system SHALL apply the same scope rules to MCP servers that apply to annotated `@ChatService` beans. There are no wildcards; every entry in `scope` is treated as a literal scope name.
