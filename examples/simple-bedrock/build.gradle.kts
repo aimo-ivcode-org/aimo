@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":aimo-server"))
     implementation(project(":aimo-plugin-ui"))
     implementation(project(":aimo-model-bedrock"))
+    implementation(project(":aimo-mcp-client"))
 
     // Spring-Boot
     implementation("org.springframework.boot:spring-boot-starter-webmvc")

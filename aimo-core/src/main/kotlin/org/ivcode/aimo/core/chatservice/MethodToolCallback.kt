@@ -1,7 +1,7 @@
 package org.ivcode.aimo.core.chatservice
 
-import org.ivcode.aimo.core.model.AimoToolCallback
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.ToolCallback
+import org.ivcode.aimo.core.model.ToolDefinition
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.lang.reflect.Method
@@ -12,7 +12,7 @@ import kotlin.reflect.jvm.javaType
 import kotlin.reflect.jvm.kotlinFunction
 
 /**
- * Reflection-backed [AimoToolCallback] implementation for a single Kotlin tool method.
+ * Reflection-backed [ToolCallback] implementation for a single Kotlin tool method.
  *
  * This class is intentionally isolated from current controller discovery/integration code.
  * It only knows how to:
@@ -30,12 +30,13 @@ import kotlin.reflect.jvm.kotlinFunction
  * - Argument binding currently expects a JSON object payload for named parameters.
  * - A context parameter is recognized only when the parameter name is `context` and its raw type is [Map].
  */
-class MethodAimoToolCallback(
+class MethodToolCallback(
     private val target: Any,
     private val method: Method,
-    override val toolDefinition: AimoToolDefinition,
+    override val toolDefinition: ToolDefinition,
+    override val scopes: Set<String>,
     private val objectMapper: ObjectMapper,
-) : AimoToolCallback {
+) : ToolCallback {
 
     private val function = method.kotlinFunction
         ?: throw IllegalArgumentException(
@@ -167,9 +168,9 @@ class MethodAimoToolCallback(
         private const val CONTEXT_PARAMETER_NAME = "context"
 
         /**
-         * Creates a [MethodAimoToolCallback] from an annotated tool method.
+         * Creates a [MethodToolCallback] from an annotated tool method.
          *
-         * The factory derives [AimoToolDefinition] metadata from the method's [Tool]
+         * The factory derives [ToolDefinition] metadata from the method's [Tool]
          * annotation and builds a basic JSON Schema object for the non-context
          * parameters expected by the tool.
          */
@@ -177,7 +178,8 @@ class MethodAimoToolCallback(
             target: Any,
             method: Method,
             objectMapper: ObjectMapper,
-        ): MethodAimoToolCallback = toAimoToolCallback(target, method, objectMapper)
+            scopes: Set<String> = emptySet(),
+        ): MethodToolCallback = toToolCallback(target, method, objectMapper, scopes)
     }
 }
 

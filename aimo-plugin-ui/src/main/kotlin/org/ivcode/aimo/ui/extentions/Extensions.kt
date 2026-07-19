@@ -1,7 +1,7 @@
 package org.ivcode.aimo.ui.extentions
 
-import org.ivcode.aimo.core.AimoConversationInfo
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.model.AimoConversationInfo
 import org.ivcode.aimo.ui.model.ConversationTitle
 import java.util.UUID
 
@@ -52,4 +52,3 @@ fun Conversation.setTitle(title: String, source: String = DEFAULT_TITLE_SOURCE):
 fun getTitle(chatId: UUID, metadata: Map<String, Any>): ConversationTitle? {
     return toConversationTitle(metadata[PROPERTY_NAME__TITLE], chatId)
 }
-

@@ -1,7 +1,7 @@
 package org.ivcode.aimo.core.conversation
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals

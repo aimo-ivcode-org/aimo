@@ -4,7 +4,7 @@ import org.ivcode.aimo.core.chatservice.ChatService
 import org.ivcode.aimo.core.chatservice.SystemMessage
 import org.ivcode.aimo.core.chatservice.Tool
 import org.ivcode.aimo.core.chatservice.ToolParam
-import org.ivcode.aimo.core.chatservice.toAimoToolCallbacks
+import org.ivcode.aimo.core.chatservice.toToolCallbacks
 import org.ivcode.aimo.core.chatservice.toSystemMessageCallbacks
 import org.ivcode.aimo.core.properties.AimoChatScopeProperties
 import tools.jackson.databind.ObjectMapper
@@ -88,14 +88,14 @@ class ChatScopeYamlDefinitionTest {
         // Tools with and without scopes
         val service = FilteredToolService()
         val parentServiceScopes = setOf("research", "admin")
-        val scopedTools = toAimoToolCallbacks(service, objectMapper, parentServiceScopes)
+        val scopedTools = toToolCallbacks(service, objectMapper, parentServiceScopes)
 
         // Tool "research_search" has @Tool(scope=["research"])
         // Tool "general_help" has no scope annotation
         assertEquals(2, scopedTools.size)
 
-        val researchTool = scopedTools.find { it.callback.toolDefinition.name == "research_search" }
-        val generalTool = scopedTools.find { it.callback.toolDefinition.name == "general_help" }
+        val researchTool = scopedTools.find { it.toolDefinition.name == "research_search" }
+        val generalTool = scopedTools.find { it.toolDefinition.name == "general_help" }
 
         // research_tool scopes from annotation
         assertEquals(setOf("research"), researchTool!!.scopes, "Research tool should have declared scope")
@@ -124,22 +124,22 @@ class ChatScopeYamlDefinitionTest {
     @Test
     fun `tool names are discovered correctly from annotations`() {
         val service = TestToolService()
-        val tools = toAimoToolCallbacks(service, objectMapper, emptySet())
+        val tools = toToolCallbacks(service, objectMapper, emptySet())
 
-        val toolNames = tools.map { it.callback.toolDefinition.name }
+        val toolNames = tools.map { it.toolDefinition.name }
         assertTrue(toolNames.contains("searchPapers"), "searchPapers tool should be discovered")
         assertTrue(toolNames.contains("analyzeData"), "analyzeData tool should be discovered")
     }
 
-    @Test
-    fun `system message names are discovered correctly from annotations`() {
-        val service = TestMessageService()
-        val messages = toSystemMessageCallbacks(service, emptySet())
+     @Test
+     fun `system message names are discovered correctly from annotations`() {
+         val service = TestMessageService()
+         val messages = toSystemMessageCallbacks(service, emptySet())
 
-        val messageNames = messages.map { it.name }
-        assertTrue(messageNames.contains("admin_prompt"), "admin_prompt message should be discovered")
-        assertTrue(messageNames.contains("research_insight"), "research_insight message should be discovered")
-    }
+         val messageNames = messages.map { it.name }
+         assertTrue(messageNames.contains("admin_prompt"), "admin_prompt message should be discovered")
+         assertTrue(messageNames.contains("research_insight"), "research_insight message should be discovered")
+     }
 
     @Test
     fun `scope properties can store and retrieve all reference types`() {

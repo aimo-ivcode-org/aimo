@@ -3,3 +3,22 @@ spring:
     async:
       request-timeout: 0s
 
+aimo:
+  mcp:
+    enabled: true                                 # Enable/disable MCP client module
+    required: true                                # Fail startup if MCP servers unreachable (false = optional)
+    discovery-interval-minutes: 5                 # Periodic refresh interval (0 = disabled)
+    servers: []                                   # List of configured MCP servers
+    # servers:
+    #   - id: my-stdio-server
+    #     transport:
+    #       type: stdio
+    #       command: /path/to/mcp-server
+    #       args: []
+    #     scope: []
+    #   - id: my-sse-server
+    #     transport:
+    #       type: sse
+    #       url: http://example.com/mcp
+    #       auth-token: ${MCP_TOKEN}
+    #     scope: [research, admin]

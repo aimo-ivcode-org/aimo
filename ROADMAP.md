@@ -200,37 +200,105 @@ For detailed ChatScope documentation and examples, see:
 - **AGENTS.md**: "Chat Scopes (Phase 2)" technical section
 - **aimo-core tests**: 15 integration tests demonstrating all features
 
+#### Missed Requirement: Programmatic Scope Builder
+**Status**: Future work. Can be added post-Phase 2 to enhance scope management capabilities.
+
+**Problem**: Current implementation only supports scope configuration via YAML or annotation discovery. There's no programmatic way to:
+- Build custom scopes at runtime from scratch
+- Add `ToolCallback` instances to scopes dynamically
+- Parse annotated classes and extract tools/system messages programmatically
+- Create scopes from MCP server definitions at runtime
+
+**Solution**: Implement a **ChatScopeBuilder** fluent API:
+
+```kotlin
+// Builder for creating scopes programmatically
+val customScope = ChatScopeBuilder(id = "custom_research")
+    .displayName("Custom Research")
+    .description("Dynamically built research scope")
+    // Parse @ChatService annotated class
+    .withAnnotatedService(MyResearchService::class)
+    // Add individual tools manually
+    .withToolCallback(myToolCallback1)
+    .withToolCallback(myToolCallback2)
+    // Add system messages
+    .withSystemMessage(mySystemMessageCallback)
+    .withSystemMessageByName("research_guide")
+    .build()  // Returns ChatScope
+```
+
+**Implementation Phases**:
+
+1. **Phase 2.5a: Annotation-Based Builder**
+   - `ChatScopeBuilder.withAnnotatedService(clazz)` — parse `@ChatService` class, extract `@Tool` and `@SystemMessage` members
+   - Reuse existing reflection/annotation discovery logic from `AimoConfig`
+   - Validate scope constraints (subset validation)
+
+2. **Phase 2.5b: Manual Tool Registration**
+   - `ChatScopeBuilder.withToolCallback(callback)` — manually add individual tools
+   - `ChatScopeBuilder.withSystemMessage(callback)` — manually add individual messages
+   - Support for creating one-off tools without needing `@ChatService` beans
+
+3. **Phase 2.5c: MCP Integration** (deferred until Phase 3)
+   - `ChatScopeBuilder.withMcpServerTools(serverId, toolNames)` — cherry-pick MCP tools by name (use `"{serverId}:{toolName}"` naming)
+   - Requires MCP tool registry to be accessible (inject `List<ScopedToolCallback>` from `aimo-mcp`)
+   - Support glob patterns: `"claude-desktop:*"` to include all tools from a server
+
+**Files to Create** (Missed Requirement):
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeBuilder.kt`
+- `aimo-core/src/main/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeBuilderImpl.kt`
+- `aimo-core/src/test/kotlin/org/ivcode/aimo/core/chatscope/ChatScopeBuilderTest.kt`
+
+**Why This Matters**:
+- Enables dynamic scope creation at runtime (not just YAML/annotations)
+- Allows frameworks/applications to programmatically compose scopes from multiple sources
+- Supports runtime scope modifications (add/remove tools from a scope)
+- Necessary for advanced use cases: multi-tenant scoping, user-specific scopes, A/B testing different tool sets
+
+**Rationale for Deferred Implementation**:
+- Should have been part of Phase 2 but wasn't prioritized initially
+- Can be added as a post-Phase 2 enhancement without blocking Phase 3
+- YAML-based configuration sufficient for initial use cases
+- Will inform future programmatic APIs for other components
+
 
 ### Phase 3: MCP Tool Consuming
 **Goal**: Enable AIMO agents to discover and consume MCP tools from external MCP servers
 
-**Status**: Ready to implement. Builds on Phase 2 ChatScopes infrastructure.
+**Status**: ✅ IMPLEMENTED - MCP client with tools and prompts integration (July 2026)
 
 **Overview**:
-- AIMO agents can discover MCP tools from external servers (Claude Desktop, Cline, etc.)
-- External MCP tools are wrapped and exposed as AIMO `@Tool` resources
-- Tools integrate seamlessly with scope and system message architecture
-- Tool results flow naturally through conversation context
-- No need to wait on provider implementation - focus on consuming existing MCP servers
+- ✅ AIMO agents can discover MCP tools from external servers (Claude Desktop, Cline, etc.)
+- ✅ External MCP tools are wrapped and exposed as AIMO `@Tool` resources
+- ✅ Tools integrate seamlessly with scope and system message architecture
+- ✅ Tool results flow naturally through conversation context
+- ✅ MCP prompts (system messages) are discovered and included in chat context
+- ✅ Prompts respect scope restrictions and are named `{serverId}:{promptName}`
 
 **Key Features**:
-- MCP Client: Connect to external MCP servers and discover available tools
-- Tool Wrapping: Auto-wrap MCP tool definitions as AIMO `@Tool` resources
-- Schema Conversion: Convert MCP tool schemas to AIMO parameter definitions
-- Scope Integration: Wrapped tools respect scope restrictions
-- Multi-Server Support: Connect to multiple MCP servers simultaneously
+- ✅ MCP Client: Connect to external MCP servers and discover available tools and prompts
+- ✅ Tool Wrapping: Auto-wrap MCP tool definitions as AIMO `@Tool` resources
+- ✅ Prompt Wrapping: Auto-wrap MCP prompts as AIMO `@SystemMessage` resources
+- ✅ Schema Conversion: Convert MCP tool/prompt schemas to AIMO parameter definitions
+- ✅ Scope Integration: Wrapped tools and prompts respect scope restrictions
+- ✅ Multi-Server Support: Connect to multiple MCP servers simultaneously
+- ✅ Dynamic Updates: Handle `tools/listChanged` and `prompts/listChanged` notifications
+- ✅ Refresh Support: Manual and periodic re-discovery of tools and prompts
 
 **Use Cases**:
 - External Tool Consumption: Integrate tools from Claude Desktop, Cline, other MCP servers
+- External Prompt Consumption: Get domain-specific system messages and context from MCP servers
 - Multi-Agent Coordination: One agent calls another agent's MCP-exposed tools
 - Third-Party Tool Integration: Quickly add specialized tools without code changes
+- Contextual Instructions: Integrate server-provided prompts for specific workflows
 
 **Deliverables**:
-- MCP client implementation with server discovery
-- Tool wrapping/conversion framework
-- Integration with existing `@Tool` and scope infrastructure
-- Example workflows showing MCP tool consumption
-- Documentation on connecting to external MCP servers
+- ✅ MCP client implementation with server and prompt discovery
+- ✅ Tool wrapping/conversion framework
+- ✅ Prompt wrapping/conversion framework
+- ✅ Integration with existing `@Tool`, `@SystemMessage` and scope infrastructure
+- ✅ Example workflows showing MCP tool and prompt consumption
+- ✅ Documentation on connecting to external MCP servers and using prompts
 
 ### Phase 3.5: MCP Tool Providing
 **Goal**: Enable AIMO to expose its tools as an MCP server for external agents to consume

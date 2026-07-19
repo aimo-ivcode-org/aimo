@@ -1,13 +1,13 @@
 package org.ivcode.aimo.ui.chatcontroller
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoConversationInfo
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.chatservice.ChatService
 import org.ivcode.aimo.core.chatservice.SystemMessage
 import org.ivcode.aimo.core.chatservice.Tool
 import org.ivcode.aimo.core.chatservice.ToolParam
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoConversationInfo
 import org.ivcode.aimo.core.util.getConversationClient
 import org.ivcode.aimo.ui.extentions.getTitle
 import org.ivcode.aimo.ui.extentions.setTitle
@@ -93,14 +93,14 @@ class TitleChatController(
              conversation.addMessages(
                  requestId = java.util.UUID.randomUUID(),
                  messages = listOf(
-                 AimoChatMessage (
-                     messageId = 1,
-                     type = AimoChatMessageType.TOOL,
-                     content = objectMapper.writeValueAsString(response),
-                     thinking = null,
-                     toolName = TITLE_TOOL_NAME,
-                     done = true
-                 )
+                     AimoChatMessage(
+                         messageId = 1,
+                         type = AimoChatMessageType.TOOL,
+                         content = objectMapper.writeValueAsString(response),
+                         thinking = null,
+                         toolName = TITLE_TOOL_NAME,
+                         done = true
+                     )
              ))
         }
 

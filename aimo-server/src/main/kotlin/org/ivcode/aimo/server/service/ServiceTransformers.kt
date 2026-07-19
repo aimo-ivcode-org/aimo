@@ -1,15 +1,15 @@
 package org.ivcode.aimo.server.service
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatRequest
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoHistoryRequest
-import org.ivcode.aimo.core.AimoConversationInfo
-import org.ivcode.aimo.core.AimoUsage
-import org.ivcode.aimo.core.AimoPromptCacheUsage
 import org.ivcode.aimo.core.dao.ChatConversationEntity
 import org.ivcode.aimo.core.dao.ChatRequestEntity
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatRequest
+import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoConversationInfo
+import org.ivcode.aimo.core.model.AimoHistoryRequest
+import org.ivcode.aimo.core.model.AimoPromptCacheUsage
+import org.ivcode.aimo.core.model.AimoUsage
 import org.ivcode.aimo.server.model.ChatHistoryRequest
 import org.ivcode.aimo.server.model.ChatMessage
 import org.ivcode.aimo.server.model.ChatRequest
@@ -19,7 +19,7 @@ import org.ivcode.aimo.server.model.ToolCall
 import org.ivcode.aimo.server.model.ChatUsage
 import org.ivcode.aimo.server.model.ChatPromptCacheUsage
 
-internal fun ChatRequest.toAimoChatRequest(context: Map<String, Any> = emptyMap()) = AimoChatRequest (
+internal fun ChatRequest.toAimoChatRequest(context: Map<String, Any> = emptyMap()) = AimoChatRequest(
     prompt = prompt,
     context = context
 )

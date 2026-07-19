@@ -1,14 +1,14 @@
 package org.ivcode.aimo.ollama.model
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoToolCall
-import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.model.AimoChatEngine
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoChatOptions
+import org.ivcode.aimo.core.model.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoPrompt
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.AimoToolCall
+import org.ivcode.aimo.core.model.AimoUsage
+import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.ollama.client.ChatRequest
 import org.ivcode.aimo.ollama.client.ChatResponse
 import org.ivcode.aimo.ollama.client.Function
@@ -19,11 +19,16 @@ import org.ivcode.aimo.ollama.client.Options
 import org.ivcode.aimo.ollama.client.Parameters
 import org.ivcode.aimo.ollama.client.Property
 import org.ivcode.aimo.ollama.client.Tool
+import org.ivcode.aimo.ollama.client.ToolCall
+import org.ivcode.aimo.ollama.client.ToolCallFunction
 import org.ivcode.aimo.ollama.client.Type
 import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.security.MessageDigest
 import java.util.UUID
+
+private val mapper = jacksonObjectMapper()
+private val schemaMapper = jacksonObjectMapper()
 
 /**
  * [AimoChatEngine] implementation that delegates to [OllamaChatClient].
@@ -38,8 +43,6 @@ internal class OllamaChatEngineImpl(
     private val modelName: String,
     override val options: AimoChatOptions,
 ) : AimoChatEngine {
-
-    private val mapper = jacksonObjectMapper()
 
     // -------------------------------------------------------------------------
     // AimoChatEngine
@@ -57,7 +60,8 @@ internal class OllamaChatEngineImpl(
         val response = client.chat(request) { chunk ->
             callback(toAimoChatResponse(chunk, done = chunk.done, messageId = messageId++))
         }
-        return toAimoChatResponse(response, done = true)
+        // Return the final merged response which includes all accumulated tool calls from streaming chunks
+        return toAimoChatResponse(response, done = true, messageId = 0)
     }
 
     // -------------------------------------------------------------------------
@@ -104,23 +108,23 @@ internal class OllamaChatEngineImpl(
         val toolCalls = msg.toolCalls
             ?.map { tc ->
                 AimoToolCall(
-                    id        = tc.id?.takeIf { it.isNotBlank() }
+                    id = tc.id?.takeIf { it.isNotBlank() }
                         ?: stableToolCallId(tc.function.name, tc.function.arguments),
-                    name      = tc.function.name,
+                    name = tc.function.name,
                     arguments = mapper.writeValueAsString(tc.function.arguments),
                 )
             }
             ?.takeIf { it.isNotEmpty() }
 
         val aimoMessage = AimoChatMessage(
-            messageId  = messageId,
-            type       = AimoChatMessageType.ASSISTANT,
-            content    = msg.content,
-            thinking   = msg.thinking?.takeIf { it.isNotBlank() },
-            toolName   = msg.toolName,
+            messageId = messageId,
+            type = AimoChatMessageType.ASSISTANT,
+            content = msg.content,
+            thinking = msg.thinking?.takeIf { it.isNotBlank() },
+            toolName = msg.toolName,
             toolCallId = null,
-            toolCalls  = toolCalls,
-            done       = done,
+            toolCalls = toolCalls,
+            done = done,
         )
 
         val promptEvalCount = response.promptEvalCount
@@ -176,16 +180,25 @@ private fun AimoChatMessage.toMessage(): Message {
         AimoChatMessageType.ASSISTANT -> "assistant"
         AimoChatMessageType.TOOL      -> "tool"
     }
+    val ollamaToolCalls = toolCalls?.map { tc ->
+        ToolCall(
+            id = tc.id,
+            function = ToolCallFunction(
+                name = tc.name,
+                arguments = mapper.readValue(tc.arguments, MutableMap::class.java) as Map<String, Any?>
+            )
+        )
+    }
     return Message(
         role      = role,
         content   = content.orEmpty(),
         thinking  = thinking,
-        toolCalls = null,   // history tool-calls are already encoded in content
+        toolCalls = ollamaToolCalls,
         toolName  = toolName,
     )
 }
 
-private fun AimoToolDefinition.toTool(): Tool =
+private fun ToolDefinition.toTool(): Tool =
     Tool(function = Function(
         name        = name,
         description = description,
@@ -199,8 +212,6 @@ private fun AimoToolDefinition.toTool(): Tool =
  * We round-trip through `treeToValue` → plain `Map` to avoid fighting with
  * Jackson 3's iterator API at the Kotlin type-inference level.
  */
-private val schemaMapper = jacksonObjectMapper()
-
 @Suppress("UNCHECKED_CAST")
 private fun JsonNode.toParameters(): Parameters {
     val raw = schemaMapper.treeToValue(this, MutableMap::class.java) as Map<String, Any?>

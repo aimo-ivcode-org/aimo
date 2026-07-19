@@ -47,3 +47,7 @@ node_modules/
 
 ### Data ###
 data/
+
+### Open-Spec ###
+.github/skills/openspec*
+.github/prompts/opsx*

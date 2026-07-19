@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core.chatscope
 
-import org.ivcode.aimo.core.model.AimoToolCallback
+import org.ivcode.aimo.core.model.ToolCallback
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
 class ChatScopeDemoTest {
 
     @Autowired
-    private lateinit var allTools: List<AimoToolCallback>
+    private lateinit var allTools: List<ToolCallback>
 
     @Autowired
     private lateinit var chatScopeProvider: ChatScopeProvider
@@ -108,7 +108,7 @@ class ChatScopeDemoTest {
         val publicScope = chatScopeProvider.getScope("public")!!
         val adminScope = chatScopeProvider.getScope("admin")!!
         val researchScope = chatScopeProvider.getScope("research")!!
-        val globalScope = chatScopeProvider.getScope("global")!!
+        val globalScope = chatScopeProvider.getScope(ChatScopeProvider.GLOBAL_SCOPE_ID)!!
 
         val publicTools = publicScope.tools.map { it.toolDefinition.name }
         val adminTools = adminScope.tools.map { it.toolDefinition.name }
@@ -191,7 +191,7 @@ class ChatScopeDemoTest {
 
     @Test
     fun `system messages are defined for global scope`() {
-        val globalScope = chatScopeProvider.getScope("global")
+        val globalScope = chatScopeProvider.getScope(ChatScopeProvider.GLOBAL_SCOPE_ID)
         requireNotNull(globalScope) { "global scope should exist" }
 
         val systemMessages = globalScope.systemMessages

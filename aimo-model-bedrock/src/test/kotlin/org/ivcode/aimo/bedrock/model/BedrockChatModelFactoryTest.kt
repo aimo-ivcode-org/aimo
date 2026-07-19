@@ -3,13 +3,14 @@ package org.ivcode.aimo.bedrock.model
 import org.ivcode.aimo.bedrock.BedrockModelProperties
 import org.ivcode.aimo.bedrock.BedrockContextProperties
 import org.ivcode.aimo.bedrock.PromptCachingStrategy
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoPrompt
-import org.ivcode.aimo.core.model.AimoToolDefinition
 import org.ivcode.aimo.bedrock.client.ConverseRequest
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.ToolDefinition
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -307,10 +308,10 @@ class BedrockChatModelFactoryTest {
                 )
             ),
             tools = listOf(
-                AimoToolDefinition(
+                ToolDefinition(
                     name = "get_title",
                     description = "Gets title",
-                    inputSchema = tools.jackson.module.kotlin.jacksonObjectMapper().createObjectNode().put("type", "object"),
+                    inputSchema = jacksonObjectMapper().createObjectNode().put("type", "object"),
                 )
             )
         )

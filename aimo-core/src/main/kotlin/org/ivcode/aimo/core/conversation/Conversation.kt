@@ -1,6 +1,6 @@
 package org.ivcode.aimo.core.conversation
 
-import org.ivcode.aimo.core.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessage
 import java.util.UUID
 
 /**

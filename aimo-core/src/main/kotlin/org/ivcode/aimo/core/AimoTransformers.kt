@@ -3,6 +3,10 @@ package org.ivcode.aimo.core
 import org.ivcode.aimo.core.dao.ChatMessageEntity
 import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.dao.ChatConversationEntity
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoConversationInfo
+import org.ivcode.aimo.core.model.AimoHistoryRequest
 import java.util.UUID
 
 internal fun ChatConversationEntity.toAimoConversationInfo(): AimoConversationInfo = AimoConversationInfo (
@@ -17,7 +21,7 @@ internal fun ChatRequestEntity.toAimoHistoryRequest(): AimoHistoryRequest = Aimo
     createdAt = createdAt
 )
 
-internal fun ChatMessageEntity.toAimoChatMessage() = AimoChatMessage (
+internal fun ChatMessageEntity.toAimoChatMessage() = AimoChatMessage(
     messageId = messageId,
     type = type.toAimoChatMessageType(),
     content = content,

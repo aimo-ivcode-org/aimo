@@ -1,8 +1,8 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.model.AimoToolCallback
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.ToolCallback
 import org.slf4j.LoggerFactory
 import kotlin.math.ceil
 
@@ -66,7 +66,7 @@ internal class ContextWindowPromptBudgeter(
         history: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
-        tools: List<AimoToolCallback>,
+        tools: List<ToolCallback>,
     ): List<AimoChatMessage> {
         return createPromptPlan(
             systemMessages = systemMessages,
@@ -96,7 +96,7 @@ internal class ContextWindowPromptBudgeter(
         systemMessages: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
-        tools: List<AimoToolCallback>,
+        tools: List<ToolCallback>,
         history: List<AimoChatMessage>,
         execute: (promptMessages: List<AimoChatMessage>) -> AimoChatResponse,
     ): AimoChatResponse {
@@ -224,7 +224,7 @@ internal class ContextWindowPromptBudgeter(
      * @param tools Tool callbacks available to the model call.
      * @return Estimated aggregate token count for all tool definitions.
      */
-    private fun estimateToolTokens(tools: List<AimoToolCallback>): Int {
+    private fun estimateToolTokens(tools: List<ToolCallback>): Int {
         return tools.sumOf { toolCallback ->
             val def = toolCallback.toolDefinition
 
@@ -299,7 +299,7 @@ internal class ContextWindowPromptBudgeter(
         history: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
-        tools: List<AimoToolCallback>,
+        tools: List<ToolCallback>,
     ): PromptPlan {
         val fixedMessages = systemMessages + listOf(prompt) + taskMessages
         val fixedInputTokens = estimateMessagesTokens(fixedMessages) + estimateToolTokens(tools)

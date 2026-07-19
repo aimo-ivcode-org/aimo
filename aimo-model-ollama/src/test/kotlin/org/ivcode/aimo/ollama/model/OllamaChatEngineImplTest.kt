@@ -1,11 +1,11 @@
 package org.ivcode.aimo.ollama.model
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoChatOptions
+import org.ivcode.aimo.core.model.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoPrompt
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.ollama.client.ChatRequest
 import org.ivcode.aimo.ollama.client.OllamaChatClient
 import org.ivcode.aimo.ollama.client.ChatResponse
@@ -63,7 +63,7 @@ class OllamaChatEngineImplTest {
                 )
             ),
             tools = listOf(
-                AimoToolDefinition(
+                ToolDefinition(
                     name = "lookupWeather",
                     description = "Look up current weather",
                     inputSchema = mapper.readTree(

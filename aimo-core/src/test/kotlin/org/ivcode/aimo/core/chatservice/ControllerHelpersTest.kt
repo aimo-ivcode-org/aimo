@@ -23,22 +23,22 @@ class ControllerHelpersTest {
     @Test
     fun discoversToolsFromToolAnnotatedMethods() {
         val controller = TestController()
-        val callbacks = toAimoToolCallbacks(controller, objectMapper)
+        val callbacks = toToolCallbacks(controller, objectMapper)
 
         assertEquals(3, callbacks.size, "Should discover 3 tools")
 
-        val toolNames = callbacks.map { it.callback.toolDefinition.name }.sorted()
+        val toolNames = callbacks.map { it.toolDefinition.name }.sorted()
         assertEquals(listOf("add", "divide", "multiply"), toolNames)
     }
 
     @Test
     fun generatesCorrectJsonSchemaForToolParameters() {
         val controller = TestController()
-        val callbacks = toAimoToolCallbacks(controller, objectMapper)
-        val addTool = callbacks.find { it.callback.toolDefinition.name == "add" }
+        val callbacks = toToolCallbacks(controller, objectMapper)
+        val addTool = callbacks.find { it.toolDefinition.name == "add" }
             ?: throw AssertionError("add tool not found")
 
-        val schema = addTool.callback.toolDefinition.inputSchema
+        val schema = addTool.toolDefinition.inputSchema
         assertEquals("object", schema.get("type").asText())
 
         val properties = schema.get("properties")
@@ -54,11 +54,11 @@ class ControllerHelpersTest {
     @Test
     fun excludesAutoInjectedContextParameterFromJsonSchema() {
         val controller = TestController()
-        val callbacks = toAimoToolCallbacks(controller, objectMapper)
-        val divide = callbacks.find { it.callback.toolDefinition.name == "divide" }
+        val callbacks = toToolCallbacks(controller, objectMapper)
+        val divide = callbacks.find { it.toolDefinition.name == "divide" }
             ?: throw AssertionError("divide tool not found")
 
-        val schema = divide.callback.toolDefinition.inputSchema
+        val schema = divide.toolDefinition.inputSchema
         val properties = schema.get("properties")
 
         // divide has signature: divide(a: Double, b: Double, context: Map<String, Any>)
@@ -72,11 +72,11 @@ class ControllerHelpersTest {
     @Test
     fun propagatesToolParamDescriptionsToSchema() {
         val controller = TestController()
-        val callbacks = toAimoToolCallbacks(controller, objectMapper)
-        val multiply = callbacks.find { it.callback.toolDefinition.name == "multiply" }
+        val callbacks = toToolCallbacks(controller, objectMapper)
+        val multiply = callbacks.find { it.toolDefinition.name == "multiply" }
             ?: throw AssertionError("multiply tool not found")
 
-        val schema = multiply.callback.toolDefinition.inputSchema
+        val schema = multiply.toolDefinition.inputSchema
         val properties = schema.get("properties")
 
         // multiply has signature: multiply(x: Double @ToolParam("First operand"), y: Double @ToolParam("Second operand"))
@@ -87,8 +87,8 @@ class ControllerHelpersTest {
     @Test
     fun usesCustomToolNameFromAnnotation() {
         val controller = TestControllerWithCustomNames()
-        val callbacks = toAimoToolCallbacks(controller, objectMapper)
-        val toolNames = callbacks.map { it.callback.toolDefinition.name }
+        val callbacks = toToolCallbacks(controller, objectMapper)
+        val toolNames = callbacks.map { it.toolDefinition.name }
 
         assertTrue(toolNames.contains("custom_add"), "Should use custom name 'custom_add' from @Tool(name=...)")
         assertEquals(1, callbacks.size, "Should only have 1 tool")
@@ -100,7 +100,7 @@ class ControllerHelpersTest {
     fun computesEmptyDeclaredScopesInheritParentScopes() {
         val controller = TestControllerWithScopes()
         val parentServiceScopes = setOf("admin", "research")
-        val callbacks = toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
+        val callbacks = toToolCallbacks(controller, objectMapper, parentServiceScopes)
 
         // Both tools in TestControllerWithScopes have empty @Tool(scope=[])
         // They should inherit parent scopes
@@ -108,7 +108,7 @@ class ControllerHelpersTest {
             assertEquals(
                 parentServiceScopes,
                 callback.scopes,
-                "Tool ${callback.callback.toolDefinition.name} should inherit parent scopes when declared scope is empty"
+                "Tool ${callback.toolDefinition.name} should inherit parent scopes when declared scope is empty"
             )
         }
     }
@@ -117,7 +117,7 @@ class ControllerHelpersTest {
     fun computesNonEmptyDeclaredScopesIntersectWithParentScopes() {
         val controller = TestControllerAdminOnly()
         val parentServiceScopes = setOf("admin", "research", "public")
-        val callbacks = toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
+        val callbacks = toToolCallbacks(controller, objectMapper, parentServiceScopes)
 
         // Tool has @Tool(scope=["admin"])
         // Intersection with parent = ["admin"]
@@ -131,7 +131,7 @@ class ControllerHelpersTest {
         val parentServiceScopes = setOf("admin", "research")
 
         val exception = assertFailsWith<IllegalArgumentException> {
-            toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
+            toToolCallbacks(controller, objectMapper, parentServiceScopes)
         }
 
         assertTrue(
@@ -146,7 +146,7 @@ class ControllerHelpersTest {
         val parentServiceScopes = setOf("admin", "research")
 
         val exception = assertFailsWith<IllegalArgumentException> {
-            toAimoToolCallbacks(controller, objectMapper, parentServiceScopes)
+            toToolCallbacks(controller, objectMapper, parentServiceScopes)
         }
 
         // Since all declared scopes are NOT in parent, this triggers "not in parent service" error

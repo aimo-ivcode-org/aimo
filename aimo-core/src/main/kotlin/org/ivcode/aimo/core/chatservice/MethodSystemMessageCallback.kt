@@ -7,6 +7,8 @@ class MethodSystemMessageCallback (
     val instance: Any?,
     val method: Method,
     val isContextual: Boolean,
+    override val name: String,
+    override val scopes: Set<String> = emptySet()
 ): SystemMessageCallback {
     override fun call(context: SystemMessageContext): String? {
         // system messages take an optional SystemMessageContext parameter, so we need to check if the method is contextual or not

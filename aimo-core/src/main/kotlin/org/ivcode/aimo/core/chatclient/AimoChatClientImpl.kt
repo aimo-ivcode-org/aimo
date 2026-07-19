@@ -1,10 +1,5 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatRequest
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageContext
@@ -12,16 +7,22 @@ import org.ivcode.aimo.core.client.chat.createSystemMessage
 import org.ivcode.aimo.core.client.chat.createToolMessage
 import org.ivcode.aimo.core.client.chat.createUserMessage
 import org.ivcode.aimo.core.conversation.Conversation
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoChatModelConfig
+import org.ivcode.aimo.core.model.AimoChatRequest
+import org.ivcode.aimo.core.model.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoPrompt
 import org.ivcode.aimo.core.model.AimoPromptBudgeterType
-import org.ivcode.aimo.core.model.AimoToolCallback
-import org.ivcode.aimo.core.model.AimoToolDefinition
+import org.ivcode.aimo.core.model.AimoUsage
+import org.ivcode.aimo.core.model.ToolCallback
+import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CHAT_ID
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CONVERSATION
 import org.ivcode.aimo.core.util.CONTEXT_KEY__REQUEST_ID
 import java.time.Instant
 import java.util.UUID
+import kotlin.collections.orEmpty
 
 /**
  * Implementation of [AimoChatClient] responsible for orchestrating chat interactions.
@@ -69,14 +70,20 @@ internal class AimoChatClientImpl (
     private val chatScope: ChatScope,
 ) : AimoChatClient {
 
-    // Map tool callbacks by name for O(1) lookup during tool invocation
-    private val toolCallbacks: Map<String, AimoToolCallback> = chatScope.tools.associateBy { it.toolDefinition.name }
+    // Fetch all tools once to ensure consistency between toolCallbacks and toolDefinitions.
+    // Uses getAllTools() (not the static `tools` field) so  provider-sourced tools
+    // (e.g. MCP server tools) are included alongside statically registered ones.
+    // Called once at initialization to avoid concurrent changes creating inconsistencies.
+    private val allToolCallbacks: List<ToolCallback> = chatScope.getAllTools()
+
+    // Map tool callbacks by name for O(1) lookup during tool invocation.
+    private val toolCallbacks: Map<String, ToolCallback> = allToolCallbacks.associateBy { it.toolDefinition.name }
 
     // Tool definitions sent to the model (extracted from callbacks)
-    private val toolDefinitions: List<AimoToolDefinition> = chatScope.tools.map { it.toolDefinition }
+    private val toolDefinitions: List<ToolDefinition> = allToolCallbacks.map { it.toolDefinition }
 
-    // System messages from the scope
-    private val systemMessages: List<SystemMessageCallback> = chatScope.systemMessages
+    // System messages from the scope (includes provider-sourced messages)
+    private val systemMessages: List<SystemMessageCallback> = chatScope.getAllSystemMessages()
 
     // Prompt budgeter selected based on model configuration
     // Responsible for filtering history to fit the model's context window

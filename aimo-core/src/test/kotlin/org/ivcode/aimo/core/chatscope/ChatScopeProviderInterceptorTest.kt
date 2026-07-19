@@ -100,7 +100,7 @@ class ChatScopeProviderInterceptorTest {
 
         val globalScope = provider.getGlobalScope()
 
-        assertEquals("global", globalScope.id)
+        assertEquals(ChatScopeProvider.GLOBAL_SCOPE_ID, globalScope.id)
     }
 
     // Helper classes and functions
@@ -114,6 +114,7 @@ class ChatScopeProviderInterceptorTest {
                 id = scopeId,
                 displayName = scopeId.replaceFirstChar { it.uppercase() },
                 description = "Test $scopeId scope",
+                providers = null,
                 tools = emptyList(),
                 systemMessages = emptyList()
             )
@@ -123,8 +124,10 @@ class ChatScopeProviderInterceptorTest {
             allTools = emptyList(),
             allSystemMessages = emptyList(),
             predefinedScopes = testScopes,
-            toolScopeMap = emptyMap(),
-            systemMessageScopeMap = emptyMap(),
+            providerManager = object : org.ivcode.aimo.core.chatservice.ChatServiceProviderManager {
+                override fun getProviders() = emptyList<org.ivcode.aimo.core.chatservice.ChatServiceProvider>()
+                override fun getProvider(id: String) = null
+            },
             interceptors = interceptors
         )
     }

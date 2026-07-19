@@ -1,0 +1,65 @@
+spring.mvc.async.request-timeout: 0s
+
+logging:
+  level:
+    # Trace all Ollama client request/response and streaming event logs.
+    org.ivcode.aimo: TRACE
+
+aimo:
+  # Path where chat conversations and requests are persisted (file-based DAO)
+  data-dir: ./data/conversations
+
+  model:
+    ollama:
+      gpt-oss:
+        base-url: http://localhost:11434
+        primary: true
+        context:
+          size: 10000
+          excludeThinking: true
+        options:
+          model: gpt-oss:20b
+          temperature: 0.7
+
+  # Interceptor configurations
+  interceptors:
+    # Logging interceptor
+    logging:
+      enabled: true
+      level: DEBUG  # DEBUG, INFO, WARN, ERROR
+
+
+  # MCP Client Configuration
+  mcp:
+    enabled: true                                 # Enable/disable MCP client module
+    required: false                               # Allow startup without configured servers
+    discovery-interval-minutes: 1                 # Refresh every 1 minute (0 = disabled)
+    servers:
+      # MCP Playground Online: https://mcpplaygroundonline.com/mcp-test-client
+
+      - id: mcp_echo
+        transport:
+          type: http
+          url: https://mcpplaygroundonline.com/mcp-echo-server
+        scope: []                                 # Empty = available in global scope
+
+      - id: mcp_auth
+        transport:
+          type: http
+          url: https://mcpplaygroundonline.com/mcp-auth-server
+          auth-token: ${MCP_AUTH}                 # generate key at mcp playground online
+        scope: []                                 # Empty = available in global scope
+
+      - id: mcp_error
+        transport:
+          type: http
+          url: https://mcpplaygroundonline.com/mcp-error-server
+          auth-token: ${MCP_ERROR}                # generate key at mcp playground online
+        scope: []                                 # Empty = available in global scope
+
+      - id: mcp_complex
+        transport:
+          type: http
+          url: https://mcpplaygroundonline.com/mcp-complex-server
+          auth-token: ${MCP_COMPLEX}              # generate key at mcp playground online
+        scope: []                                 # Empty = available in global scope

@@ -1,22 +1,22 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatRequest
-import org.ivcode.aimo.core.AimoChatResponse
 import org.ivcode.aimo.core.conversation.Conversation
-import org.ivcode.aimo.core.AimoToolCall
-import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatservice.Tool
-import org.ivcode.aimo.core.chatservice.toAimoToolCallbacks
+import org.ivcode.aimo.core.chatservice.toToolCallbacks
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatContext
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatRequest
+import org.ivcode.aimo.core.model.AimoChatResponse
 import org.ivcode.aimo.core.model.AimoPrompt
+import org.ivcode.aimo.core.model.AimoToolCall
+import org.ivcode.aimo.core.model.AimoUsage
 import org.ivcode.aimo.core.toChatMessageEntity
 import org.ivcode.aimo.core.toAimoChatMessage
 import java.time.Instant
@@ -87,7 +87,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )
@@ -219,7 +219,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )
@@ -258,7 +258,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )
@@ -397,7 +397,7 @@ class AimoChatClientImplMessageIdTest {
                 id = "test",
                 displayName = "Test",
                 description = "Test scope",
-                tools = toAimoToolCallbacks(TestTools(), objectMapper).map { it.callback },
+                tools = toToolCallbacks(TestTools(), objectMapper),
                 systemMessages = emptyList(),
             ),
         )

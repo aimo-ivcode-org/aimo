@@ -1,11 +1,10 @@
 package org.ivcode.aimo.core.conversation
 
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
-import org.ivcode.aimo.core.dao.ChatConversationEntity
 import org.ivcode.aimo.core.dao.ChatMessageEntity
 import org.ivcode.aimo.core.dao.ChatRequestEntity
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

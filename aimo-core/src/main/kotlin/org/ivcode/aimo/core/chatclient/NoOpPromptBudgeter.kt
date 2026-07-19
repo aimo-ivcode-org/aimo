@@ -1,8 +1,8 @@
 package org.ivcode.aimo.core.chatclient
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.model.AimoToolCallback
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.ToolCallback
 
 /**
  * Prompt budgeter that performs no token-based truncation.
@@ -19,7 +19,7 @@ internal class NoOpPromptBudgeter(
         systemMessages: List<AimoChatMessage>,
         prompt: AimoChatMessage,
         taskMessages: List<AimoChatMessage>,
-        tools: List<AimoToolCallback>,
+        tools: List<ToolCallback>,
         history: List<AimoChatMessage>,
         execute: (promptMessages: List<AimoChatMessage>) -> AimoChatResponse,
     ): AimoChatResponse {

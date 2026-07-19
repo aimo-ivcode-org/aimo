@@ -15,7 +15,7 @@ aimo:
         base-url: http://localhost:11434
         primary: true
         context:
-          size: 1000
+          size: 10000
           excludeThinking: true
         options:
           model: gpt-oss:20b
@@ -27,4 +27,3 @@ aimo:
     logging:
       enabled: true
       level: DEBUG  # DEBUG, INFO, WARN, ERROR
-

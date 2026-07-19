@@ -1,18 +1,11 @@
 package org.ivcode.aimo.bedrock.model
 
-import org.ivcode.aimo.core.AimoChatMessage
-import org.ivcode.aimo.core.AimoChatMessageType
-import org.ivcode.aimo.core.AimoChatResponse
-import org.ivcode.aimo.core.AimoPromptCacheUsage
-import org.ivcode.aimo.core.AimoToolCall
-import org.ivcode.aimo.core.AimoUsage
 import org.ivcode.aimo.core.model.AimoChatEngine
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatContext
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoPrompt
-import org.ivcode.aimo.core.model.AimoToolDefinition
 import org.ivcode.aimo.bedrock.BedrockModelProperties
 import org.ivcode.aimo.bedrock.PromptCachingStrategy
 import org.ivcode.aimo.bedrock.client.BedrockChatClient
@@ -26,6 +19,13 @@ import org.ivcode.aimo.bedrock.client.Tool
 import org.ivcode.aimo.bedrock.client.ToolConfiguration
 import org.ivcode.aimo.bedrock.client.ToolSpec
 import org.ivcode.aimo.bedrock.client.ToolUse
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoPromptCacheUsage
+import org.ivcode.aimo.core.model.AimoToolCall
+import org.ivcode.aimo.core.model.AimoUsage
+import org.ivcode.aimo.core.model.ToolDefinition
 import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.security.MessageDigest
@@ -499,7 +499,7 @@ private fun String.toJsonMap(): Map<String, Any?> {
     }
 }
 
-private fun AimoToolDefinition.toTool(): Tool {
+private fun ToolDefinition.toTool(): Tool {
     return Tool(
         toolSpec = ToolSpec(
             name = name,
