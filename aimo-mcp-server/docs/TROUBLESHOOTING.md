@@ -212,8 +212,7 @@ fun callApi(
    - Default path is `/mcp/`
    - If configured differently, check `application.yml`:
      ```yaml
-     aimo:
-       mcp:
+     aimo:`n  mcp-server:
          transports:
            http:
              basePath: "/mcp"  # or custom path
@@ -230,8 +229,7 @@ fun callApi(
 4. **HTTP transport disabled**
    - Check `application.yml`:
      ```yaml
-     aimo:
-       mcp:
+     aimo:`n  mcp-server:
          transports:
            http:
              enabled: true  # Must be true
@@ -244,8 +242,7 @@ fun callApi(
 **Solution:**
 - This is expected behavior - timeout is configurable:
   ```yaml
-  aimo:
-    mcp:
+  aimo:`n  mcp-server:
       transports:
         sse:
           connectionTimeout: 600000  # 10 minutes
@@ -257,7 +254,7 @@ fun callApi(
 
 **Causes and Solutions:**
 1. **Not configured**
-   - Ensure `aimo.mcp.transports.stdio.enabled: true`
+   - Ensure `aimo.mcp-server.transports.stdio.enabled: true`
 
 2. **Stdin redirected**
    - Check if application runs with stdin connected
@@ -294,7 +291,7 @@ logging:
 1. Rebuild application (configuration embedded in JAR)
 2. Pass configuration via environment:
    ```bash
-   java -Daimo.mcp.enabled=true -jar app.jar
+   java -Daimo.mcp-server.enabled=true -jar app.jar
    ```
 3. External configuration file:
    ```bash
@@ -319,8 +316,7 @@ logging:
 3. **aimo-mcp-client not configured**
    - Add server to `application.yml`:
      ```yaml
-     aimo:
-       mcp:
+     aimo:`n  mcp-server:
          servers:
            - id: "my-server"
              url: "http://localhost:8080/mcp"
@@ -329,8 +325,7 @@ logging:
 4. **Required flag preventing startup**
    - Set `required: false` to allow graceful degradation:
      ```yaml
-     aimo:
-       mcp:
+     aimo:`n  mcp-server:
          required: false
          servers:
            - id: "my-server"
@@ -389,8 +384,7 @@ jmap -heap [PID]  # Heap usage
 1. **Many services to discover**
    - Reduce number of scanned packages:
      ```yaml
-     aimo:
-       mcp:
+     aimo:`n  mcp-server:
          discovery:
            basePackages: "com.mycompany.mcp"
      ```
@@ -418,5 +412,6 @@ If you encounter issues not covered here:
 | "Cannot infer type" | Generic type without bounds | Specify concrete type |
 | "No MCP services found" | No `@McpService` beans discovered | Check `@Component` + `@McpService` + package path |
 | "Unresolved reference" | Annotation not imported | Add `import org.ivcode.aimo.server.mcp.annotation.*` |
+
 
 

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController
  * via HTTP POST endpoints.
  */
 @RestController
-@RequestMapping("\${aimo.mcp.transports.http.basePath:/mcp}")
+@RequestMapping("\${aimo.mcp-server.transports.http.basePath:/mcp}")
 class HttpMcpTransport(
     private val requestHandler: McpRequestHandler,
     private val objectMapper: ObjectMapper

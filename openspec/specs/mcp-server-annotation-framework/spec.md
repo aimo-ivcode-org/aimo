@@ -10,7 +10,7 @@ Declarative annotation-based framework for defining MCP services, tools, and pro
 The framework SHALL provide five core annotations that developers can use to declare MCP services, tools, and prompts with full Spring integration.
 
 **Details**: Framework provides five core annotations:
-1. `@McpService` — Marks a Spring bean as MCP service provider (optional: `id`, `name`, `description`)
+1. `@McpService(name = "...")` — Marks a Spring bean as MCP service provider (optional: `name` for service disambiguation in multi-service servers)
 2. `@McpTool` — Marks public methods as LLM-callable tools (optional: `name`, `description`, `category`)
 3. `@McpPrompt` — Marks public methods as MCP prompts returning String (optional: `name`, `description`)
 4. `@McpParam` — Documents method parameters (optional: `description`, `example`, `required`)
@@ -20,9 +20,45 @@ The framework SHALL provide five core annotations that developers can use to dec
 - **WHEN** developer creates class with `@McpService` and public method with `@McpTool` annotation
 - **THEN** framework discovers service, registers tool, and generates schema for client discovery
 
+#### Scenario: Multiple services with tool name collisions
+- **WHEN** two or more services expose tools that result in the same client-visible name
+  - This occurs when: both services have the same tool name AND both have the same service name (or both have no service name)
+- **THEN** framework detects the conflict at application startup and throws `IllegalArgumentException` with message describing the conflicting services
+- **AND** application startup is prevented (fail-fast behavior)
+
+#### Scenario: Multiple services with same tool name but different service names
+- **WHEN** two services have tools with the same name but different explicit @McpService(name="...")
+- **THEN** no conflict occurs; clients see both tools with different prefixes:
+  - Service A (name="weather") tool "getTemp" → client sees `"weather:getTemp"`
+  - Service B (name="history") tool "getTemp" → client sees `"history:getTemp"`
+
+#### Scenario: Multiple services with different tool names
+- **WHEN** multiple services are registered, each with unique tool names
+- **THEN** all services are discovered successfully and `tools/list` returns all tools with client-visible names:
+  - `"serviceName:toolName"` (when service has explicit @McpService(name="..."))
+  - `"toolName"` (when service has no explicit name)
+
+#### Scenario: Multiple services without explicit service names and prompt name conflicts
+- **WHEN** two or more services have prompts with the same name AND both have no explicit @McpService(name="...")
+- **THEN** framework detects the conflict at application startup and throws `IllegalArgumentException` with message describing the conflicting services
+- **AND** application startup is prevented (fail-fast behavior)
+
 #### Scenario: Tool with context parameter
 - **WHEN** tool method has parameter with `@McpContext` annotation of type `Map<String, Any>`
 - **THEN** framework automatically injects request context; parameter is excluded from generated schema
+
+#### Scenario: Tool definitions in tools/list response
+- **WHEN** client calls `tools/list` endpoint
+- **THEN** returned tool names use client-visible format:
+  - `"serviceName:toolName"` (when service has explicit @McpService(name="..."))
+  - `"toolName"` (when service has no explicit name and no conflicts with other unnamed services)
+- **AND** client can call any tool by using the exact name from tools/list in a `tools/call` request
+- **AND** bean name is internal-only for Spring isolation and NOT visible to clients
+
+#### Scenario: Tool invocation with client-visible names
+- **WHEN** client calls `tools/call` with tool name from `tools/list` response (e.g., "weather:get-temperature" or "add")
+- **THEN** framework looks up the tool by client-visible name and invokes the corresponding method
+- **AND** framework supports both internal lookup formats (full "beanName:serviceName:toolName") and client-visible formats
 
 ### Requirement: Service Discovery
 The framework SHALL automatically discover all `@McpService` beans during Spring application startup and register them as available MCP services.
@@ -67,10 +103,15 @@ The framework SHALL validate all annotations at application startup, failing fas
 - `@McpContext` only on `Map<String, Any>` type parameters
 - No duplicate tool/prompt names within a service
 - Annotations must have `@Retention(RetentionPolicy.RUNTIME)`
+- Application startup fails with exception if invalid annotation usage detected
 
 #### Scenario: Invalid annotation usage detected at startup
 - **WHEN** `@McpTool` annotation is applied to private method
-- **THEN** framework detects invalid usage at application startup and logs error "@McpTool can only be applied to public methods"
+- **THEN** framework detects invalid usage at application startup and throws `IllegalArgumentException` with message "Service 'X' has private/protected method 'Y' annotated with @McpTool. Only public methods can be exposed as MCP tools."
+
+#### Scenario: Invalid prompt annotation on private method
+- **WHEN** `@McpPrompt` annotation is applied to private method
+- **THEN** framework detects invalid usage at application startup and throws `IllegalArgumentException` with message "Service 'X' has private/protected method 'Y' annotated with @McpPrompt. Only public methods can be exposed as MCP prompts."
 
 #### Scenario: Context parameter with wrong type fails validation
 - **WHEN** `@McpContext` annotation is used on parameter not of type `Map<String, Any>`

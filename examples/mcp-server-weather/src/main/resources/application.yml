@@ -10,8 +10,7 @@ server:
   port: 9090
 
 aimo:
-  mcp:
-    enabled: true
+  mcp-server:
     name: "weather-mcp-server"
     version: "1.0.0"
 

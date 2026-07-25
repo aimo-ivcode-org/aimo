@@ -11,11 +11,21 @@ import org.springframework.stereotype.Component
  *
  * This annotation is itself a @Component, so @McpService beans are automatically
  * registered with Spring and can be discovered at startup for tool/prompt binding.
+ *
+ * @param name Optional service name for tool/prompt disambiguation in multi-service MCP servers.
+ *             When specified, tool IDs are formatted as "beanName:serviceName:toolName".
+ *             When omitted, tool IDs are formatted as "beanName:toolName".
  */
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)
 @Component
-public annotation class McpService
+public annotation class McpService(
+    /**
+     * Optional service name to disambiguate tools when multiple services are in one MCP server.
+     * If omitted, defaults to empty string (no service name in tool ID).
+     */
+    val name: String = ""
+)
 
 /**
  * Marks a method as an MCP tool (callable by LLM).

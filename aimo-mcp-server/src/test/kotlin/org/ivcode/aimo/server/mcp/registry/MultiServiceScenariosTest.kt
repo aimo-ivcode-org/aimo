@@ -53,6 +53,7 @@ class MultiServiceScenariosTest {
 
         val tools = registry.getToolDefinitions()
         assertEquals(4, tools.size)  // add, multiply, reverse, uppercase
+        // Tool names are client-visible format (tool name only for unnamed services)
         assertTrue(tools.any { it.name == "add" })
         assertTrue(tools.any { it.name == "multiply" })
         assertTrue(tools.any { it.name == "reverse" })
@@ -72,6 +73,7 @@ class MultiServiceScenariosTest {
 
         val prompts = registry.getPromptDefinitions()
         assertEquals(2, prompts.size)  // mathHelp, stringHelp
+        // Prompt names are client-visible format (prompt name only for unnamed services)
         assertTrue(prompts.any { it.name == "mathHelp" })
         assertTrue(prompts.any { it.name == "stringHelp" })
     }
@@ -155,9 +157,9 @@ class MultiServiceScenariosTest {
     }
 
     @Test
-    fun `should handle services with overlapping tool names`() {
-        val service1 = OverlapService1()
-        val service2 = OverlapService2()
+    fun `should handle services with overlapping tool names using explicit service names`() {
+        val service1 = OverlapService1WithName()
+        val service2 = OverlapService2WithName()
 
         applicationContext.beanFactory.registerSingleton("service1", service1)
         applicationContext.beanFactory.registerSingleton("service2", service2)
@@ -165,13 +167,13 @@ class MultiServiceScenariosTest {
         val registry = McpServiceRegistry(applicationContext, schemaGenerator)
         registry.discoverServices()
 
-        // Both services have a 'process' tool
+        // Both services have a 'process' tool but with explicit service names
         val tools = registry.getToolDefinitions()
         assertEquals(2, tools.size)
 
-        // Full ID lookup should work
-        val tool1 = registry.getTool("service1:process")
-        val tool2 = registry.getTool("service2:process")
+        // Client-visible format: "serviceName:toolName"
+        val tool1 = registry.getTool("processor1:process")
+        val tool2 = registry.getTool("processor2:process")
         assertNotNull(tool1)
         assertNotNull(tool2)
         assertNotEquals(tool1, tool2)
@@ -245,6 +247,18 @@ class MultiServiceScenariosTest {
 
     @McpService
     class OverlapService2 {
+        @McpTool
+        fun process(@McpParam(description = "Input") input: String): String = "Service2: $input"
+    }
+
+    @McpService(name = "processor1")
+    class OverlapService1WithName {
+        @McpTool
+        fun process(@McpParam(description = "Input") input: String): String = "Service1: $input"
+    }
+
+    @McpService(name = "processor2")
+    class OverlapService2WithName {
         @McpTool
         fun process(@McpParam(description = "Input") input: String): String = "Service2: $input"
     }

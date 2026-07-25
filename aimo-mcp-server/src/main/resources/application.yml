@@ -1,8 +1,10 @@
 # Example aimo-mcp-server configuration
+#
+# MCP Server is enabled via @EnableMcpServer annotation.
+# Configure transports and discovery below.
 
 aimo:
-  mcp:
-    enabled: true
+  mcp-server:
     name: "aimo-mcp-server"
     version: "1.0.0"
 

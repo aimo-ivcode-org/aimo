@@ -186,6 +186,8 @@ fun main(args: Array<String>) {
 }
 ```
 
+The `@EnableMcpServer` annotation registers all necessary beans. Individual transports (HTTP, SSE, stdio) are controlled via their respective enabled flags in configuration.
+
 ### 3. Create a Service
 
 Define an `@McpService` with `@McpTool` methods:
@@ -207,9 +209,9 @@ In `application.yml`:
 
 ```yaml
 aimo:
-  mcp:
-    enabled: true
+  mcp-server:
     name: "my-mcp-server"
+    version: "1.0.0"
     transports:
       http:
         enabled: true
@@ -277,7 +279,7 @@ Standard input/output for subprocess/local communication.
 **Configuration:**
 ```yaml
 aimo:
-  mcp:
+  mcp-server:
     transports:
       stdio:
         enabled: true
@@ -285,30 +287,31 @@ aimo:
 
 ## Configuration
 
-Configuration via `application.yml` under `aimo.mcp.*`:
+Configuration via `application.yml` under `aimo.mcp-server.*`:
+
+The MCP server framework is enabled by using the `@EnableMcpServer` annotation. Individual transports and discovery behavior are then configured via properties:
 
 ```yaml
 aimo:
-  mcp:
-    enabled: true                              # Enable MCP server
+  mcp-server:
     name: "my-mcp-server"                      # Server name
     version: "1.0.0"                           # Server version
     
     transports:
       http:
-        enabled: true                          # Enable HTTP
+        enabled: true                          # Enable HTTP transport
         basePath: "/mcp"                       # Base path
         connectionTimeout: 30000               # Connection timeout (ms)
         readTimeout: 30000                     # Read timeout (ms)
       
       sse:
-        enabled: false                         # Enable SSE
+        enabled: false                         # Enable SSE transport
         basePath: "/mcp/sse"
         connectionTimeout: 300000
         keepAliveInterval: 30000
       
       stdio:
-        enabled: false                         # Enable stdio
+        enabled: false                         # Enable stdio transport
     
     discovery:
       enabled: true                            # Enable auto-discovery

@@ -14,6 +14,7 @@ import org.ivcode.aimo.server.mcp.transport.TransportCoordinator
 import org.ivcode.aimo.server.mcp.validation.ParameterValidator
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
@@ -25,16 +26,14 @@ import org.springframework.context.event.EventListener
  * Spring Boot auto-configuration for MCP server framework.
  *
  * Registers all required beans for the MCP server to operate.
- * Enable via @EnableMcpServer annotation or include in spring.factories.
+ * Enable via @EnableMcpServer annotation.
+ *
+ * Transport activation is controlled by individual transport enabled flags
+ * in application.yml (aimo.mcp-server.transports.http.enabled, etc.).
  */
 @Configuration
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
-    prefix = "aimo.mcp",
-    name = ["enabled"],
-    havingValue = "true",
-    matchIfMissing = true
-)
 @EnableConfigurationProperties(McpServerProperties::class)
+class McpServerAutoConfiguration {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
@@ -183,10 +182,6 @@ import org.springframework.context.event.EventListener
         val coordinator = event.applicationContext.getBean(TransportCoordinator::class.java)
         val properties = event.applicationContext.getBean(McpServerProperties::class.java)
 
-        if (!properties.enabled) {
-            logger.info("MCP server is disabled")
-            return
-        }
 
         logger.info("Initializing MCP server framework (v{})", properties.version)
 

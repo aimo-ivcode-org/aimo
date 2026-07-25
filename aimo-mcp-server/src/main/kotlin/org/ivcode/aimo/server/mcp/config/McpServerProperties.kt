@@ -7,14 +7,10 @@ import org.springframework.stereotype.Component
 /**
  * MCP server configuration properties.
  *
- * Binds to application.yml configuration under "aimo.mcp" prefix.
+ * Binds to application.yml configuration under "aimo.mcp-server" prefix.
  */
-@ConfigurationProperties(prefix = "aimo.mcp")
+@ConfigurationProperties(prefix = "aimo.mcp-server")
 data class McpServerProperties(
-    /**
-     * Enable MCP server framework.
-     */
-    var enabled: Boolean = true,
 
     /**
      * Server name.

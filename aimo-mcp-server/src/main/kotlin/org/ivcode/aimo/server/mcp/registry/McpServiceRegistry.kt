@@ -55,10 +55,40 @@ class McpServiceRegistry(
     private fun registerService(beanName: String, bean: Any) {
         val serviceClass = bean.javaClass
 
-        // Build tool registry
-        val serviceMethods = serviceClass.declaredMethods
+        // Get service name from annotation if provided
+        val serviceAnnotation = serviceClass.getAnnotation(McpService::class.java)
+        val serviceName = serviceAnnotation?.name?.takeIf { it.isNotBlank() } ?: ""
+
+        // First, validate that no private/protected methods have @McpTool or @McpPrompt annotations
+        val declaredMethods = serviceClass.declaredMethods
+        for (method in declaredMethods) {
+            val isPublic = java.lang.reflect.Modifier.isPublic(method.modifiers)
+            if (!isPublic) {
+                val toolAnnotation = method.getAnnotation(McpTool::class.java)
+                val promptAnnotation = method.getAnnotation(McpPrompt::class.java)
+
+                if (toolAnnotation != null) {
+                    throw IllegalArgumentException(
+                        "Service '$beanName' has private/protected method '${method.name}' annotated with @McpTool. " +
+                        "Only public methods can be exposed as MCP tools."
+                    )
+                }
+                if (promptAnnotation != null) {
+                    throw IllegalArgumentException(
+                        "Service '$beanName' has private/protected method '${method.name}' annotated with @McpPrompt. " +
+                        "Only public methods can be exposed as MCP prompts."
+                    )
+                }
+            }
+        }
+
+        // Build tool registry - only scan public methods
+        val serviceMethods = serviceClass.methods
         val tools = mutableListOf<ToolInfo>()
         val prompts = mutableListOf<PromptInfo>()
+
+        // Build ID prefix: "beanName" or "beanName:serviceName"
+        val idPrefix = if (serviceName.isNotEmpty()) "$beanName:$serviceName" else beanName
 
         for (method in serviceMethods) {
             // Check for @McpTool
@@ -70,7 +100,37 @@ class McpServiceRegistry(
                     logger.warn("Tool '{}' validation errors: {}", schema.name, errors)
                 }
 
-                val toolId = "${beanName}:${schema.name}"
+                val toolId = "$idPrefix:${schema.name}"
+
+                // Build client-visible name
+                val clientVisibleName = when {
+                    serviceName.isNotEmpty() -> "$serviceName:${schema.name}"
+                    else -> schema.name
+                }
+
+                // Check for conflicts: same client-visible name from different services
+                val conflictingTool = this.tools.entries.find { (existingToolId, registry) ->
+                    val existingIdParts = existingToolId.split(":")
+                    val existingServiceName = if (existingIdParts.size == 3) existingIdParts[1] else ""
+                    val existingToolName = if (existingIdParts.size == 3) existingIdParts[2] else if (existingIdParts.size == 2) existingIdParts[1] else ""
+
+                    val existingClientVisibleName = when {
+                        existingServiceName.isNotEmpty() -> "$existingServiceName:$existingToolName"
+                        else -> existingToolName
+                    }
+
+                    // Conflict if client-visible names match AND they're from different beans
+                    existingClientVisibleName == clientVisibleName && registry.beanName != beanName
+                }
+
+                if (conflictingTool != null) {
+                    throw IllegalArgumentException(
+                        "Tool name conflict detected: multiple services expose tool with client-visible name '$clientVisibleName'. " +
+                        "Conflicting services: '${conflictingTool.value.beanName}' and '$beanName'. " +
+                        "Either use different service names or rename one of the tools."
+                    )
+                }
+
                 tools.add(
                     ToolInfo(
                         id = toolId,
@@ -94,7 +154,37 @@ class McpServiceRegistry(
             method.getAnnotation(McpPrompt::class.java)?.let { promptAnnotation ->
                 val schema = schemaGenerator.generatePromptSchema(method)
 
-                val promptId = "${beanName}:${schema.name}"
+                val promptId = "$idPrefix:${schema.name}"
+
+                // Build client-visible name
+                val clientVisibleName = when {
+                    serviceName.isNotEmpty() -> "$serviceName:${schema.name}"
+                    else -> schema.name
+                }
+
+                // Check for conflicts: same client-visible name from different services
+                val conflictingPrompt = this.prompts.entries.find { (existingPromptId, registry) ->
+                    val existingIdParts = existingPromptId.split(":")
+                    val existingServiceName = if (existingIdParts.size == 3) existingIdParts[1] else ""
+                    val existingPromptName = if (existingIdParts.size == 3) existingIdParts[2] else if (existingIdParts.size == 2) existingIdParts[1] else ""
+
+                    val existingClientVisibleName = when {
+                        existingServiceName.isNotEmpty() -> "$existingServiceName:$existingPromptName"
+                        else -> existingPromptName
+                    }
+
+                    // Conflict if client-visible names match AND they're from different beans
+                    existingClientVisibleName == clientVisibleName && registry.beanName != beanName
+                }
+
+                if (conflictingPrompt != null) {
+                    throw IllegalArgumentException(
+                        "Prompt name conflict detected: multiple services expose prompt with client-visible name '$clientVisibleName'. " +
+                        "Conflicting services: '${conflictingPrompt.value.beanName}' and '$beanName'. " +
+                        "Either use different service names or rename one of the prompts."
+                    )
+                }
+
                 prompts.add(
                     PromptInfo(
                         id = promptId,
@@ -125,26 +215,79 @@ class McpServiceRegistry(
 
     /**
      * Get all registered tool definitions.
+     *
+     * Returns tool names visible to clients:
+     * - "serviceName:toolName" (when service has explicit @McpService(name="..."))
+     * - "toolName" (when service has no explicit name)
+     *
+     * The bean name is internal-only for Spring-level isolation and not exposed to clients.
      */
     fun getToolDefinitions(): List<ToolDefinition> {
-        return tools.values.map { it.schema }
+        return tools.entries.map { (toolId, registry) ->
+            // Extract client-visible name: remove beanName prefix from toolId
+            // toolId format: "beanName" or "beanName:serviceName:toolName" or "beanName:toolName"
+            val idParts = toolId.split(":")
+            val clientVisibleName = when {
+                idParts.size == 3 -> "${idParts[1]}:${idParts[2]}"  // "beanName:serviceName:toolName" -> "serviceName:toolName"
+                idParts.size == 2 -> idParts[1]                     // "beanName:toolName" -> "toolName"
+                else -> toolId                                        // fallback
+            }
+            registry.schema.copy(name = clientVisibleName)
+        }
     }
 
     /**
      * Get all registered prompt definitions.
+     *
+     * Returns prompt names visible to clients:
+     * - "serviceName:promptName" (when service has explicit @McpService(name="..."))
+     * - "promptName" (when service has no explicit name)
+     *
+     * The bean name is internal-only for Spring-level isolation and not exposed to clients.
      */
     fun getPromptDefinitions(): List<PromptDefinition> {
-        return prompts.values.map { it.schema }
+        return prompts.entries.map { (promptId, registry) ->
+            // Extract client-visible name: remove beanName prefix from promptId
+            // promptId format: "beanName" or "beanName:serviceName:promptName" or "beanName:promptName"
+            val idParts = promptId.split(":")
+            val clientVisibleName = when {
+                idParts.size == 3 -> "${idParts[1]}:${idParts[2]}"  // "beanName:serviceName:promptName" -> "serviceName:promptName"
+                idParts.size == 2 -> idParts[1]                     // "beanName:promptName" -> "promptName"
+                else -> promptId                                      // fallback
+            }
+            registry.schema.copy(name = clientVisibleName)
+        }
     }
 
     /**
      * Look up a tool by ID.
-     * Supports both "beanName:toolName" format and simple "toolName" format
-     * (in which case it searches by tool name across all services).
+     * Supports multiple formats:
+     * - "beanName:serviceName:toolName" (full internal ID)
+     * - "serviceName:toolName" (client-visible format with service name)
+     * - "toolName" (simple tool name, searches across all services)
      */
     fun getTool(toolId: String): ToolRegistry? {
-        // First try direct lookup with full ID (e.g., "weatherService:get-weather")
+        // First try direct lookup with full ID
         tools[toolId]?.let { return it }
+
+        // If not found and has colon, try matching as client-visible format
+        // Client calls with "serviceName:toolName", need to find matching "beanName:serviceName:toolName"
+        if (toolId.contains(":")) {
+            val toolIdParts = toolId.split(":")
+            if (toolIdParts.size == 2) {
+                // Client-visible format "serviceName:toolName" - find matching internal ID
+                for ((internalId, registry) in tools) {
+                    val internalIdParts = internalId.split(":")
+                    // Match: internalId has 3 parts "beanName:serviceName:toolName"
+                    // and client format matches last 2 parts
+                    if (internalIdParts.size == 3 &&
+                        internalIdParts[1] == toolIdParts[0] &&
+                        internalIdParts[2] == toolIdParts[1]) {
+                        return registry
+                    }
+                }
+            }
+        }
 
         // If not found and no colon, search by tool name across all services
         if (!toolId.contains(":")) {
@@ -160,12 +303,33 @@ class McpServiceRegistry(
 
     /**
      * Look up a prompt by ID.
-     * Supports both "beanName:promptName" format and simple "promptName" format
-     * (in which case it searches by prompt name across all services).
+     * Supports multiple formats:
+     * - "beanName:serviceName:promptName" (full internal ID)
+     * - "serviceName:promptName" (client-visible format with service name)
+     * - "promptName" (simple prompt name, searches across all services)
      */
     fun getPrompt(promptId: String): PromptRegistry? {
-        // First try direct lookup with full ID (e.g., "weatherService:weather-help")
+        // First try direct lookup with full ID
         prompts[promptId]?.let { return it }
+
+        // If not found and has colon, try matching as client-visible format
+        // Client calls with "serviceName:promptName", need to find matching "beanName:serviceName:promptName"
+        if (promptId.contains(":")) {
+            val promptIdParts = promptId.split(":")
+            if (promptIdParts.size == 2) {
+                // Client-visible format "serviceName:promptName" - find matching internal ID
+                for ((internalId, registry) in prompts) {
+                    val internalIdParts = internalId.split(":")
+                    // Match: internalId has 3 parts "beanName:serviceName:promptName"
+                    // and client format matches last 2 parts
+                    if (internalIdParts.size == 3 &&
+                        internalIdParts[1] == promptIdParts[0] &&
+                        internalIdParts[2] == promptIdParts[1]) {
+                        return registry
+                    }
+                }
+            }
+        }
 
         // If not found and no colon, search by prompt name across all services
         if (!promptId.contains(":")) {

@@ -7,21 +7,26 @@ Spring Boot auto-configuration and integration enabling declarative MCP server s
 ## Requirements
 
 ### Requirement: Spring Boot Auto-Configuration
-The framework SHALL provide auto-configuration class that registers beans and enables MCP server without manual wiring.
+The framework SHALL provide auto-configuration class that registers beans and enables MCP server via explicit annotation.
 
 **Details**:
 - `@Configuration` class `McpServerAutoConfiguration`
 - Auto-discovered via `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`
-- Conditional on `aimo-mcp-server.enabled: true` property
-- Creates all framework beans when enabled
+- Activated via `@EnableMcpServer` annotation on Spring Boot application class
+- Creates all framework beans when annotation is present
+- No global `enabled` property flag; annotation provides explicit opt-in
 
-#### Scenario: Auto-configuration enables MCP server
-- **WHEN** application.yml sets `aimo-mcp-server.enabled: true`
+#### Scenario: Auto-configuration enables MCP server via annotation
+- **WHEN** Spring Boot application class has `@EnableMcpServer` annotation
 - **THEN** Spring Boot auto-configuration registers MCP server beans and services become available
 
-#### Scenario: Auto-configuration disables MCP server
-- **WHEN** application.yml sets `aimo-mcp-server.enabled: false`
-- **THEN** Spring Boot auto-configuration skips bean creation and MCP server is not available
+#### Scenario: MCP server disabled when annotation absent
+- **WHEN** Spring Boot application class does not have `@EnableMcpServer` annotation
+- **THEN** Spring Boot auto-configuration is not loaded and MCP server is not available
+
+#### Scenario: Transport enablement is independent
+- **WHEN** application.yml sets individual transport flags (e.g., `aimo-mcp-server.transports.http.enabled: false`)
+- **THEN** that specific transport is disabled while framework remains active; other transports can be independently enabled/disabled
 
 ### Requirement: Configuration Properties Binding
 Application YAML configuration SHALL bind to `McpServerProperties` class for type-safe property access.

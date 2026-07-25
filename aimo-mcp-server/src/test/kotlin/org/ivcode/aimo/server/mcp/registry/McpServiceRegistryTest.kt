@@ -43,6 +43,7 @@ class McpServiceRegistryTest {
 
         val toolDefinitions = registry.getToolDefinitions()
         assertEquals(2, toolDefinitions.size)
+        // Tool names are client-visible format (tool name only for unnamed services)
         assertTrue(toolDefinitions.any { it.name == "add" })
         assertTrue(toolDefinitions.any { it.name == "multiply" })
     }
@@ -57,6 +58,7 @@ class McpServiceRegistryTest {
 
         val promptDefinitions = registry.getPromptDefinitions()
         assertEquals(1, promptDefinitions.size)
+        // Prompt names are client-visible format (prompt name only for unnamed services)
         assertTrue(promptDefinitions.any { it.name == "calculationHelp" })
     }
 
@@ -182,6 +184,202 @@ class McpServiceRegistryTest {
         assertEquals(0, managedService.prompts.size)
     }
 
+    @Test
+    fun `should use service name when specified in @McpService annotation`() {
+        val service = ServiceWithName()
+        applicationContext.beanFactory.registerSingleton("weatherService", service)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+        registry.discoverServices()
+
+        val toolDefinitions = registry.getToolDefinitions()
+        assertEquals(1, toolDefinitions.size)
+
+        // With service name, client-visible tool name should be "serviceName:toolName"
+        val expectedName = "weather:getTemp"
+        assertTrue(toolDefinitions.any { it.name == expectedName },
+            "Expected tool name '$expectedName' but got: ${toolDefinitions.map { it.name }}")
+    }
+
+    @Test
+    fun `should build tool IDs without service name when not specified`() {
+        val service = TestCalculatorService()
+        applicationContext.beanFactory.registerSingleton("calculatorService", service)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+        registry.discoverServices()
+
+        val toolDefinitions = registry.getToolDefinitions()
+        // Without service name, client-visible tool names should be just the tool name
+        assertTrue(toolDefinitions.any { it.name == "add" })
+        assertTrue(toolDefinitions.any { it.name == "multiply" })
+    }
+
+    @Test
+    fun `should handle multiple services with same tool names using explicit service names`() {
+        val forecastService = ServiceWithNameForecast()
+        val historyService = ServiceWithNameHistory()
+
+        applicationContext.beanFactory.registerSingleton("weatherService1", forecastService)
+        applicationContext.beanFactory.registerSingleton("weatherService2", historyService)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+        registry.discoverServices()
+
+        val toolDefinitions = registry.getToolDefinitions()
+        // Both have "getTemp" tool but with different service names in client-visible format
+        assertTrue(toolDefinitions.any { it.name == "forecast:getTemp" })
+        assertTrue(toolDefinitions.any { it.name == "history:getTemp" })
+    }
+
+    @Test
+    fun `should use service name in prompt definitions when specified`() {
+        val service = ServiceWithNameAndPrompt()
+        applicationContext.beanFactory.registerSingleton("weatherService", service)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+        registry.discoverServices()
+
+        val promptDefinitions = registry.getPromptDefinitions()
+        assertEquals(1, promptDefinitions.size)
+
+        // With service name, client-visible prompt name should be "serviceName:promptName"
+        assertTrue(promptDefinitions.any { it.name == "weather:weatherHelp" })
+    }
+
+    @Test
+    fun `should throw exception when private method has @McpTool annotation`() {
+        val service = ServiceWithPrivateTool()
+        applicationContext.beanFactory.registerSingleton("serviceWithPrivateTool", service)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            registry.discoverServices()
+        }
+
+        assertTrue(exception.message?.contains("private/protected method") ?: false)
+        assertTrue(exception.message?.contains("@McpTool") ?: false)
+        assertTrue(exception.message?.contains("Only public methods") ?: false)
+    }
+
+    @Test
+    fun `should throw exception when protected method has @McpTool annotation`() {
+        val service = ServiceWithProtectedTool()
+        applicationContext.beanFactory.registerSingleton("serviceWithProtectedTool", service)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            registry.discoverServices()
+        }
+
+        assertTrue(exception.message?.contains("private/protected method") ?: false)
+        assertTrue(exception.message?.contains("@McpTool") ?: false)
+    }
+
+    @Test
+    fun `should throw exception when private method has @McpPrompt annotation`() {
+        val service = ServiceWithPrivatePrompt()
+        applicationContext.beanFactory.registerSingleton("serviceWithPrivatePrompt", service)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            registry.discoverServices()
+        }
+
+        assertTrue(exception.message?.contains("private/protected method") ?: false)
+        assertTrue(exception.message?.contains("@McpPrompt") ?: false)
+        assertTrue(exception.message?.contains("Only public methods") ?: false)
+    }
+
+    @Test
+    fun `should throw exception when unnamed services have conflicting tool names`() {
+        // Create two unnamed services with the same tool name
+        val service1 = ServiceUnnamedWithGetWeather()
+        val service2 = ServiceUnnamedConflictingGetWeather()
+        applicationContext.beanFactory.registerSingleton("weatherService1", service1)
+        applicationContext.beanFactory.registerSingleton("weatherService2", service2)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            registry.discoverServices()
+        }
+
+        assertTrue(exception.message?.contains("Tool name conflict") ?: false)
+        assertTrue(exception.message?.contains("getWeather") ?: false)
+    }
+
+    @Test
+    fun `should throw exception when unnamed services have conflicting prompt names`() {
+        // Create two unnamed services with the same prompt name
+        val service1 = ServiceUnnamedWithPrompt()
+        val service2 = ServiceUnnamedConflictingPrompt()
+        applicationContext.beanFactory.registerSingleton("promptService1", service1)
+        applicationContext.beanFactory.registerSingleton("promptService2", service2)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            registry.discoverServices()
+        }
+
+        assertTrue(exception.message?.contains("Prompt name conflict") ?: false)
+        assertTrue(exception.message?.contains("help") ?: false)
+    }
+
+    @Test
+    fun `should allow multiple unnamed services with different tool names`() {
+        val service1 = ServiceUnnamedWithGetWeather()
+        val service2 = TestStringService()
+        applicationContext.beanFactory.registerSingleton("weatherService", service1)
+        applicationContext.beanFactory.registerSingleton("stringService", service2)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+        registry.discoverServices()
+
+        val toolDefinitions = registry.getToolDefinitions()
+        assertTrue(toolDefinitions.any { it.name == "getWeather" })
+        assertTrue(toolDefinitions.any { it.name == "reverse" })
+    }
+
+    @Test
+    fun `should allow services with explicit names even if tool names conflict`() {
+        // Named services should not conflict even with same tool names
+        val service1 = ServiceWithNameForecast()
+        val service2 = ServiceWithNameHistory()
+        applicationContext.beanFactory.registerSingleton("weatherService", service1)
+        applicationContext.beanFactory.registerSingleton("historyService", service2)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+        registry.discoverServices()
+
+        val toolDefinitions = registry.getToolDefinitions()
+        // Should have both tools with client-visible format "serviceName:toolName"
+        assertTrue(toolDefinitions.any { it.name == "forecast:getTemp" })
+        assertTrue(toolDefinitions.any { it.name == "history:getTemp" })
+    }
+
+    @Test
+    fun `should throw exception when named services have same tool name with same service name`() {
+        // Two services with same tool name AND same service name should conflict
+        val service1 = ServiceWithNameForecast()  // name="forecast", tool="getTemp"
+        val service2 = ServiceWithNameForecastConflict()  // also name="forecast", tool="getTemp"
+        applicationContext.beanFactory.registerSingleton("weatherService1", service1)
+        applicationContext.beanFactory.registerSingleton("weatherService2", service2)
+
+        val registry = McpServiceRegistry(applicationContext, schemaGenerator)
+
+        val exception = assertThrows(IllegalArgumentException::class.java) {
+            registry.discoverServices()
+        }
+
+        assertTrue(exception.message?.contains("Tool name conflict") ?: false)
+        assertTrue(exception.message?.contains("forecast:getTemp") ?: false)
+    }
+
     // Test service implementations
     @McpService
     class TestCalculatorService {
@@ -211,9 +409,81 @@ class McpServiceRegistryTest {
 
     @McpService
     class EmptyService
+
+    @McpService
+    class ServiceWithPrivateTool {
+        @McpTool
+        private fun privateTool(): String = "This is private"
+    }
+
+    @McpService
+    class ServiceWithProtectedTool {
+        @McpTool
+        protected fun protectedTool(): String = "This is protected"
+    }
+
+    @McpService
+    class ServiceWithPrivatePrompt {
+        @McpPrompt
+        private fun privatePrompt(): String = "This is a private prompt"
+    }
+
+    @McpService(name = "weather")
+    class ServiceWithName {
+        @McpTool
+        fun getTemp(): Double = 72.5
+    }
+
+
+    @McpService(name = "forecast")
+    class ServiceWithNameForecast {
+        @McpTool
+        fun getTemp(): Double = 75.0
+    }
+
+    @McpService(name = "history")
+    class ServiceWithNameHistory {
+        @McpTool
+        fun getTemp(): Double = 65.0
+    }
+
+    @McpService(name = "weather")
+    class ServiceWithNameAndPrompt {
+        @McpTool
+        fun getTemp(): Double = 72.5
+
+        @McpPrompt
+        fun weatherHelp(): String = "Get current weather temperature"
+    }
+
+    @McpService(name = "forecast")
+    class ServiceWithNameForecastConflict {
+        @McpTool
+        fun getTemp(): Double = 75.0
+    }
+
+    // Services for conflict detection tests
+    @McpService
+    class ServiceUnnamedWithGetWeather {
+        @McpTool
+        fun getWeather(): String = "Sunny, 72F"
+    }
+
+    @McpService
+    class ServiceUnnamedConflictingGetWeather {
+        @McpTool
+        fun getWeather(): String = "Rainy, 65F"
+    }
+
+    @McpService
+    class ServiceUnnamedWithPrompt {
+        @McpPrompt
+        fun help(): String = "Get help"
+    }
+
+    @McpService
+    class ServiceUnnamedConflictingPrompt {
+        @McpPrompt
+        fun help(): String = "More help"
+    }
 }
-
-
-
-
-
