@@ -45,10 +45,9 @@
 
 **Causes and Solutions:**
 1. **Service not a Spring bean**
-   - Add `@Component`, `@Service`, or define as `@Bean`
+   - Ensure the class is discovered by Spring component scanning
    - Wrong: `class MyService { ... }`
-   - Right: `@Component @McpService class MyService { ... }`
-
+   - Right: `@McpService class MyService { ... }`
 2. **Service not in component scan path**
    - Ensure service is in package scanned by Spring
    - Check `@ComponentScan` configuration

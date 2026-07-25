@@ -19,6 +19,7 @@ import kotlin.concurrent.thread
  * Implemented as a Spring Lifecycle bean for graceful startup/shutdown.
  */
 @Component
+@ConditionalOnProperty(prefix = "aimo.mcp.transports.stdio", name = ["enabled"], havingValue = "true")
 class StdioMcpTransport(
     private val requestHandler: org.ivcode.aimo.server.mcp.handler.McpRequestHandler,
     private val objectMapper: ObjectMapper

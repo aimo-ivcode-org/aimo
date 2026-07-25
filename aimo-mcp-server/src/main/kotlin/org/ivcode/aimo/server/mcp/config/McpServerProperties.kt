@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component
  *
  * Binds to application.yml configuration under "aimo.mcp" prefix.
  */
-@Component
 @ConfigurationProperties(prefix = "aimo.mcp")
 data class McpServerProperties(
     /**

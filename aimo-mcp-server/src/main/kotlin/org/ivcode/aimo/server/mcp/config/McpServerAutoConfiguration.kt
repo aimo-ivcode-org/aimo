@@ -28,8 +28,13 @@ import org.springframework.context.event.EventListener
  * Enable via @EnableMcpServer annotation or include in spring.factories.
  */
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    prefix = "aimo.mcp",
+    name = ["enabled"],
+    havingValue = "true",
+    matchIfMissing = true
+)
 @EnableConfigurationProperties(McpServerProperties::class)
-class McpServerAutoConfiguration {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**

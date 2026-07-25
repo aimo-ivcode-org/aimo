@@ -27,12 +27,16 @@ data class JsonRpcRequest(
 
     @JsonProperty("params")
     val params: Map<String, Any?>? = null
-) : JsonRpcMessage() {
+ ) : JsonRpcMessage() {
+    private val additionalProperties = mutableMapOf<String, Any?>()
+
     @JsonAnySetter
-    private val _additionalProperties = mutableMapOf<String, Any?>()
+    fun setAdditionalProperty(name: String, value: Any?) {
+        additionalProperties[name] = value
+    }
 
     @JsonAnyGetter
-    fun getAdditionalProperties(): Map<String, Any?> = _additionalProperties
+    fun getAdditionalProperties(): Map<String, Any?> = additionalProperties
 }
 
 /**
