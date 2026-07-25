@@ -22,6 +22,7 @@ rootProject.name = "aimo"
 // --== Modules ==-- //
 include("aimo-core")
 include("aimo-mcp-client")
+include("aimo-mcp-server")
 include("aimo-model-ollama")
 include("aimo-model-bedrock")
 include("aimo-server")
@@ -32,3 +33,5 @@ include("aimo-ui")
 include(":examples:simple-ollama")
 include(":examples:simple-bedrock")
 include(":examples:mcp-client-ollama")
+include(":examples:mcp-server-weather")
+include(":examples:mcp-client-weather")

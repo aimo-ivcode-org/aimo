@@ -20,6 +20,7 @@ import org.ivcode.aimo.core.model.ToolDefinition
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CHAT_ID
 import org.ivcode.aimo.core.util.CONTEXT_KEY__CONVERSATION
 import org.ivcode.aimo.core.util.CONTEXT_KEY__REQUEST_ID
+import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.util.UUID
 import kotlin.collections.orEmpty
@@ -69,12 +70,16 @@ internal class AimoChatClientImpl (
     private val model: AimoChatModelConfig,
     private val chatScope: ChatScope,
 ) : AimoChatClient {
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     // Fetch all tools once to ensure consistency between toolCallbacks and toolDefinitions.
     // Uses getAllTools() (not the static `tools` field) so  provider-sourced tools
     // (e.g. MCP server tools) are included alongside statically registered ones.
     // Called once at initialization to avoid concurrent changes creating inconsistencies.
-    private val allToolCallbacks: List<ToolCallback> = chatScope.getAllTools()
+    private val allToolCallbacks: List<ToolCallback> = chatScope.getAllTools().also { tools ->
+        logger.info("AimoChatClientImpl initialized with {} tools for chat {}", tools.size, chatId)
+        tools.forEach { tool -> logger.debug("  Tool: {}", tool.toolDefinition.name) }
+    }
 
     // Map tool callbacks by name for O(1) lookup during tool invocation.
     private val toolCallbacks: Map<String, ToolCallback> = allToolCallbacks.associateBy { it.toolDefinition.name }

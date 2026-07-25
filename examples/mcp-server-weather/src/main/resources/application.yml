@@ -1,0 +1,39 @@
+# Weather MCP Server Configuration
+
+spring:
+  application:
+    name: "weather-mcp-server"
+  profiles:
+    active: default
+
+server:
+  port: 9090
+
+aimo:
+  mcp:
+    enabled: true
+    name: "weather-mcp-server"
+    version: "1.0.0"
+
+    transports:
+      http:
+        enabled: true
+        basePath: "/mcp"
+
+    discovery:
+      enabled: true
+      failIfEmpty: false
+
+logging:
+  level:
+    org.ivcode.aimo.server.mcp: INFO
+    org.springframework: WARN
+
+# Springdoc/OpenAPI configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+

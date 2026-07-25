@@ -1,0 +1,48 @@
+# Example aimo-mcp-server configuration
+
+aimo:
+  mcp:
+    enabled: true
+    name: "aimo-mcp-server"
+    version: "1.0.0"
+
+    # Transport configuration
+    transports:
+      http:
+        enabled: true
+        basePath: "/mcp"
+        connectionTimeout: 30000
+        readTimeout: 30000
+
+      sse:
+        enabled: false
+        basePath: "/mcp/sse"
+        connectionTimeout: 300000
+        keepAliveInterval: 30000
+
+      stdio:
+        enabled: false
+
+    # Service discovery configuration
+    discovery:
+      enabled: true
+      basePackages: ""  # Empty = scan all packages
+      failIfEmpty: false
+
+    # Error handling configuration
+    errorHandling:
+      includeStackTrace: false
+      includeErrorData: true
+      failOnValidationError: true
+
+# Spring Boot configuration
+spring:
+  application:
+    name: "aimo-mcp-server"
+
+# Logging configuration
+logging:
+  level:
+    org.ivcode.aimo.server.mcp: INFO
+    org.springframework: WARN
+
