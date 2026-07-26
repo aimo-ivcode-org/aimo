@@ -57,14 +57,23 @@ class ToolCallHandler(
             logger.debug("Invoking tool: {}", toolName)
 
             // Bind parameters
-            val boundArgs = parameterBinder.bindParameters(
-                method = toolRegistry.method,
-                arguments = arguments,
-                context = mapOf(
-                    "toolName" to toolName,
-                    "requestId" to request.id?.toString()
+            val boundArgs = try {
+                parameterBinder.bindParameters(
+                    method = toolRegistry.method,
+                    arguments = arguments,
+                    context = mapOf(
+                        "toolName" to toolName,
+                        "requestId" to request.id?.toString()
+                    )
                 )
-            )
+            } catch (e: ParameterBindingException) {
+                logger.warn("Parameter binding failed for tool '{}': {}", toolName, e.message)
+                return error(
+                    request.id,
+                    McpErrorCode.INVALID_PARAMS,
+                    e.message ?: "Invalid parameter"
+                )
+            }
 
             // Invoke tool
             val result = try {
@@ -100,6 +109,16 @@ class ToolCallHandler(
 }
 
 /**
+ * Exception thrown when parameter binding fails.
+ */
+class ParameterBindingException(
+    val parameterName: String,
+    val expectedType: Class<*>,
+    val providedValue: Any?,
+    message: String
+) : Exception(message)
+
+/**
  * Binds request parameters to method arguments.
  */
 @Component
@@ -110,6 +129,7 @@ class ParameterBinder(
 
     /**
      * Bind parameters from request to method arguments.
+     * @throws ParameterBindingException if parameter conversion fails
      */
     fun bindParameters(
         method: java.lang.reflect.Method,
@@ -140,29 +160,70 @@ class ParameterBinder(
                 value != null && (param.type == Int::class.java || param.type == Integer::class.java) -> {
                     when (value) {
                         is Number -> value.toInt()
-                        is String -> value.toIntOrNull() ?: 0
-                        else -> 0
+                        is String -> {
+                            value.toIntOrNull() ?: throw ParameterBindingException(
+                                parameterName = param.name,
+                                expectedType = param.type,
+                                providedValue = value,
+                                message = "Parameter '${param.name}' expects an integer but got invalid value: '$value'"
+                            )
+                        }
+                        else -> throw ParameterBindingException(
+                            parameterName = param.name,
+                            expectedType = param.type,
+                            providedValue = value,
+                            message = "Parameter '${param.name}' expects an integer but got ${value.javaClass.simpleName}: $value"
+                        )
                     }
                 }
                 value != null && param.type == Long::class.java -> {
                     when (value) {
                         is Number -> value.toLong()
-                        is String -> value.toLongOrNull() ?: 0L
-                        else -> 0L
+                        is String -> {
+                            value.toLongOrNull() ?: throw ParameterBindingException(
+                                parameterName = param.name,
+                                expectedType = param.type,
+                                providedValue = value,
+                                message = "Parameter '${param.name}' expects a long but got invalid value: '$value'"
+                            )
+                        }
+                        else -> throw ParameterBindingException(
+                            parameterName = param.name,
+                            expectedType = param.type,
+                            providedValue = value,
+                            message = "Parameter '${param.name}' expects a long but got ${value.javaClass.simpleName}: $value"
+                        )
                     }
                 }
                 value != null && (param.type == Double::class.java || param.type == Float::class.java) -> {
                     when (value) {
                         is Number -> value.toDouble()
-                        is String -> value.toDoubleOrNull() ?: 0.0
-                        else -> 0.0
+                        is String -> {
+                            value.toDoubleOrNull() ?: throw ParameterBindingException(
+                                parameterName = param.name,
+                                expectedType = param.type,
+                                providedValue = value,
+                                message = "Parameter '${param.name}' expects a decimal number but got invalid value: '$value'"
+                            )
+                        }
+                        else -> throw ParameterBindingException(
+                            parameterName = param.name,
+                            expectedType = param.type,
+                            providedValue = value,
+                            message = "Parameter '${param.name}' expects a decimal number but got ${value.javaClass.simpleName}: $value"
+                        )
                     }
                 }
                 value != null && (param.type == Boolean::class.java || param.type == java.lang.Boolean::class.java) -> {
                     when (value) {
                         is Boolean -> value
                         is String -> value.equals("true", ignoreCase = true)
-                        else -> false
+                        else -> throw ParameterBindingException(
+                            parameterName = param.name,
+                            expectedType = param.type,
+                            providedValue = value,
+                            message = "Parameter '${param.name}' expects a boolean but got ${value.javaClass.simpleName}: $value"
+                        )
                     }
                 }
                 value != null -> {
@@ -170,8 +231,12 @@ class ParameterBinder(
                     try {
                         objectMapper.convertValue(value, param.type)
                     } catch (e: Exception) {
-                        logger.warn("Could not convert parameter '${param.name}' to type ${param.type}", e)
-                        value
+                        throw ParameterBindingException(
+                            parameterName = param.name,
+                            expectedType = param.type,
+                            providedValue = value,
+                            message = "Could not convert parameter '${param.name}' to type ${param.type.simpleName}: ${e.message}"
+                        )
                     }
                 }
                 // Handle missing/null values for optional parameters
