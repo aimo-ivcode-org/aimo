@@ -2,7 +2,6 @@ package org.ivcode.aimo.server.mcp.config
 
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.NestedConfigurationProperty
-import org.springframework.stereotype.Component
 
 /**
  * MCP server configuration properties.
@@ -21,6 +20,12 @@ data class McpServerProperties(
      * Server version.
      */
     var version: String = "1.0.0",
+
+    /**
+     * Master enable flag for the MCP server framework.
+     * When false, auto-configuration should be skipped and transports/controllers not registered.
+     */
+    var enabled: Boolean = true,
 
     /**
      * Transport configurations.

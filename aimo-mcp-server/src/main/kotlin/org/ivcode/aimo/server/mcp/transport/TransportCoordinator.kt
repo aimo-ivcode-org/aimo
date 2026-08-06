@@ -2,6 +2,7 @@ package org.ivcode.aimo.server.mcp.transport
 
 import org.ivcode.aimo.server.mcp.config.McpServerProperties
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.stereotype.Component
 
 /**
@@ -12,8 +13,8 @@ import org.springframework.stereotype.Component
 @Component
 class TransportCoordinator(
     private val properties: McpServerProperties,
-    private val httpTransport: HttpMcpTransport,
-    private val sseTransport: SseMcpTransport
+    private val httpTransportProvider: ObjectProvider<HttpMcpTransport>,
+    private val sseTransportProvider: ObjectProvider<SseMcpTransport>
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val activeTransports = mutableListOf<McpTransport>()
@@ -26,16 +27,26 @@ class TransportCoordinator(
 
         // HTTP transport (usually enabled by default)
         if (properties.transports.http.enabled) {
-            logger.info("Enabling HTTP transport")
-            httpTransport.initialize()
-            activeTransports.add(httpTransport)
+            val httpTransport = httpTransportProvider.getIfAvailable()
+            if (httpTransport != null) {
+                logger.info("Enabling HTTP transport")
+                httpTransport.initialize()
+                activeTransports.add(httpTransport)
+            } else {
+                logger.warn("HTTP transport is enabled in configuration but no HttpMcpTransport bean is available")
+            }
         }
 
         // SSE transport
         if (properties.transports.sse.enabled) {
-            logger.info("Enabling SSE transport")
-            sseTransport.initialize()
-            activeTransports.add(sseTransport)
+            val sseTransport = sseTransportProvider.getIfAvailable()
+            if (sseTransport != null) {
+                logger.info("Enabling SSE transport")
+                sseTransport.initialize()
+                activeTransports.add(sseTransport)
+            } else {
+                logger.warn("SSE transport is enabled in configuration but no SseMcpTransport bean is available")
+            }
         }
 
         logger.info("MCP transports initialized: {} active", activeTransports.size)

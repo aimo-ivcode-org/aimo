@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse
 import org.slf4j.LoggerFactory
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.Lifecycle
-import org.springframework.stereotype.Component
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
@@ -18,8 +16,6 @@ import kotlin.concurrent.thread
  * Communicates via stdin/stdout for local/subprocess connections.
  * Implemented as a Spring Lifecycle bean for graceful startup/shutdown.
  */
-@Component
-@ConditionalOnProperty(prefix = "aimo.mcp-server.transports.stdio", name = ["enabled"], havingValue = "true")
 class StdioMcpTransport(
     private val requestHandler: org.ivcode.aimo.server.mcp.handler.McpRequestHandler,
     private val objectMapper: ObjectMapper

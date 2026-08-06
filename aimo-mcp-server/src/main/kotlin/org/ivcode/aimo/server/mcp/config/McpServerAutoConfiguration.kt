@@ -19,6 +19,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.beans.factory.ObjectProvider
+import org.ivcode.aimo.server.mcp.transport.StdioMcpTransport
 import org.springframework.context.event.ContextRefreshedEvent
 import org.springframework.context.event.EventListener
 
@@ -33,6 +35,7 @@ import org.springframework.context.event.EventListener
  */
 @Configuration
 @EnableConfigurationProperties(McpServerProperties::class)
+@ConditionalOnProperty(prefix = "aimo.mcp-server", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 class McpServerAutoConfiguration {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -139,6 +142,7 @@ class McpServerAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.http", name = ["enabled"], havingValue = "true", matchIfMissing = true)
     fun httpMcpTransport(
         requestHandler: McpRequestHandler,
         objectMapper: ObjectMapper
@@ -151,11 +155,24 @@ class McpServerAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.sse", name = ["enabled"], havingValue = "true", matchIfMissing = false)
     fun sseMcpTransport(
         requestHandler: McpRequestHandler,
         objectMapper: ObjectMapper
     ): SseMcpTransport {
         return SseMcpTransport(requestHandler, objectMapper)
+    }
+
+    /**
+     * Register stdio transport as a bean when enabled. Stdio transport is implemented as a Lifecycle
+     * and must be created explicitly from auto-configuration to avoid accidental creation via
+     * component scanning (which may not happen when only @EnableMcpServer is used).
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.stdio", name = ["enabled"], havingValue = "true", matchIfMissing = false)
+    fun stdioMcpTransport(requestHandler: McpRequestHandler, objectMapper: ObjectMapper): StdioMcpTransport {
+        return StdioMcpTransport(requestHandler, objectMapper)
     }
 
     /**
@@ -165,10 +182,10 @@ class McpServerAutoConfiguration {
     @ConditionalOnMissingBean
     fun transportCoordinator(
         properties: McpServerProperties,
-        httpTransport: HttpMcpTransport,
-        sseTransport: SseMcpTransport
+        httpTransportProvider: ObjectProvider<HttpMcpTransport>,
+        sseTransportProvider: ObjectProvider<SseMcpTransport>
     ): TransportCoordinator {
-        return TransportCoordinator(properties, httpTransport, sseTransport)
+        return TransportCoordinator(properties, httpTransportProvider, sseTransportProvider)
     }
 
     /**

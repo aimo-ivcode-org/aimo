@@ -12,8 +12,6 @@ import org.ivcode.aimo.server.mcp.protocol.ToolInputSchema
 import java.lang.reflect.Method
 import java.lang.reflect.Parameter
 import kotlin.reflect.KClass
-import kotlin.reflect.full.findAnnotation
-import kotlin.reflect.jvm.kotlinFunction
 
 /**
  * Generates OpenRPC-compliant schemas from annotated method signatures.
