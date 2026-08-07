@@ -8,12 +8,15 @@ import org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse
 import org.ivcode.aimo.server.mcp.protocol.McpErrorCode
 import org.ivcode.aimo.server.mcp.registry.McpServiceRegistry
 import org.slf4j.LoggerFactory
+import kotlin.reflect.KParameter
+import kotlin.reflect.full.instanceParameter
+import kotlin.reflect.jvm.isAccessible
+import kotlin.reflect.jvm.kotlinFunction
 import org.springframework.stereotype.Component
 
 /**
  * Handles prompts/get requests - invokes @McpPrompt methods.
  */
-@Component
 class PromptGetHandler(
     private val serviceRegistry: McpServiceRegistry,
     private val parameterBinder: ParameterBinder,
@@ -55,7 +58,7 @@ class PromptGetHandler(
             logger.debug("Invoking prompt: {}", promptName)
 
             // Bind parameters
-            val boundArgs = parameterBinder.bindParameters(
+            val bindingResult = parameterBinder.bindParameters(
                 method = promptRegistry.method,
                 arguments = arguments,
                 context = mapOf(
@@ -64,9 +67,32 @@ class PromptGetHandler(
                 )
             )
 
-            // Invoke prompt
+            // Invoke prompt (prefer Kotlin callBy to respect defaults)
             val result = try {
-                promptRegistry.method.invoke(promptRegistry.bean, *boundArgs.toTypedArray())
+                val kotlinFn = promptRegistry.method.kotlinFunction
+                if (kotlinFn != null) {
+                    val callByMap = mutableMapOf<KParameter, Any?>()
+                    kotlinFn.instanceParameter?.let { callByMap[it] = promptRegistry.bean }
+
+                    for (kp in kotlinFn.parameters) {
+                        if (kp == kotlinFn.instanceParameter) continue
+                        val name = kp.name
+                        if (name != null && bindingResult.provided.contains(name)) {
+                            callByMap[kp] = bindingResult.values[name]
+                        } else {
+                            val javaParam = promptRegistry.method.parameters.firstOrNull { it.name == name }
+                            if (javaParam != null && javaParam.getAnnotation(McpContext::class.java) != null) {
+                                callByMap[kp] = bindingResult.context
+                            }
+                        }
+                    }
+
+                    kotlinFn.isAccessible = true
+                    kotlinFn.callBy(callByMap)
+                } else {
+                    val javaArgs = promptRegistry.method.parameters.map { p -> bindingResult.values[p.name] }
+                    promptRegistry.method.invoke(promptRegistry.bean, *javaArgs.toTypedArray())
+                }
             } catch (e: Exception) {
                 logger.error("Prompt invocation failed: {}", promptName, e)
                 return error(

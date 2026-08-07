@@ -15,7 +15,6 @@ import org.springframework.stereotype.Component
  * Dispatches tool/call and prompts/get methods to registered service methods,
  * handling errors and validation.
  */
-@Component
 class McpRequestHandler(
     private val serviceRegistry: McpServiceRegistry,
     private val toolCallHandler: ToolCallHandler,

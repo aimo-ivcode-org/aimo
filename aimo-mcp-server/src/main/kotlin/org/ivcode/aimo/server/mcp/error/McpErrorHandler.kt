@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component
 /**
  * Handles error conversion and formatting for MCP responses.
  */
-@Component
 class McpErrorHandler {
     private val logger = LoggerFactory.getLogger(javaClass)
 

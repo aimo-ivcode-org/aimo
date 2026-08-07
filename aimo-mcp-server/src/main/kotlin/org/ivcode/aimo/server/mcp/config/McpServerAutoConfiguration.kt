@@ -44,7 +44,7 @@ class McpServerAutoConfiguration {
      * Creates a basic ObjectMapper that works with JSON-RPC requests/responses.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(ObjectMapper::class)
     fun objectMapper(): ObjectMapper {
         return ObjectMapper()
     }
@@ -53,7 +53,7 @@ class McpServerAutoConfiguration {
      * Register schema generator bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(McpSchemaGenerator::class)
     fun mcpSchemaGenerator(): McpSchemaGenerator {
         return McpSchemaGenerator()
     }
@@ -62,7 +62,7 @@ class McpServerAutoConfiguration {
      * Register service registry bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(McpServiceRegistry::class)
     fun mcpServiceRegistry(
         applicationContext: ApplicationContext,
         schemaGenerator: McpSchemaGenerator
@@ -74,7 +74,7 @@ class McpServerAutoConfiguration {
      * Register parameter validator bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(ParameterValidator::class)
     fun parameterValidator(): ParameterValidator {
         return ParameterValidator()
     }
@@ -83,7 +83,7 @@ class McpServerAutoConfiguration {
      * Register error handler bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(McpErrorHandler::class)
     fun mcpErrorHandler(): McpErrorHandler {
         return McpErrorHandler()
     }
@@ -92,7 +92,7 @@ class McpServerAutoConfiguration {
      * Register parameter binder bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(ParameterBinder::class)
     fun parameterBinder(objectMapper: ObjectMapper): ParameterBinder {
         return ParameterBinder(objectMapper)
     }
@@ -101,7 +101,7 @@ class McpServerAutoConfiguration {
      * Register tool call handler bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(ToolCallHandler::class)
     fun toolCallHandler(
         serviceRegistry: McpServiceRegistry,
         parameterBinder: ParameterBinder,
@@ -114,7 +114,7 @@ class McpServerAutoConfiguration {
      * Register prompt get handler bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(PromptGetHandler::class)
     fun promptGetHandler(
         serviceRegistry: McpServiceRegistry,
         parameterBinder: ParameterBinder,
@@ -127,7 +127,7 @@ class McpServerAutoConfiguration {
      * Register request handler bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(McpRequestHandler::class)
     fun mcpRequestHandler(
         serviceRegistry: McpServiceRegistry,
         toolCallHandler: ToolCallHandler,
@@ -141,7 +141,7 @@ class McpServerAutoConfiguration {
      * Register HTTP transport bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(HttpMcpTransport::class)
     @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.http", name = ["enabled"], havingValue = "true", matchIfMissing = true)
     fun httpMcpTransport(
         requestHandler: McpRequestHandler,
@@ -154,7 +154,7 @@ class McpServerAutoConfiguration {
      * Register SSE transport bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(SseMcpTransport::class)
     @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.sse", name = ["enabled"], havingValue = "true", matchIfMissing = false)
     fun sseMcpTransport(
         requestHandler: McpRequestHandler,
@@ -169,7 +169,7 @@ class McpServerAutoConfiguration {
      * component scanning (which may not happen when only @EnableMcpServer is used).
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(StdioMcpTransport::class)
     @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.stdio", name = ["enabled"], havingValue = "true", matchIfMissing = false)
     fun stdioMcpTransport(requestHandler: McpRequestHandler, objectMapper: ObjectMapper): StdioMcpTransport {
         return StdioMcpTransport(requestHandler, objectMapper)
@@ -179,13 +179,14 @@ class McpServerAutoConfiguration {
      * Register transport coordinator bean.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(TransportCoordinator::class)
     fun transportCoordinator(
         properties: McpServerProperties,
         httpTransportProvider: ObjectProvider<HttpMcpTransport>,
-        sseTransportProvider: ObjectProvider<SseMcpTransport>
+        sseTransportProvider: ObjectProvider<SseMcpTransport>,
+        stdioTransportProvider: ObjectProvider<org.ivcode.aimo.server.mcp.transport.McpTransport>
     ): TransportCoordinator {
-        return TransportCoordinator(properties, httpTransportProvider, sseTransportProvider)
+        return TransportCoordinator(properties, httpTransportProvider, sseTransportProvider, stdioTransportProvider)
     }
 
     /**

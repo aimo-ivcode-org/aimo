@@ -3,18 +3,17 @@ package org.ivcode.aimo.server.mcp.transport
 import org.ivcode.aimo.server.mcp.config.McpServerProperties
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.stereotype.Component
 
 /**
  * Coordinator for transport selection and initialization.
  *
  * Manages which transports are enabled and active based on configuration.
  */
-@Component
 class TransportCoordinator(
     private val properties: McpServerProperties,
     private val httpTransportProvider: ObjectProvider<HttpMcpTransport>,
-    private val sseTransportProvider: ObjectProvider<SseMcpTransport>
+    private val sseTransportProvider: ObjectProvider<SseMcpTransport>,
+    private val stdioTransportProvider: ObjectProvider<McpTransport>
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val activeTransports = mutableListOf<McpTransport>()
@@ -46,6 +45,22 @@ class TransportCoordinator(
                 activeTransports.add(sseTransport)
             } else {
                 logger.warn("SSE transport is enabled in configuration but no SseMcpTransport bean is available")
+            }
+        }
+
+        // Stdio transport
+        if (properties.transports.stdio.enabled) {
+            val stdioTransport = stdioTransportProvider.getIfAvailable()
+            if (stdioTransport != null) {
+                logger.info("Enabling Stdio transport")
+                try {
+                    stdioTransport.initialize()
+                    activeTransports.add(stdioTransport)
+                } catch (e: Exception) {
+                    logger.error("Error initializing Stdio transport", e)
+                }
+            } else {
+                logger.warn("Stdio transport is enabled in configuration but no stdio transport bean is available")
             }
         }
 

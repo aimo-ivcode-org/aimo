@@ -8,7 +8,6 @@ import java.lang.reflect.Parameter
 /**
  * Validates tool/prompt parameters before invocation.
  */
-@Component
 class ParameterValidator {
     private val logger = LoggerFactory.getLogger(javaClass)
 

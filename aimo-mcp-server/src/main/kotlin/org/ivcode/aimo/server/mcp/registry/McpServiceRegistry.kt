@@ -17,7 +17,6 @@ import java.lang.reflect.Method
  * Scans Spring application context for @McpService beans and builds a schema catalog
  * of all available tools and prompts.
  */
-@Component
 class McpServiceRegistry(
     private val applicationContext: ApplicationContext,
     private val schemaGenerator: McpSchemaGenerator

@@ -168,7 +168,7 @@ In your Spring Boot application's `build.gradle.kts`:
 
 ```kotlin
 dependencies {
-    implementation(":aimo-mcp-server")
+    implementation(project(":aimo-mcp-server"))
 }
 ```
 

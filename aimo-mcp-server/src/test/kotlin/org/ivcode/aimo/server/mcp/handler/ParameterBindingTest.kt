@@ -79,11 +79,11 @@ class ParameterBindingTest {
         val arguments = mapOf("a" to "123", "b" to 456)
         val context = emptyMap<String, Any?>()
 
-        val boundArgs = parameterBinder.bindParameters(method, arguments, context)
+        val binding = parameterBinder.bindParameters(method, arguments, context)
 
-        assertEquals(2, boundArgs.size)
-        assertEquals(123, boundArgs[0])
-        assertEquals(456, boundArgs[1])
+        assertEquals(123, binding.values["a"])
+        assertEquals(456, binding.values["b"])
+        assertTrue(binding.provided.containsAll(listOf("a", "b")))
     }
 
     @Test
@@ -92,10 +92,10 @@ class ParameterBindingTest {
         val arguments = mapOf("value" to "50.5")
         val context = emptyMap<String, Any?>()
 
-        val boundArgs = parameterBinder.bindParameters(method, arguments, context)
+        val binding = parameterBinder.bindParameters(method, arguments, context)
 
-        assertEquals(1, boundArgs.size)
-        assertEquals(50.5, boundArgs[0] as Double, 0.01)
+        assertEquals(50.5, binding.values["value"] as Double, 0.01)
+        assertTrue(binding.provided.contains("value"))
     }
 
     @Test
@@ -104,12 +104,12 @@ class ParameterBindingTest {
         val arguments = mapOf("intVal" to "100", "longVal" to 500L, "doubleVal" to "3.14")
         val context = emptyMap<String, Any?>()
 
-        val boundArgs = parameterBinder.bindParameters(method, arguments, context)
+        val binding = parameterBinder.bindParameters(method, arguments, context)
 
-        assertEquals(3, boundArgs.size)
-        assertEquals(100, boundArgs[0])
-        assertEquals(500L, boundArgs[1])
-        assertEquals(3.14, boundArgs[2] as Double, 0.01)
+        assertEquals(100, binding.values["intVal"])
+        assertEquals(500L, binding.values["longVal"])
+        assertEquals(3.14, binding.values["doubleVal"] as Double, 0.01)
+        assertTrue(binding.provided.containsAll(listOf("intVal", "longVal", "doubleVal")))
     }
 
     @Test
