@@ -35,7 +35,6 @@ import org.springframework.context.event.EventListener
  */
 @Configuration
 @EnableConfigurationProperties(McpServerProperties::class)
-@ConditionalOnProperty(prefix = "aimo.mcp-server", name = ["enabled"], havingValue = "true", matchIfMissing = true)
 class McpServerAutoConfiguration {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -104,10 +103,9 @@ class McpServerAutoConfiguration {
     @ConditionalOnMissingBean(ToolCallHandler::class)
     fun toolCallHandler(
         serviceRegistry: McpServiceRegistry,
-        parameterBinder: ParameterBinder,
-        objectMapper: ObjectMapper
+        parameterBinder: ParameterBinder
     ): ToolCallHandler {
-        return ToolCallHandler(serviceRegistry, parameterBinder, objectMapper)
+        return ToolCallHandler(serviceRegistry, parameterBinder)
     }
 
     /**
@@ -206,6 +204,17 @@ class McpServerAutoConfiguration {
         try {
             // Discover services
             serviceRegistry.discoverServices()
+
+            // Warn if any methods expose synthetic Java parameter names (arg0/arg1)
+            val synthetic = serviceRegistry.detectSyntheticParameterNames()
+            if (synthetic.isNotEmpty()) {
+                logger.warn("Detected ${synthetic.size} parameter(s) with synthetic Java names. This may break schema generation or runtime parameter binding.")
+                synthetic.take(10).forEach { logger.warn(it) }
+                if (synthetic.size > 10) {
+                    logger.warn("...and ${synthetic.size - 10} more")
+                }
+                logger.warn("Recommend compiling Kotlin/JVM code with -java-parameters or annotating parameters with @McpParam to provide stable names.")
+            }
 
             // Check if discovery found any services
             if (properties.discovery.failIfEmpty && serviceRegistry.getServices().isEmpty()) {

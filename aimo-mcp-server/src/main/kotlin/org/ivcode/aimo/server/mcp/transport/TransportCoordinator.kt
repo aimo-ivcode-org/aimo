@@ -65,6 +65,14 @@ class TransportCoordinator(
         }
 
         logger.info("MCP transports initialized: {} active", activeTransports.size)
+
+        // Fail-fast: if no transports are active after initialization, consider the
+        // server non-functional and abort startup by throwing an exception. This
+        // prevents the application from running with no way to receive MCP requests.
+        if (activeTransports.isEmpty()) {
+            logger.error("No active MCP transports configured; aborting startup")
+            throw IllegalStateException("No active MCP transports configured")
+        }
     }
 
     /**

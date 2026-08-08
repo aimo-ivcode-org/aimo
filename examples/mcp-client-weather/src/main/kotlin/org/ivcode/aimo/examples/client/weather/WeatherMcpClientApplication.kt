@@ -13,7 +13,7 @@ import org.springframework.boot.runApplication
  * - Ollama running on localhost:11434
  * - Weather MCP server running on localhost:9090/mcp
  *
- * Access the UI at: http://localhost:9090
+ * Access the UI at: http://localhost:8080
  */
 @SpringBootApplication
 class WeatherMcpClientApplication

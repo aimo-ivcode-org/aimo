@@ -20,34 +20,17 @@ A Spring Boot framework for building **Model Context Protocol (MCP)** servers us
 
 ### Core Components
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                 HTTP/SSE/Stdio Transports                    │
-│   (Transport interface implementations)                       │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                      ┌────────▼────────┐
-                      │ McpRequestHandler│
-                      │  (routes requests)│
-                      └────────┬────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-       ┌──────▼──────┐  ┌──────▼──────┐  ┌──────▼──────┐
-       │ToolCallHandler
-│  │PromptGetHandler│  │ ResourceHandler
-│
-       └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-              │                │                │
-       ┌──────▼────────────────▼────────────────▼─┐
-       │         McpServiceRegistry               │
-       │   (service/tool/prompt discovery)        │
-       └─────────────────────────────────────────┘
-              │
-       ┌──────▼──────────────────┐
-       │  @McpService Beans      │
-       │  (user-defined services)│
-       └─────────────────────────┘
+```mermaid
+flowchart TB
+  A[HTTP / SSE / Stdio Transports] --> B[McpRequestHandler]
+  B --> C{Route to Handler}
+  C --> D[ToolCallHandler]
+  C --> E[PromptGetHandler]
+  C --> F[ResourceHandler]
+  D --> G[McpServiceRegistry]
+  E --> G
+  F --> G
+  G --> H["@McpService Beans"]
 ```
 
 ### Request Flow
@@ -222,7 +205,7 @@ aimo:
 
 **HTTP:**
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -387,7 +370,7 @@ aimo:
     servers:
       - id: "my-calculator"
         transport: "http"
-        url: "http://localhost:8080/mcp"
+        url: "http://localhost:9090/mcp"
         scope: ["global"]
 ```
 

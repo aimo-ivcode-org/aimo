@@ -369,6 +369,38 @@ class McpServiceRegistry(
     fun getPromptIds(): List<String> {
         return prompts.keys.toList()
     }
+
+    /**
+     * Check for methods that expose synthetic Java parameter names (e.g., "arg0").
+     * Returns a list of description strings for offending methods.
+     */
+    fun detectSyntheticParameterNames(): List<String> {
+        val problems = mutableListOf<String>()
+
+        for ((beanName, managed) in services) {
+            for (tool in managed.tools) {
+                val method = tool.method
+                for ((i, param) in method.parameters.withIndex()) {
+                    val pname = param.name
+                    if (pname == null || pname.matches(Regex("arg\\d+"))) {
+                        problems.add("${beanName}.${method.name} parameter at index ${i} has synthetic name '${pname}'")
+                    }
+                }
+            }
+
+            for (prompt in managed.prompts) {
+                val method = prompt.method
+                for ((i, param) in method.parameters.withIndex()) {
+                    val pname = param.name
+                    if (pname == null || pname.matches(Regex("arg\\d+"))) {
+                        problems.add("${beanName}.${method.name} parameter at index ${i} has synthetic name '${pname}'")
+                    }
+                }
+            }
+        }
+
+        return problems
+    }
 }
 
 /**

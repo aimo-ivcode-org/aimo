@@ -53,6 +53,31 @@ class TransportCoordinatorTest {
         coordinator.shutdownTransports()
         assertTrue(stdio.shutdownCalled, "Stdio transport should have been shutdown")
     }
+
+    @Test
+    fun `fail fast when no transports active`() {
+        val properties = McpServerProperties()
+        // disable all transports
+        properties.transports.http.enabled = false
+        properties.transports.sse.enabled = false
+        properties.transports.stdio.enabled = false
+
+        val coordinator = TransportCoordinator(
+            properties,
+            FixedProvider(null) as ObjectProvider<HttpMcpTransport>,
+            FixedProvider(null) as ObjectProvider<SseMcpTransport>,
+            FixedProvider(null)
+        )
+
+        var thrown = false
+        try {
+            coordinator.initializeTransports()
+        } catch (e: IllegalStateException) {
+            thrown = true
+        }
+
+        assertTrue(thrown, "TransportCoordinator should throw IllegalStateException when no transports are active")
+    }
 }
 
 

@@ -70,7 +70,7 @@ cd ../mcp-server-weather
 
 Verify it's running:
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
@@ -88,13 +88,13 @@ cd aimo/examples/mcp-client-weather
 ../../gradlew.bat bootRun
 ```
 
-The application will start on **http://localhost:9090**
+The application will start on **http://localhost:8080**
 
 ## Usage
 
 ### Access the Web UI
 
-1. Open browser to **http://localhost:9090**
+1. Open browser to **http://localhost:8080**
 2. You should see the AIMO chat interface
 3. Start a new conversation
 
@@ -160,8 +160,9 @@ aimo:
     required: false
     servers:
       - id: "weather"
-        transport: "http"
-        url: "http://localhost:8080/mcp"
+        transport:
+          type: "http"
+          url: "http://localhost:9090/mcp"
         scope: ["global"]
 ```
 
@@ -193,7 +194,7 @@ ollama serve
 **Solution:**
 ```bash
 # Check if weather server is running
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
@@ -287,11 +288,17 @@ aimo:
   mcp:
     servers:
       - id: "weather"
-        url: "http://localhost:8080/mcp"
+        transport:
+          type: "http"
+          url: "http://localhost:9090/mcp"
       - id: "news"
-        url: "http://localhost:8081/mcp"
+        transport:
+          type: "http"
+          url: "http://localhost:8081/mcp"
       - id: "research"
-        url: "http://localhost:8082/mcp"
+        transport:
+          type: "http"
+          url: "http://localhost:8082/mcp"
 ```
 
 ## Performance Tips

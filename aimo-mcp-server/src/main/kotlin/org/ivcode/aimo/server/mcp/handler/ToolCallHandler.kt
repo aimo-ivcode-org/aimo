@@ -9,7 +9,6 @@ import org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse
 import org.ivcode.aimo.server.mcp.protocol.McpErrorCode
 import org.ivcode.aimo.server.mcp.registry.McpServiceRegistry
 import org.slf4j.LoggerFactory
-import org.springframework.stereotype.Component
 import kotlin.reflect.KParameter
 import kotlin.reflect.full.instanceParameter
 import kotlin.reflect.jvm.isAccessible
@@ -20,8 +19,7 @@ import kotlin.reflect.jvm.kotlinFunction
  */
 class ToolCallHandler(
     private val serviceRegistry: McpServiceRegistry,
-    private val parameterBinder: ParameterBinder,
-    private val objectMapper: ObjectMapper
+    private val parameterBinder: ParameterBinder
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -173,13 +171,38 @@ class ParameterBinder(
         val values = mutableMapOf<String, Any?>()
         val provided = mutableSetOf<String>()
 
-        for (param in method.parameters) {
-            val name = param.name ?: throw ParameterBindingException(
-                parameterName = "<unknown>",
-                expectedType = param.type,
-                providedValue = null,
-                message = "Unable to bind parameter with no name"
-            )
+        // Precompute Kotlin parameter names (excluding instance param) for robust fallback
+        val kotlinParamNames: List<String?> = method.kotlinFunction
+            ?.parameters
+            ?.filter { it != method.kotlinFunction!!.instanceParameter }
+            ?.map { it.name }
+            ?: emptyList()
+
+        var nonInstanceIndex = 0
+        for ((idx, param) in method.parameters.withIndex()) {
+            // Resolve parameter name. Prefer the Java parameter name, but fall back to Kotlin
+            // metadata when the Java name is missing or synthetic (e.g., "arg0"). Use a
+            // position-based fallback against Kotlin parameter names to avoid relying solely
+            // on Java -parameters being present.
+            val javaName = param.name
+            val name: String? = if (javaName == null || javaName.matches(Regex("arg\\d+"))) {
+                // Use the next Kotlin parameter name if available
+                val kname = kotlinParamNames.getOrNull(nonInstanceIndex)
+                nonInstanceIndex++
+                kname ?: javaName
+            } else {
+                nonInstanceIndex++
+                javaName
+            }
+
+            if (name == null || name.matches(Regex("arg\\d+"))) {
+                throw ParameterBindingException(
+                    parameterName = "<unknown>",
+                    expectedType = param.type,
+                    providedValue = null,
+                    message = "Unable to bind parameter with no name"
+                )
+            }
 
             // Check if this is a context parameter
             if (param.getAnnotation(McpContext::class.java) != null) {
@@ -247,16 +270,33 @@ class ParameterBinder(
                         )
                     }
                 }
-                value != null && (param.type == Double::class.java || param.type == Float::class.java) -> {
+                value != null && (param.type == java.lang.Double::class.java || param.type == java.lang.Double.TYPE
+                        || param.type == java.lang.Float::class.java || param.type == java.lang.Float.TYPE) -> {
                     when (value) {
-                        is Number -> value.toDouble()
+                        is Number -> {
+                            // Preserve the requested numeric precision: Float vs Double
+                            if (param.type == java.lang.Float::class.java || param.type == java.lang.Float.TYPE) {
+                                value.toFloat()
+                            } else {
+                                value.toDouble()
+                            }
+                        }
                         is String -> {
-                            value.toDoubleOrNull() ?: throw ParameterBindingException(
-                                parameterName = name,
-                                expectedType = param.type,
-                                providedValue = value,
-                                message = "Parameter '$name' expects a decimal number but got invalid value: '$value'"
-                            )
+                            if (param.type == java.lang.Float::class.java || param.type == java.lang.Float.TYPE) {
+                                value.toFloatOrNull() ?: throw ParameterBindingException(
+                                    parameterName = name,
+                                    expectedType = param.type,
+                                    providedValue = value,
+                                    message = "Parameter '$name' expects a decimal number (float) but got invalid value: '$value'"
+                                )
+                            } else {
+                                value.toDoubleOrNull() ?: throw ParameterBindingException(
+                                    parameterName = name,
+                                    expectedType = param.type,
+                                    providedValue = value,
+                                    message = "Parameter '$name' expects a decimal number (double) but got invalid value: '$value'"
+                                )
+                            }
                         }
                         else -> throw ParameterBindingException(
                             parameterName = name,
@@ -266,10 +306,28 @@ class ParameterBinder(
                         )
                     }
                 }
-                value != null && (param.type == Boolean::class.java || param.type == java.lang.Boolean::class.java) -> {
+                value != null && (param.type == java.lang.Boolean::class.java || param.type == java.lang.Boolean.TYPE) -> {
                     when (value) {
                         is Boolean -> value
-                        is String -> value.equals("true", ignoreCase = true)
+                        is String -> {
+                            val v = value.trim()
+                            when {
+                                v.equals("true", ignoreCase = true) -> true
+                                v.equals("false", ignoreCase = true) -> false
+                                v.equals("yes", ignoreCase = true) -> true
+                                v.equals("no", ignoreCase = true) -> false
+                                v == "1" -> true
+                                v == "0" -> false
+                                v.equals("on", ignoreCase = true) -> true
+                                v.equals("off", ignoreCase = true) -> false
+                                else -> throw ParameterBindingException(
+                                    parameterName = name,
+                                    expectedType = param.type,
+                                    providedValue = value,
+                                    message = "Parameter '$name' expects a boolean (true/false or yes/no/1/0/on/off) but got: '$value'"
+                                )
+                            }
+                        }
                         else -> throw ParameterBindingException(
                             parameterName = name,
                             expectedType = param.type,
@@ -290,10 +348,6 @@ class ParameterBinder(
                             message = "Could not convert parameter '$name' to type ${param.type.simpleName}: ${e.message}"
                         )
                     }
-                }
-                isProvided && value == null -> {
-                    // Explicitly provided null
-                    null
                 }
                 else -> null
             }

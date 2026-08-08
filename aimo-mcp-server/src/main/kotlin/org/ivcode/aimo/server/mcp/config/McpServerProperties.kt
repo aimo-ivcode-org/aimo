@@ -21,11 +21,9 @@ data class McpServerProperties(
      */
     var version: String = "1.0.0",
 
-    /**
-     * Master enable flag for the MCP server framework.
-     * When false, auto-configuration should be skipped and transports/controllers not registered.
-     */
-    var enabled: Boolean = true,
+    // Master enable flag removed. Activation is performed via @EnableMcpServer annotation
+    // (explicit opt-in). Use transport-specific enabled flags under transports.* to
+    // control individual transport activation.
 
     /**
      * Transport configurations.

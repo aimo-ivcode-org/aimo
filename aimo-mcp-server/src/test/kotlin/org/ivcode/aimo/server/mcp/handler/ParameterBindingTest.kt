@@ -113,6 +113,46 @@ class ParameterBindingTest {
     }
 
     @Test
+    fun `should successfully bind float parameter from number`() {
+        val method = TestService::class.java.getMethod("processFloat", Float::class.java)
+        val arguments = mapOf("value" to 1.5f)
+        val context = emptyMap<String, Any?>()
+
+        val binding = parameterBinder.bindParameters(method, arguments, context)
+
+        assertTrue(binding.values["value"] is Float)
+        assertEquals(1.5f, binding.values["value"] as Float, 0.0001f)
+        assertTrue(binding.provided.contains("value"))
+    }
+
+    @Test
+    fun `should successfully bind float parameter from string`() {
+        val method = TestService::class.java.getMethod("processFloat", Float::class.java)
+        val arguments = mapOf("value" to "2.75")
+        val context = emptyMap<String, Any?>()
+
+        val binding = parameterBinder.bindParameters(method, arguments, context)
+
+        assertTrue(binding.values["value"] is Float)
+        assertEquals(2.75f, binding.values["value"] as Float, 0.0001f)
+        assertTrue(binding.provided.contains("value"))
+    }
+
+    @Test
+    fun `should throw exception when invalid float string is provided`() {
+        val method = TestService::class.java.getMethod("processFloat", Float::class.java)
+        val arguments = mapOf("value" to "not_a_float")
+        val context = emptyMap<String, Any?>()
+
+        val exception = assertThrows(ParameterBindingException::class.java) {
+            parameterBinder.bindParameters(method, arguments, context)
+        }
+
+        assertTrue(exception.message?.contains("value") ?: false)
+        assertTrue((exception.message?.contains("float") == true) || (exception.message?.contains("decimal") == true))
+    }
+
+    @Test
     fun `should throw exception with details about parameter name`() {
         val method = TestService::class.java.getMethod("addNumbers", Int::class.java, Int::class.java)
         val arguments = mapOf("a" to "invalid", "b" to 5)
@@ -179,6 +219,8 @@ class ParameterBindingTest {
         fun processLong(value: Long): Long = value * 2
 
         fun mixedTypes(intVal: Int, longVal: Long, doubleVal: Double): String = "$intVal:$longVal:$doubleVal"
+
+        fun processFloat(value: Float): Float = value
 
         fun processCustom(data: CustomData): String = data.toString()
 

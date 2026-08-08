@@ -62,6 +62,8 @@ class StdioMcpTransport(
                     val line = reader.readLine()
                     if (line == null) {
                         logger.info("EOF on stdin, shutting down")
+                        // Safe to call stop() here because stop() will not join the
+                        // current thread and will not close global System streams.
                         stop()
                         break
                     }
@@ -92,13 +94,33 @@ class StdioMcpTransport(
         isRunning = false
 
         try {
-            reader.close()
-            writer.close()
+            // Do not close System.in / System.out wrappers: closing them can break
+            // the host application's global IO. Instead, flush the output writer
+            // and rely on thread interruption to stop the reader loop.
+            try {
+                writer.flush()
+            } catch (_: Exception) {
+                // ignore flush errors
+            }
         } catch (e: Exception) {
             logger.debug("Error closing stdio streams", e)
         }
 
-        readerThread?.join(5000)  // Wait up to 5 seconds
+        // Interrupt and join the reader thread if it's a different thread than the caller.
+        val rt = readerThread
+        if (rt != null && rt != Thread.currentThread()) {
+            try {
+                rt.interrupt()
+            } catch (_: Exception) {
+                // ignore
+            }
+
+            try {
+                rt.join(5000)
+            } catch (_: Exception) {
+                logger.debug("Reader thread did not terminate within timeout")
+            }
+        }
     }
 
     /**

@@ -42,8 +42,7 @@ Start your MCP server and ensure it's reachable:
 ```yaml
 # In your aimo-mcp-server application.yml
 aimo:
-  mcp:
-    enabled: true
+  mcp-server:
     name: "my-tools"
     version: "1.0.0"
     transports:
@@ -55,7 +54,7 @@ aimo:
 Start the server:
 ```bash
 ./gradlew.bat :examples:your-mcp-app:bootRun
-# Server runs on http://localhost:8080/mcp
+# Server runs on http://localhost:9090/mcp
 ```
 
 ### 2. Configure aimo-mcp-client
@@ -72,7 +71,7 @@ aimo:
     servers:
       - id: "my-tools"             # Server identifier (appears in tool names)
         transport: "http"           # or "sse" or "stdio"
-        url: "http://localhost:8080/mcp"
+        url: "http://localhost:9090/mcp"
         auth:
           type: "none"              # or "bearer", "api-key", etc.
         scope: ["global"]            # Scope restriction (empty = global only)
@@ -139,7 +138,7 @@ If your MCP server defines scopes, `aimo-mcp-client` respects them:
 **In aimo-mcp-server:**
 ```yaml
 aimo:
-  mcp:
+  mcp-server:
     servers:
       - id: "admin-tools"
         scope: ["admin", "research"]  # Only available in these scopes
@@ -167,7 +166,7 @@ aimo:
   mcp:
     servers:
       - id: "calculator"
-        url: "http://localhost:8080/mcp"
+        url: "http://localhost:9090/mcp"
         scope: ["global"]
       
       - id: "search"
@@ -191,7 +190,7 @@ Tools from all servers are available:
 ```bash
 # In examples/calculator-mcp-server (hypothetical)
 ./gradlew.bat :examples:calculator-mcp-server:bootRun
-# Serves at http://localhost:8080/mcp
+# Serves at http://localhost:9090/mcp
 ```
 
 ### 2. Configure aimo-mcp-client
@@ -202,8 +201,8 @@ In your AIMO app:
 aimo:
   mcp:
     servers:
-      - id: "calc"
-        url: "http://localhost:8080/mcp"
+        - id: "calc"
+        url: "http://localhost:9090/mcp"
         scope: ["global"]
 ```
 
@@ -262,7 +261,7 @@ In logs, look for:
 
 ```bash
 # From AIMO host:
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
@@ -289,7 +288,7 @@ logging:
 
 ### Tools not appearing in AIMO
 
-- [ ] Verify server is running: `curl http://localhost:8080/mcp/tools/list`
+- [ ] Verify server is running: `curl http://localhost:9090/mcp/tools/list`
 - [ ] Check configuration URL is correct
 - [ ] Verify server ID matches in config
 - [ ] Check scope restrictions

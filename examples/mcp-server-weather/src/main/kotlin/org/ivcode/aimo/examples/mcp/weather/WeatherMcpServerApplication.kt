@@ -11,14 +11,15 @@ import org.springframework.boot.runApplication
  * Runs on http://localhost:9090
  *
  * Example requests:
- * - Get weather: curl -X POST http://localhost:9090/mcp/ \
- *      -H "Content-Type: application/json" \
-
- *      -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get-weather","arguments":{"city":"Seattle"}}}'
+ * - Get weather:
+ *   curl -X POST http://localhost:9090/mcp/ \
+ *     -H "Content-Type: application/json" \
+ *     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get-weather","arguments":{"city":"Seattle"}}}'
  *
- * - List tools: curl http://localhost:8080/mcp/ \
- *      -H "Content-Type: application/json" \
- *      -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+ * - List tools:
+ *   curl -X POST http://localhost:9090/mcp/ \
+ *     -H "Content-Type: application/json" \
+ *     -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
  */
 @SpringBootApplication
 @EnableMcpServer

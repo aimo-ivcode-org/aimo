@@ -45,14 +45,14 @@ cd aimo/examples/mcp-server-weather
 ../../gradlew.bat bootRun
 ```
 
-The server will start on **http://localhost:8080**
+The server will start on **http://localhost:9090**
 
 ## Testing
 
 ### List Available Tools
 
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -64,7 +64,7 @@ curl -X POST http://localhost:8080/mcp/ \
 ### Get Weather for a City
 
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -82,7 +82,7 @@ curl -X POST http://localhost:8080/mcp/ \
 ### Get Weather with Forecast
 
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -101,7 +101,7 @@ curl -X POST http://localhost:8080/mcp/ \
 ### Get Weather for Multiple Cities
 
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -119,7 +119,7 @@ curl -X POST http://localhost:8080/mcp/ \
 ### List Available Prompts
 
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -131,7 +131,7 @@ curl -X POST http://localhost:8080/mcp/ \
 ### Get a Prompt
 
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -176,7 +176,7 @@ aimo:
     servers:
       - id: "weather"
         transport: "http"
-        url: "http://localhost:8080/mcp"
+        url: "http://localhost:9090/mcp"
 ```
 
 ## API Details

@@ -33,7 +33,7 @@ class ToolCallHandlerTest {
         val service = MathService()
         applicationContext.beanFactory.registerSingleton("mathService", service)
         registry.discoverServices()
-        handler = ToolCallHandler(registry, parameterBinder, objectMapper)
+        handler = ToolCallHandler(registry, parameterBinder)
 
         val request = JsonRpcRequest(
             id = "test-1",
@@ -56,7 +56,7 @@ class ToolCallHandlerTest {
         val service = MathService()
         applicationContext.beanFactory.registerSingleton("mathService", service)
         registry.discoverServices()
-        handler = ToolCallHandler(registry, parameterBinder, objectMapper)
+        handler = ToolCallHandler(registry, parameterBinder)
 
         val request = JsonRpcRequest(
             id = "test-2",
@@ -78,7 +78,7 @@ class ToolCallHandlerTest {
         val service = MathService()
         applicationContext.beanFactory.registerSingleton("mathService", service)
         registry.discoverServices()
-        handler = ToolCallHandler(registry, parameterBinder, objectMapper)
+        handler = ToolCallHandler(registry, parameterBinder)
 
         val request = JsonRpcRequest(
             id = "test-3",
@@ -100,7 +100,7 @@ class ToolCallHandlerTest {
         val service = MathService()
         applicationContext.beanFactory.registerSingleton("mathService", service)
         registry.discoverServices()
-        handler = ToolCallHandler(registry, parameterBinder, objectMapper)
+        handler = ToolCallHandler(registry, parameterBinder)
 
         val request = JsonRpcRequest(
             id = "test-4",
@@ -122,7 +122,7 @@ class ToolCallHandlerTest {
         val service = MathService()
         applicationContext.beanFactory.registerSingleton("mathService", service)
         registry.discoverServices()
-        handler = ToolCallHandler(registry, parameterBinder, objectMapper)
+        handler = ToolCallHandler(registry, parameterBinder)
 
         val request = JsonRpcRequest(
             id = "test-5",
@@ -146,7 +146,7 @@ class ToolCallHandlerTest {
         val service = MathService()
         applicationContext.beanFactory.registerSingleton("mathService", service)
         registry.discoverServices()
-        handler = ToolCallHandler(registry, parameterBinder, objectMapper)
+        handler = ToolCallHandler(registry, parameterBinder)
 
         val request = JsonRpcRequest(
             id = "test-6",
@@ -169,7 +169,7 @@ class ToolCallHandlerTest {
         val service = MathService()
         applicationContext.beanFactory.registerSingleton("mathService", service)
         registry.discoverServices()
-        handler = ToolCallHandler(registry, parameterBinder, objectMapper)
+        handler = ToolCallHandler(registry, parameterBinder)
 
         val request = JsonRpcRequest(
             id = "test-7",

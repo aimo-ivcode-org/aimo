@@ -1,25 +1,31 @@
 package org.ivcode.aimo.server.mcp.config
 
-import org.ivcode.aimo.server.mcp.protocol.McpErrorCode
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.*
 
 class ConfigurationValidationTest {
 
     @Test
-    fun `should validate enabled flag`() {
-        val enabled = true
-        assertTrue(enabled)
-    }
+    fun `default McpServerProperties values are sane`() {
+        val props = McpServerProperties()
 
-    @Test
-    fun `should validate server properties`() {
-        val props = mapOf(
-            "name" to "aimo-mcp-server",
-            "version" to "1.0.0"
-        )
-        assertTrue(props.containsKey("name"))
-        assertTrue(props.containsKey("version"))
+        // Basic metadata defaults
+        assertEquals("aimo-mcp-server", props.name)
+        assertEquals("1.0.0", props.version)
+
+        // Transport defaults
+        assertTrue(props.transports.http.enabled, "HTTP transport should be enabled by default")
+        assertFalse(props.transports.sse.enabled, "SSE transport should be disabled by default")
+        assertFalse(props.transports.stdio.enabled, "Stdio transport should be disabled by default")
+
+        // Discovery defaults
+        assertTrue(props.discovery.enabled, "Discovery should be enabled by default")
+        assertFalse(props.discovery.failIfEmpty, "failIfEmpty should be false by default")
+
+        // Error handling defaults
+        assertFalse(props.errorHandling.includeStackTrace)
+        assertTrue(props.errorHandling.includeErrorData)
+        assertTrue(props.errorHandling.failOnValidationError)
     }
 }
 

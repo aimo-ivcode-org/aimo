@@ -109,7 +109,7 @@ class DebugService {
 
 Then test via HTTP:
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -211,12 +211,13 @@ fun callApi(
 2. **Wrong URL**
    - Default path is `/mcp/`
    - If configured differently, check `application.yml`:
-     ```yaml
-     aimo:`n  mcp-server:
-         transports:
-           http:
-             basePath: "/mcp"  # or custom path
-     ```
+      ```yaml
+      aimo:
+        mcp-server:
+          transports:
+            http:
+              basePath: "/mcp"  # or custom path
+      ```
 
 3. **Port mismatch**
    - Default Spring Boot port: 8080
@@ -228,12 +229,13 @@ fun callApi(
 
 4. **HTTP transport disabled**
    - Check `application.yml`:
-     ```yaml
-     aimo:`n  mcp-server:
-         transports:
-           http:
-             enabled: true  # Must be true
-     ```
+      ```yaml
+      aimo:
+        mcp-server:
+          transports:
+            http:
+              enabled: true  # Must be true
+      ```
 
 #### SSE connection times out
 
@@ -242,7 +244,8 @@ fun callApi(
 **Solution:**
 - This is expected behavior - timeout is configurable:
   ```yaml
-  aimo:`n  mcp-server:
+  aimo:
+    mcp-server:
       transports:
         sse:
           connectionTimeout: 600000  # 10 minutes
@@ -290,9 +293,9 @@ logging:
 **Solutions:**
 1. Rebuild application (configuration embedded in JAR)
 2. Pass configuration via environment:
-   ```bash
-   java -Daimo.mcp-server.enabled=true -jar app.jar
-   ```
+    ```bash
+    java -Daimo.mcp-server.enabled=true -jar app.jar
+    ```
 3. External configuration file:
    ```bash
    java -jar app.jar --spring.config.location=file:./application.yml
@@ -307,7 +310,7 @@ logging:
 **Causes and Solutions:**
 1. **URL incorrect**
    - Verify server URL in client configuration
-   - Test directly: `curl http://localhost:8080/mcp/tools/list`
+    - Test directly: `curl http://localhost:9090/mcp/tools/list`
 
 2. **Server offline**
    - Check server is running
@@ -315,22 +318,24 @@ logging:
 
 3. **aimo-mcp-client not configured**
    - Add server to `application.yml`:
-     ```yaml
-     aimo:`n  mcp-server:
-         servers:
-           - id: "my-server"
-             url: "http://localhost:8080/mcp"
-     ```
+      ```yaml
+      aimo:
+        mcp-server:
+          servers:
+            - id: "my-server"
+              url: "http://localhost:9090/mcp"
+      ```
 
 4. **Required flag preventing startup**
    - Set `required: false` to allow graceful degradation:
-     ```yaml
-     aimo:`n  mcp-server:
-         required: false
-         servers:
-           - id: "my-server"
-             url: "http://localhost:8080/mcp"
-     ```
+      ```yaml
+      aimo:
+        mcp-server:
+          required: false
+          servers:
+            - id: "my-server"
+              url: "http://localhost:9090/mcp"
+      ```
 
 #### Scope visibility issues
 
@@ -383,11 +388,12 @@ jmap -heap [PID]  # Heap usage
 **Causes and Solutions:**
 1. **Many services to discover**
    - Reduce number of scanned packages:
-     ```yaml
-     aimo:`n  mcp-server:
-         discovery:
-           basePackages: "com.mycompany.mcp"
-     ```
+      ```yaml
+      aimo:
+        mcp-server:
+          discovery:
+            basePackages: "com.mycompany.mcp"
+      ```
 
 2. **Expensive service initialization**
    - Delay initialization: use `@Lazy`

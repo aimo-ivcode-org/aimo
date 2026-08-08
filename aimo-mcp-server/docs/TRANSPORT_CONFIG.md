@@ -13,7 +13,7 @@
 
 ```yaml
 aimo:
-  mcp:
+  mcp-server:
     transports:
       http:
         enabled: true
@@ -27,7 +27,7 @@ aimo:
 Send JSON-RPC requests to `POST /mcp/`:
 
 ```bash
-curl -X POST http://localhost:8080/mcp/ \
+curl -X POST http://localhost:9090/mcp/ \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -88,7 +88,7 @@ curl -X POST http://localhost:8080/mcp/ \
 
 ```yaml
 aimo:
-  mcp:
+  mcp-server:
     transports:
       sse:
         enabled: true
@@ -101,12 +101,12 @@ aimo:
 
 1. **Connect:**
 ```bash
-curl -N http://localhost:8080/mcp/sse/connect
+curl -N http://localhost:9090/mcp/sse/connect
 ```
 
 2. **Send request (in another terminal):**
 ```bash
-curl -X POST http://localhost:8080/mcp/sse/request \
+curl -X POST http://localhost:9090/mcp/sse/request \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -132,7 +132,7 @@ curl -X POST http://localhost:8080/mcp/sse/request \
 
 ```yaml
 aimo:
-  mcp:
+  mcp-server:
     transports:
       stdio:
         enabled: true
@@ -172,7 +172,7 @@ All transports can be enabled simultaneously:
 
 ```yaml
 aimo:
-  mcp:
+  mcp-server:
     transports:
       http:
         enabled: true
