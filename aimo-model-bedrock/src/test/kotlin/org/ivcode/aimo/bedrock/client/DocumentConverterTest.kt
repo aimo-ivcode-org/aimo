@@ -165,8 +165,8 @@ class DocumentConverterTest {
         val unwrapped = DocumentConverter.unwrapDocument(doc)
 
         assertTrue { unwrapped is Map<*, *> }
-        @Suppress("UNCHECKED_CAST")
-        val map = unwrapped as Map<String, Any?>
+        val map = (unwrapped as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v }
+            ?: throw AssertionError("Expected unwrapped to be a Map")
         assertEquals("hello", map["text"])
         assertEquals(42.0, map["number"])
     }

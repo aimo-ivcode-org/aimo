@@ -23,6 +23,7 @@ import org.ivcode.aimo.ollama.client.ToolCall
 import org.ivcode.aimo.ollama.client.ToolCallFunction
 import org.ivcode.aimo.ollama.client.Type
 import tools.jackson.databind.JsonNode
+import tools.jackson.core.type.TypeReference
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.security.MessageDigest
 import java.util.UUID
@@ -185,7 +186,12 @@ private fun AimoChatMessage.toMessage(): Message {
             id = tc.id,
             function = ToolCallFunction(
                 name = tc.name,
-                arguments = mapper.readValue(tc.arguments, MutableMap::class.java) as Map<String, Any?>
+                arguments = try {
+                    val json = tc.arguments?.toString() ?: "{}"
+                    mapper.readValue(json, object : TypeReference<Map<String, Any?>>() {})
+                } catch (e: Exception) {
+                    emptyMap<String, Any?>()
+                }
             )
         )
     }
@@ -212,24 +218,26 @@ private fun ToolDefinition.toTool(): Tool =
  * We round-trip through `treeToValue` → plain `Map` to avoid fighting with
  * Jackson 3's iterator API at the Kotlin type-inference level.
  */
-@Suppress("UNCHECKED_CAST")
 private fun JsonNode.toParameters(): Parameters {
-    val raw = schemaMapper.treeToValue(this, MutableMap::class.java) as Map<String, Any?>
+    val raw: Map<String, Any?> = try {
+        schemaMapper.treeToValue(this, object : TypeReference<Map<String, Any?>>() {})
+    } catch (e: Exception) {
+        emptyMap()
+    }
     val required = (raw["required"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-    val propertiesRaw = raw["properties"] as? Map<String, Any?> ?: emptyMap()
-    val properties = propertiesRaw.mapValues { (_, v) ->
-        @Suppress("UNCHECKED_CAST")
-        (v as? Map<String, Any?>)?.toProperty() ?: Property(type = Type.STRING)
+    val propertiesRaw = (raw["properties"] as? Map<*, *>) ?: emptyMap<Any, Any>()
+    val properties: Map<String, Property> = propertiesRaw.entries.associate { (k, v) ->
+        val key = k.toString()
+        val prop = v.asStringKeyedMap()?.toProperty() ?: Property(type = Type.STRING)
+        key to prop
     }
     return Parameters(type = Type.OBJECT, required = required, properties = properties)
 }
-
-@Suppress("UNCHECKED_CAST")
 private fun Map<String, Any?>.toProperty(): Property {
     val type     = Type.fromText(this["type"] as? String ?: "string")
     val desc     = this["description"] as? String
     val enumList = (this["enum"] as? List<*>)?.filterIsInstance<String>()
-    val itemsMap = this["items"] as? Map<String, Any?>
+    val itemsMap = this["items"].asStringKeyedMap()
     val items    = itemsMap?.let {
         Items(
             type = Type.fromText(it["type"] as? String ?: "string"),
@@ -237,6 +245,12 @@ private fun Map<String, Any?>.toProperty(): Property {
         )
     }
     return Property(type = type, description = desc, enum = enumList, items = items)
+}
+
+// Helper to coerce Map<*,*> to Map<String,Any?> without unsafe unchecked casts
+private fun Any?.asStringKeyedMap(): Map<String, Any?>? = when (this) {
+    is Map<*, *> -> this.entries.associate { it.key.toString() to it.value }
+    else -> null
 }
 
 private fun AimoChatOptions.toOllamaOptions(): Options? {

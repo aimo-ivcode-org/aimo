@@ -69,10 +69,13 @@ class HttpMcpTransport(
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun toolsCall(@RequestBody requestBody: Map<String, Any?>): JsonRpcResponse {
+        val paramsAny = requestBody["params"]
+        val params = (paramsAny as? Map<*, *>)?.mapKeys { it.key.toString() }
+            ?.mapValues { it.value }
         val request = JsonRpcRequest(
             id = requestBody["id"],
             method = "tools/call",
-            params = requestBody["params"] as? Map<String, Any?>
+            params = params
         )
         return handleRequest(request)
     }
@@ -86,10 +89,12 @@ class HttpMcpTransport(
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun promptsGet(@RequestBody requestBody: Map<String, Any?>): JsonRpcResponse {
+        val paramsAny = requestBody["params"]
+        val params = (paramsAny as? Map<*, *>)?.mapKeys { it.key.toString() }?.mapValues { it.value }
         val request = JsonRpcRequest(
             id = requestBody["id"],
             method = "prompts/get",
-            params = requestBody["params"] as? Map<String, Any?>
+            params = params
         )
         return handleRequest(request)
     }
@@ -103,10 +108,12 @@ class HttpMcpTransport(
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun toolsList(@RequestBody requestBody: Map<String, Any?>): JsonRpcResponse {
+        val paramsAny = requestBody["params"]
+        val params = (paramsAny as? Map<*, *>)?.mapKeys { it.key.toString() }?.mapValues { it.value }
         val request = JsonRpcRequest(
             id = requestBody["id"],
             method = "tools/list",
-            params = requestBody["params"] as? Map<String, Any?>
+            params = params
         )
         return handleRequest(request)
     }
@@ -120,10 +127,12 @@ class HttpMcpTransport(
         produces = [MediaType.APPLICATION_JSON_VALUE]
     )
     fun promptsList(@RequestBody requestBody: Map<String, Any?>): JsonRpcResponse {
+        val paramsAny = requestBody["params"]
+        val params = (paramsAny as? Map<*, *>)?.mapKeys { it.key.toString() }?.mapValues { it.value }
         val request = JsonRpcRequest(
             id = requestBody["id"],
             method = "prompts/list",
-            params = requestBody["params"] as? Map<String, Any?>
+            params = params
         )
         return handleRequest(request)
     }

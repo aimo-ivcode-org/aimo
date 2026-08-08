@@ -23,11 +23,11 @@ class TransportCoordinatorTest {
         }
     }
 
-    private class FixedProvider(private val value: McpTransport?) : ObjectProvider<McpTransport> {
-        override fun getIfAvailable(): McpTransport? = value
-        override fun getIfUnique(): McpTransport? = value
-        override fun getObject(vararg args: Any?): McpTransport = value ?: throw NoSuchElementException()
-        override fun getObject(): McpTransport = value ?: throw NoSuchElementException()
+    private class FixedProvider<T : Any>(private val value: T?) : ObjectProvider<T> {
+        override fun getIfAvailable(): T? = value
+        override fun getIfUnique(): T? = value
+        override fun getObject(vararg args: Any?): T = value ?: throw NoSuchElementException()
+        override fun getObject(): T = value ?: throw NoSuchElementException()
     }
 
     @Test
@@ -39,9 +39,9 @@ class TransportCoordinatorTest {
 
         val coordinator = TransportCoordinator(
             properties,
-            FixedProvider(null) as ObjectProvider<HttpMcpTransport>, // no http
-            FixedProvider(null) as ObjectProvider<SseMcpTransport>, // no sse
-            FixedProvider(stdio)
+            FixedProvider<HttpMcpTransport>(null), // no http
+            FixedProvider<SseMcpTransport>(null), // no sse
+            FixedProvider<McpTransport>(stdio)
         )
 
         coordinator.initializeTransports()
@@ -64,9 +64,9 @@ class TransportCoordinatorTest {
 
         val coordinator = TransportCoordinator(
             properties,
-            FixedProvider(null) as ObjectProvider<HttpMcpTransport>,
-            FixedProvider(null) as ObjectProvider<SseMcpTransport>,
-            FixedProvider(null)
+            FixedProvider<HttpMcpTransport>(null),
+            FixedProvider<SseMcpTransport>(null),
+            FixedProvider<McpTransport>(null)
         )
 
         var thrown = false

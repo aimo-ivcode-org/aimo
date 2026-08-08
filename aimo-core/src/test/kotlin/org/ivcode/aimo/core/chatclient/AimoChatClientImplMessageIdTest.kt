@@ -623,7 +623,7 @@ class AimoChatClientImplMessageIdTest {
                 )
             )
             // Append to cache
-            val existing = (runtimeMetadata["chat.messages"] as? List<AimoChatMessage>).orEmpty()
+            val existing = (runtimeMetadata["chat.messages"] as? List<*>)?.filterIsInstance<AimoChatMessage>().orEmpty()
             runtimeMetadata["chat.messages"] = existing + messages
         }
         override fun getChatMetadata(): Map<String, Any> = metadata.toMap()

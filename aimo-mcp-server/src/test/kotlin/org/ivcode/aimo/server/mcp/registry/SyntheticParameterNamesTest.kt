@@ -25,7 +25,8 @@ class SyntheticParameterNamesTest {
         // If running on a JRE (no javac available) skip the test rather than fail CI
         assumeTrue(compiler != null, "JDK JavaCompiler not available; skipping test")
 
-        val tmpDir = createTempDir(prefix = "synth-param-test")
+        // Use java.nio.Files.createTempDirectory to avoid deprecated kotlin.io.createTempDir
+        val tmpDir = java.nio.file.Files.createTempDirectory("synth-param-test").toFile()
         try {
             val source = """
                 public class SyntheticParamService {
@@ -59,9 +60,14 @@ class SyntheticParameterNamesTest {
             // Insert into the registry's private services map via reflection
             val servicesField = McpServiceRegistry::class.java.getDeclaredField("services")
             servicesField.isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            val servicesMap = servicesField.get(registry) as MutableMap<String, ManagedMcpService>
-            servicesMap["synthetic"] = managed
+            val servicesAny = servicesField.get(registry)
+            if (servicesAny is MutableMap<*, *>) {
+                // Use reflection to avoid unchecked generic cast warnings when inserting into the map
+                val put = servicesAny.javaClass.getMethod("put", Any::class.java, Any::class.java)
+                put.invoke(servicesAny, "synthetic", managed)
+            } else {
+                fail("Unable to access services map on McpServiceRegistry")
+            }
 
             val problems = registry.detectSyntheticParameterNames()
             assertTrue(problems.isNotEmpty(), "Expected to detect synthetic parameter names but found none")

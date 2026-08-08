@@ -396,7 +396,12 @@ class OllamaChatEngineImplTest {
     }
 
     @Suppress("DEPRECATION")
-    private fun tools.jackson.databind.JsonNode.getTextValue(): String = textValue()
+    private fun tools.jackson.databind.JsonNode.getTextValue(): String = try {
+        // Prefer using the test's mapper to avoid calling deprecated JsonNode APIs
+        mapper.treeToValue(this, String::class.java)
+    } catch (_: Exception) {
+        this.toString()
+    }
 
     private class StubOllamaServer(
         responses: List<StubResponse>,

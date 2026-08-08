@@ -118,8 +118,8 @@ private class InterceptedChatClient(
         )
 
         val chain = buildChain(interceptors, 0) { ctx ->
-            @Suppress("UNCHECKED_CAST")
-            val req = ctx["request"] as AimoChatRequest
+            val req = ctx["request"] as? AimoChatRequest
+                ?: throw IllegalStateException("Interceptor chain missing 'request' of type AimoChatRequest")
             delegate.chat(req)
         }
 
@@ -135,11 +135,10 @@ private class InterceptedChatClient(
         )
 
         val chain = buildChain(interceptors, 0) { ctx ->
-            @Suppress("UNCHECKED_CAST")
-            val req = ctx["request"] as AimoChatRequest
-            @Suppress("UNCHECKED_CAST")
-            val cb = ctx["callback"] as (AimoChatResponse) -> Unit
-            delegate.chatStream(req, cb)
+            val req = ctx["request"] as? AimoChatRequest
+                ?: throw IllegalStateException("Interceptor chain missing 'request' of type AimoChatRequest")
+            // Use the original callback captured from the outer scope to avoid unsafe casts from the context map
+            delegate.chatStream(req, callback)
         }
 
         return chain.proceed(context)

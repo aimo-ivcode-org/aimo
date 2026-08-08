@@ -27,6 +27,7 @@ import org.ivcode.aimo.core.model.AimoToolCall
 import org.ivcode.aimo.core.model.AimoUsage
 import org.ivcode.aimo.core.model.ToolDefinition
 import tools.jackson.databind.JsonNode
+import tools.jackson.core.type.TypeReference
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.security.MessageDigest
 import java.time.Instant
@@ -490,10 +491,9 @@ private fun AimoChatMessage.toConverseMessageOrNull(): ConverseMessage? {
     return ConverseMessage(role = role, content = blocks)
 }
 
-@Suppress("UNCHECKED_CAST")
 private fun String.toJsonMap(): Map<String, Any?> {
     return try {
-        schemaMapper.readValue(this, Map::class.java) as? Map<String, Any?> ?: mapOf("raw" to this)
+        schemaMapper.readValue(this, object : TypeReference<Map<String, Any?>>() {})
     } catch (_: Exception) {
         mapOf("raw" to this)
     }
@@ -511,9 +511,12 @@ private fun ToolDefinition.toTool(): Tool {
 
 private val schemaMapper = jacksonObjectMapper()
 
-@Suppress("UNCHECKED_CAST")
 private fun JsonNode.treeToMap(): Map<String, Any?> {
-    return schemaMapper.treeToValue(this, MutableMap::class.java) as Map<String, Any?>
+    return try {
+        schemaMapper.treeToValue(this, object : TypeReference<Map<String, Any?>>() {})
+    } catch (e: Exception) {
+        emptyMap()
+    }
 }
 
 private fun AimoChatOptions.toInferenceConfiguration(): InferenceConfiguration? {
@@ -530,9 +533,14 @@ private fun AimoChatOptions.toInferenceConfiguration(): InferenceConfiguration? 
 }
 
 private fun AimoChatOptions.additionalModelRequestFields(): Map<String, Any?>? {
-    val direct = providerOptions["additionalModelRequestFields"] as? Map<String, Any?>
-    val kebab = providerOptions["additional-model-request-fields"] as? Map<String, Any?>
-    val snake = providerOptions["additional_model_request_fields"] as? Map<String, Any?>
+    fun Any?.asStringKeyedMap(): Map<String, Any?>? = when (this) {
+        is Map<*, *> -> this.entries.associate { it.key.toString() to it.value }
+        else -> null
+    }
+
+    val direct = providerOptions["additionalModelRequestFields"].asStringKeyedMap()
+    val kebab = providerOptions["additional-model-request-fields"].asStringKeyedMap()
+    val snake = providerOptions["additional_model_request_fields"].asStringKeyedMap()
 
     val merged = LinkedHashMap<String, Any?>()
     if (!direct.isNullOrEmpty()) merged.putAll(direct)

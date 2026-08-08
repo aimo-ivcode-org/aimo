@@ -140,8 +140,7 @@ private fun Any.asDouble(): Double = when (this) {
     is Number -> toDouble()
     else      -> toString().toDouble()
 }
-@Suppress("UNCHECKED_CAST")
 private fun Any.asStringList(): List<String> = when (this) {
-    is List<*> -> this as List<String>
+    is List<*> -> this.filterIsInstance<String>()
     else       -> toString().split(",").map { it.trim() }
 }

@@ -77,11 +77,19 @@ class ChatScopeProviderImpl(
         mutableContext.putAll(context)
 
         val chain = buildChain(interceptors, 0) { ctx ->
-            ctx["scopes"] as List<ChatScope>
+            // Ensure we return a properly-typed list from the final action to avoid
+            // unchecked casts in the interceptor chain. If the context value is not
+            // a list, fall back to an empty list. Use filterIsInstance to safely
+            // coerce the items to ChatScope.
+            val raw = ctx["scopes"] as? List<*>
+            raw?.filterIsInstance<ChatScope>() ?: emptyList<ChatScope>()
         }
 
-        @Suppress("UNCHECKED_CAST")
-        return chain.proceed(mutableContext) as List<ChatScope>
+        val result = chain.proceed(mutableContext)
+        return when (result) {
+            is List<*> -> result.filterIsInstance<ChatScope>()
+            else -> emptyList()
+        }
     }
 
     override fun getScope(id: String, context: Map<String, Any>): ChatScope? {
