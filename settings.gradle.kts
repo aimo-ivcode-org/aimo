@@ -7,7 +7,7 @@ pluginManagement {
         id("org.gradle.toolchains.foojay-resolver-convention").version("0.8.0")
         id("org.jetbrains.dokka").version("2.2.0")
         id("org.jetbrains.dokka-javadoc").version("2.2.0")
-        id("org.ivcode.core.gradle-dokka-pages").version("0.1.0-SNAPSHOT")
+        id("org.ivcode.core.gradle-gh-pages").version("0.1.0-SNAPSHOT")
     }
     repositories {
         gradlePluginPortal()

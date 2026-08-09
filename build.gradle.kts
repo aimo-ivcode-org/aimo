@@ -2,7 +2,54 @@ plugins {
 	kotlin("jvm").apply(false)
 	id("io.spring.dependency-management").apply(false)
 	id("org.jetbrains.dokka").apply(false)
-	id("org.ivcode.core.gradle-dokka-pages")
+	id("org.jetbrains.dokka-javadoc").apply(false)
+	id("org.ivcode.core.gradle-gh-pages")
+}
+
+// GhPages Configuration
+ghPages {
+	modules {
+		"aimo-core" to {
+			jacoco { enabled = true }
+			javadoc { enabled = true }
+			kdoc { enabled = true}
+		}
+
+		"aimo-mcp-client" to {
+			jacoco { enabled = true }
+			javadoc { enabled = true }
+			kdoc { enabled = true}
+		}
+
+		"aimo-mcp-server" to {
+			jacoco { enabled = true }
+			javadoc { enabled = true }
+			kdoc { enabled = true}
+		}
+
+		"aimo-model-bedrock" to {
+			jacoco { enabled = true }
+			javadoc { enabled = true }
+			kdoc { enabled = true}
+		}
+
+		"aimo-model-ollama" to {
+			jacoco { enabled = true }
+			javadoc { enabled = true }
+			kdoc { enabled = true}
+		}
+
+		"aimo-server" to {
+			jacoco { enabled = true }
+			javadoc { enabled = true }
+			kdoc { enabled = true}
+		}
+
+		"aimo-plugin-ui" to {
+			javadoc { enabled = true }
+			kdoc { enabled = true}
+		}
+	}
 }
 
 group = "org.ivcode"
@@ -83,6 +130,7 @@ subprojects {
 	pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
 		pluginManager.apply("org.jetbrains.dokka")
 		pluginManager.apply("org.jetbrains.dokka-javadoc")
+		pluginManager.apply("jacoco")
 
 		val kotlinExt = extensions.findByName("kotlin")
 		if (kotlinExt != null) {

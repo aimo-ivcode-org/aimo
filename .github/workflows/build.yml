@@ -26,12 +26,12 @@ jobs:
           java-version: '21'
 
       - name: Build and Test
-        run: ./gradlew clean buildAll
+        run: ./gradlew clean build ghPages
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./build/dokka-pages
+          path: ./build/gh-pages
 
   deploy-gh-pages:
     runs-on: ubuntu-latest
