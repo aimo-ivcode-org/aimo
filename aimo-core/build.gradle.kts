@@ -33,3 +33,4 @@ tasks.named("bootJar") {
 tasks.named("jar") {
     enabled = true
 }
+

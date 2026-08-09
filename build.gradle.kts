@@ -163,6 +163,66 @@ subprojects {
 					// maps line numbers to GitHub
 					remoteLineSuffix.set("#L")
 				}
+
+				// Include module-level documentation files, but only if the file's
+				// first non-empty heading is a valid Dokka classifier: either
+				// "Module <name>" or "Package <name>". This prevents Dokka's
+				// publication tasks from failing on arbitrary README.md files.
+				// Look for module-level docs either at the project root or under
+				// `src/main/kotlin/**/Module.md` (some modules place them inside
+				// the package tree). Normalize to the set of existing files.
+				val rootCandidates = listOf("Module.md", "module.md", "packages.md", "Package.md")
+					.map { file(it) }
+					.filter { it.exists() }
+
+				val srcCandidates = fileTree("src/main/kotlin") {
+					include("**/Module.md")
+					include("**/module.md")
+					include("**/packages.md")
+					include("**/Package.md")
+				}.files
+
+				val moduleCandidates = (rootCandidates + srcCandidates).distinct()
+					.filter { f ->
+						try {
+							val firstRaw = f.readLines().firstOrNull { it.trim().isNotEmpty() }?.trim() ?: ""
+							val first = firstRaw.trimStart('#', ' ', '\t')
+							first.startsWith("Module ") || first.startsWith("Package ")
+						} catch (e: Exception) {
+							false
+						}
+					}
+				if (moduleCandidates.isNotEmpty()) {
+					includes.from(moduleCandidates)
+				}
+
+				// Discover and include package markdown files under src/main/kotlin for this module.
+				// Only include package files whose first heading starts with "Package ".
+				val srcRoot = file("src/main/kotlin")
+				if (srcRoot.exists()) {
+					val pkgFiles = fileTree(srcRoot) {
+						include("**/package.md")
+						include("**/Package.md")
+					}.files
+
+					val validPkgFiles = pkgFiles.filter { f ->
+						try {
+							val firstRaw = f.readLines().firstOrNull { it.trim().isNotEmpty() }?.trim() ?: ""
+							val first = firstRaw.trimStart('#', ' ', '\t')
+							first.startsWith("Package ")
+						} catch (e: Exception) {
+							false
+						}
+					}
+
+					if (validPkgFiles.isNotEmpty()) {
+						includes.from(validPkgFiles)
+					}
+					val skipped = pkgFiles - validPkgFiles
+					if (skipped.isNotEmpty()) {
+						logger.lifecycle("Dokka: skipped including ${skipped.size} package.md files that lack a 'Package <name>' header")
+					}
+				}
 			}
 		}
 	}

@@ -2,7 +2,7 @@ package org.ivcode.aimo.core.chatservice
 
 import java.lang.reflect.Field
 
-class FieldSystemMessageCallback(
+internal class FieldSystemMessageCallback(
     private val instance: Any?,
     private val field: Field,
     override val name: String,
