@@ -43,10 +43,17 @@ internal class OllamaChatClient (
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .build()
 
-        val response = client.send(
-            httpRequest,
-            HttpResponse.BodyHandlers.ofInputStream()
-        )
+        val response = try {
+            client.send(
+                httpRequest,
+                HttpResponse.BodyHandlers.ofInputStream()
+            )
+        } catch (ie: InterruptedException) {
+            // Preserve interrupt status and translate to an IO error suitable for higher layers
+            Thread.currentThread().interrupt()
+            log.warn("Thread interrupted while waiting for Ollama HTTP response for model={}", request.model)
+            throw java.io.IOException("Interrupted while waiting for Ollama response", ie)
+        }
 
         log.debug(
             "Ollama chat response status={} model={}",

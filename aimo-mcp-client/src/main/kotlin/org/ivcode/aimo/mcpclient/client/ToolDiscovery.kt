@@ -31,7 +31,13 @@ class ToolDiscovery(
                 try {
                     convertToToolDefinition(toolNode)
                 } catch (e: Exception) {
-                    val toolName = toolNode.get("name")?.asText() ?: "<unknown>"
+                    val toolName = toolNode.get("name")?.let {
+                        try {
+                            objectMapper.treeToValue(it, String::class.java)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } ?: "<unknown>"
                     throw DiscoveryException("Failed to convert discovered MCP tool '$toolName'", e)
                 }
             }
@@ -44,8 +50,19 @@ class ToolDiscovery(
     }
 
     private fun convertToToolDefinition(toolNode: JsonNode): ToolDefinition {
-        val name = toolNode.get("name")?.asText() ?: throw DiscoveryException("Tool missing 'name'")
-        val description = toolNode.get("description")?.asText()
+        val nameNode = toolNode.get("name") ?: throw DiscoveryException("Tool missing 'name'")
+        val name = try {
+            objectMapper.treeToValue(nameNode, String::class.java)
+        } catch (_: Exception) {
+            throw DiscoveryException("Tool 'name' is not a text node")
+        }
+        val description = toolNode.get("description")?.let {
+            try {
+                objectMapper.treeToValue(it, String::class.java)
+            } catch (_: Exception) {
+                null
+            }
+        }
         val inputSchema = toolNode.get("inputSchema") ?: throw DiscoveryException("Tool '$name' missing 'inputSchema'")
 
         validateJsonSchema(inputSchema, name)

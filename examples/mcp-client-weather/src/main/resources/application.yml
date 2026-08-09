@@ -1,0 +1,64 @@
+# Weather MCP Client with Ollama
+# An AIMO application that connects to the weather MCP server
+
+spring:
+  application:
+    name: "weather-mcp-client"
+  profiles:
+    active: default
+
+server:
+  port: 8080
+  servlet:
+    context-path: "/"
+
+aimo:
+  # Ollama model configuration
+  model:
+    ollama:
+      gpt-oss:
+        base-url: http://localhost:11434
+        primary: true
+        context:
+          size: 10000
+          excludeThinking: true
+        options:
+          model: gpt-oss:20b
+          temperature: 0.7
+
+  # Chat scopes configuration
+  scope:
+    global:
+      tool-refs: []  # All tools available
+      system-message-refs: []  # All system messages available
+
+  # MCP Client configuration
+  mcp:
+    required: false  # Graceful degradation if server unavailable
+    discovery-interval-minutes: 0  # No periodic refresh
+
+    servers:
+      # Weather MCP server
+      - id: "weather"
+        transport:
+          type: "http"
+          url: "http://localhost:9090/mcp"
+        scope: []  # Empty scope = available in global scope
+
+  # DAO configuration (memory-based for this example)
+  dao:
+    implementation: "memory"
+
+logging:
+  level:
+    org.ivcode.aimo: DEBUG
+    org.springframework: WARN
+    org.springframework.boot: INFO
+
+# Application info
+info:
+  app:
+    name: Weather MCP Client
+    description: AIMO with Ollama + Weather MCP Server
+    version: 1.0.0
+

@@ -35,7 +35,6 @@ internal object DocumentConverter {
 
     fun documentToMap(document: Document): Map<String, Any?> {
         val unwrapped = unwrapDocument(document)
-        @Suppress("UNCHECKED_CAST")
         return when (unwrapped) {
             is Map<*, *> -> unwrapped.entries.associate { (k, v) -> k.toString() to v }
             else -> mapOf("raw" to unwrapped)

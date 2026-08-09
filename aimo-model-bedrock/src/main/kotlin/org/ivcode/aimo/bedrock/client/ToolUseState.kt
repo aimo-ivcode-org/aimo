@@ -2,6 +2,7 @@ package org.ivcode.aimo.bedrock.client
 
 import software.amazon.awssdk.core.document.Document
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.core.type.TypeReference
 
 /**
  * Accumulates tool-use state across stream delta events.
@@ -36,10 +37,9 @@ internal class ToolUseState {
         )
     }
 
-    @Suppress("UNCHECKED_CAST")
     private fun parseToolInput(mapper: ObjectMapper, raw: String): Map<String, Any?> {
         return try {
-            mapper.readValue(raw, Map::class.java) as? Map<String, Any?> ?: mapOf("raw" to raw)
+            mapper.readValue(raw, object : TypeReference<Map<String, Any?>>() {})
         } catch (_: Exception) {
             mapOf("raw" to raw)
         }

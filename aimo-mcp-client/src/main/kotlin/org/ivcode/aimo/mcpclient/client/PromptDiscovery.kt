@@ -40,7 +40,13 @@ class PromptDiscovery(
                 try {
                     convertToPromptDefinition(promptNode)
                 } catch (e: Exception) {
-                    val promptName = promptNode.get("name")?.asText() ?: "<unknown>"
+                    val promptName = promptNode.get("name")?.let {
+                        try {
+                            objectMapper.treeToValue(it, String::class.java)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    } ?: "<unknown>"
                     throw DiscoveryException("Failed to convert discovered MCP prompt '$promptName'", e)
                 }
             }
@@ -53,8 +59,19 @@ class PromptDiscovery(
     }
 
     private fun convertToPromptDefinition(promptNode: JsonNode): PromptDefinition {
-        val name = promptNode.get("name")?.asText() ?: throw DiscoveryException("Prompt missing 'name'")
-        val description = promptNode.get("description")?.asText()
+        val name = try {
+            val node = promptNode.get("name") ?: throw DiscoveryException("Prompt missing 'name'")
+            objectMapper.treeToValue(node, String::class.java)
+        } catch (e: Exception) {
+            throw DiscoveryException("Prompt missing or invalid 'name'", e)
+        }
+        val description = promptNode.get("description")?.let {
+            try {
+                objectMapper.treeToValue(it, String::class.java)
+            } catch (_: Exception) {
+                null
+            }
+        }
         val argumentSchema = promptNode.get("arguments")
 
         return PromptDefinition(

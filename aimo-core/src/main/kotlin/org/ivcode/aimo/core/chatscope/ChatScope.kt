@@ -3,6 +3,7 @@ package org.ivcode.aimo.core.chatscope
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.ChatServiceProvider
+import org.slf4j.LoggerFactory
 
 /**
  * Defines autonomous decision-making capabilities for a conversation.
@@ -31,6 +32,8 @@ data class ChatScope(
     val tools: List<ToolCallback> = emptyList(),
     val systemMessages: List<SystemMessageCallback> = emptyList()
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     /**
      * Get all available tools in this scope.
      * Combines tools from all contributing providers (filtered by scope) with static tools.
@@ -40,26 +43,38 @@ data class ChatScope(
     fun getAllTools(): List<ToolCallback> {
         // Combine provider-sourced tools with static tools
         val providerTools = if (providers != null) {
+            log.debug("getAllTools() for scope '$id': providers={}", providers.size)
             providers.flatMap { provider ->
+                log.debug("  Provider '${provider.id}': scopes={}, requesting tools...", provider.scopes)
                 // Apply two-condition AND filtering:
                 // 1. Provider's scope set must allow this scope id
                 // 2. Tool's scope set must allow this scope id
                 val providerAllowsScope = provider.scopes.isEmpty() || provider.scopes.contains(id)
                 
                 if (providerAllowsScope) {
-                    provider.getTools().filter { tool ->
+                    val providerToolsList = provider.getTools()
+                    log.debug("    Provider '${provider.id}' returned {} tools", providerToolsList.size)
+                    providerToolsList.filter { tool ->
                         // Tool's scope set allows this scope
                         tool.scopes.isEmpty() || tool.scopes.contains(id)
+                    }.also { filtered ->
+                        log.debug("    After filtering for scope '$id': {} tools", filtered.size)
                     }
                 } else {
+                    log.debug("    Provider '${provider.id}' does not allow scope '$id'")
                     emptyList()
                 }
             }
         } else {
+            log.debug("getAllTools() for scope '$id': no providers")
             emptyList()
         }
         
-        return (providerTools + tools).distinctBy { it.toolDefinition.name }
+        val allTools = (providerTools + tools).distinctBy { it.toolDefinition.name }
+        log.info("getAllTools() for scope '$id': {} provider tools + {} static tools = {} total",
+            providerTools.size, tools.size, allTools.size)
+        allTools.forEach { log.debug("  Tool: {}", it.toolDefinition.name) }
+        return allTools
     }
 
     /**

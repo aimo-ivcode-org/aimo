@@ -50,7 +50,7 @@ fun disconnect() {
         messageReaderThread?.interrupt()
         try {
             messageReaderThread?.join(5000)
-        } catch (e: InterruptedException) {
+        } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }
         log.info("Protocol client disconnected")
@@ -129,8 +129,13 @@ fun disconnect() {
         val idNode = jsonNode.get("id")
         val id = when {
             idNode == null || idNode.isNull -> null
-            idNode.isTextual -> idNode.asText()
-            else -> idNode.toString()
+            else -> try {
+                // Use ObjectMapper to convert textual nodes to String without calling deprecated JsonNode APIs
+                objectMapper.treeToValue(idNode, String::class.java)
+            } catch (_: Exception) {
+                // Fallback to structural serialization for non-text id values
+                idNode.toString()
+            }
         }
 
         if (id != null) {
@@ -149,7 +154,13 @@ fun disconnect() {
             }
         } else {
             // Message without ID - this is a server notification
-            val method = jsonNode.get("method")?.asText() ?: "unknown"
+            val method = jsonNode.get("method")?.let {
+                try {
+                    objectMapper.treeToValue(it, String::class.java)
+                } catch (_: Exception) {
+                    null
+                }
+            } ?: "unknown"
             val params = jsonNode.get("params")
             log.debug("Received server notification: $method")
 

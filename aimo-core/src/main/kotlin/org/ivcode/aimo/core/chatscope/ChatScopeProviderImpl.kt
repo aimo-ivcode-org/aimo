@@ -3,6 +3,7 @@ package org.ivcode.aimo.core.chatscope
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.ChatServiceProviderManager
+import org.slf4j.LoggerFactory
 
 /**
  * Default implementation of ChatScopeProvider.
@@ -28,6 +29,7 @@ class ChatScopeProviderImpl(
     private val providerManager: ChatServiceProviderManager,
     private val interceptors: List<ChatScopeProviderInterceptor> = emptyList()
 ) : ChatScopeProvider {
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     private val globalScope: ChatScope = run {
         // Include only tools with no scope restrictions
@@ -42,6 +44,13 @@ class ChatScopeProviderImpl(
                 message.scopes.isEmpty()
             }
 
+        val providersForGlobal = providerManager.getProviders()
+        logger.info("Building global scope with {} providers, {} static tools, {} static system messages",
+            providersForGlobal.size, globalTools.size, globalMessages.size)
+        providersForGlobal.forEach { provider ->
+            logger.debug("  Provider: id={}, scopes={}", provider.id, provider.scopes)
+        }
+
         ChatScope(
             id = ChatScopeProvider.GLOBAL_SCOPE_ID,
             displayName = "Global",
@@ -50,7 +59,7 @@ class ChatScopeProviderImpl(
             // getAllSystemMessages() already apply per-provider and per-callback scope filtering,
             // so passing every provider here is safe and ensures dynamically-registered providers
             // (e.g. MCP servers) are not silently excluded from the global scope.
-            providers = providerManager.getProviders(),
+            providers = providersForGlobal,
             tools = globalTools,
             systemMessages = globalMessages
         )
@@ -68,11 +77,19 @@ class ChatScopeProviderImpl(
         mutableContext.putAll(context)
 
         val chain = buildChain(interceptors, 0) { ctx ->
-            ctx["scopes"] as List<ChatScope>
+            // Ensure we return a properly-typed list from the final action to avoid
+            // unchecked casts in the interceptor chain. If the context value is not
+            // a list, fall back to an empty list. Use filterIsInstance to safely
+            // coerce the items to ChatScope.
+            val raw = ctx["scopes"] as? List<*>
+            raw?.filterIsInstance<ChatScope>() ?: emptyList<ChatScope>()
         }
 
-        @Suppress("UNCHECKED_CAST")
-        return chain.proceed(mutableContext) as List<ChatScope>
+        val result = chain.proceed(mutableContext)
+        return when (result) {
+            is List<*> -> result.filterIsInstance<ChatScope>()
+            else -> emptyList()
+        }
     }
 
     override fun getScope(id: String, context: Map<String, Any>): ChatScope? {

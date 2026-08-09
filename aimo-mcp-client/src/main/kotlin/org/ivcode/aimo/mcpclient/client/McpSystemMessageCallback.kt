@@ -90,10 +90,20 @@ class McpSystemMessageCallback(
             val messages = result.get("messages")
             if (messages != null && messages.isArray) {
                 messages.mapNotNull { msg ->
-                    msg.get("content")?.get("text")?.asText()
+                    msg.get("content")?.get("text")?.let {
+                        try {
+                            objectMapper.treeToValue(it, String::class.java)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
                 }.joinToString("\n")
             } else {
-                result.asText()
+                try {
+                    objectMapper.treeToValue(result, String::class.java)
+                } catch (_: Exception) {
+                    result.toString()
+                }
             }
         } catch (e: Exception) {
             log.error("System message callback execution failed: serverId=$serverId prompt=$promptName", e)
