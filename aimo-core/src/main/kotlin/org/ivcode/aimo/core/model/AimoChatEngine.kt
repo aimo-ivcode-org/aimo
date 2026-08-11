@@ -18,6 +18,31 @@ import tools.jackson.databind.JsonNode
  * - Engine implementations have no knowledge of higher-level tool-call loops; they only handle single-turn model calls
  */
 interface AimoChatEngine {
+    /**
+     * Default options applied to every chat request.
+     *
+     * This property represents the **engine-wide configuration template** for model tuning
+     * parameters (temperature, max tokens, top-p, top-k, penalties, stop sequences, etc.).
+     * Every invocation of [call] uses these as the base configuration.
+     *
+     * ## Merge Strategy
+     * Per-request options from [AimoPrompt.options] override these defaults:
+     * - Engine [options] provides the base/fallback values
+     * - [AimoPrompt.options] (if provided) supplies per-request overrides
+     * - Non-null override values replace base values; null overrides defer to the base
+     * - Maps like [providerOptions] are merged (base + override entries)
+     *
+     * ## Conversion to Provider Format
+     * After merging, the resulting [AimoChatOptions] is converted to the concrete model
+     * provider's native option format (e.g., Ollama [Options], Bedrock request parameters).
+     * Implementations map AIMO field names to provider equivalents (e.g., [maxTokens] → `numPredict`).
+     *
+     * ## Semantics
+     * - Nullable fields allow options to remain unset, deferring to provider/model defaults
+     * - [model] enables runtime model selection when the provider supports multiple models
+     * - [stopSequences] is an ordered list; order and duplicates are preserved if the provider supports them
+     * - [providerOptions] is an escape hatch for provider-specific flags while the portable surface area evolves
+     */
     val options: AimoChatOptions
 
     /**

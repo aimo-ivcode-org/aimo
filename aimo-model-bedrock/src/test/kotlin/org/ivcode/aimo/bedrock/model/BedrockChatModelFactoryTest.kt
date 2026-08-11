@@ -112,7 +112,7 @@ class BedrockChatModelFactoryTest {
 
         val factory = BedrockChatModelFactory(properties)
         val model = assertNotNull(factory.getModel("model-a"))
-        assertEquals(listOf("alpha", "42", "true", "beta"), model.options.stopSequences)
+        assertEquals(listOf("alpha", "42", "true", "beta"), model.chatEngine.options.stopSequences)
     }
 
     @Test
@@ -131,7 +131,7 @@ class BedrockChatModelFactoryTest {
 
         val factory = BedrockChatModelFactory(properties)
         val model = assertNotNull(factory.getModel("model-a"))
-        assertEquals(listOf("first", "second", "third"), model.options.stopSequences)
+        assertEquals(listOf("first", "second", "third"), model.chatEngine.options.stopSequences)
     }
 
     @Test

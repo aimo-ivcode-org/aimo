@@ -49,7 +49,6 @@ class OllamaChatModelFactory (
         return AimoChatModelConfig(
             name        = name,
             chatEngine  = engine,
-            options     = aimoOptions,
             isPrimary   = props.primary,
             context = AimoChatContext(
                 size = props.context.size,

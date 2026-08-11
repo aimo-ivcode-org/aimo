@@ -49,9 +49,8 @@ class OllamaChatModelFactoryTest {
                 stopSequences = listOf("END", "DONE"),
                 providerOptions = mapOf("format" to "json"),
             ),
-            model.options,
+            model.chatEngine.options,
         )
-        assertEquals(model.options, model.chatEngine.options)
     }
 
     @Test
@@ -69,8 +68,8 @@ class OllamaChatModelFactoryTest {
 
         val model = assertNotNull(factory.getModel("chatbot"))
 
-        assertEquals("llama3.1:8b", model.options.model)
-        assertEquals(0.4, model.options.temperature)
+        assertEquals("llama3.1:8b", model.chatEngine.options.model)
+        assertEquals(0.4, model.chatEngine.options.temperature)
     }
 
     @Test

@@ -3,16 +3,20 @@ package org.ivcode.aimo.core.model
 /**
  * Runtime configuration for an Aimo-owned chat model implementation.
  *
+ * This is the **model configuration layer** that combines a concrete chat engine with
+ * model-specific defaults and context rules. It forms part of the core seam:
+ * `AimoChatModelProviderFactory` → `AimoChatModelConfig` → `AimoChatEngine`.
+ *
  * @property name Human-readable model identifier.
  * @property chatEngine Provider-backed engine used to execute prompts.
- * @property options Default provider-agnostic options applied to requests for this model.
+ *     The engine stores the model's default options (from YAML configuration) and merges them
+ *     with per-request options via [AimoPrompt.options] when building requests.
  * @property isPrimary Whether this model is the default selection when multiple models exist.
  * @property context Prompt budgeting behavior for this model.
  */
 data class AimoChatModelConfig (
     val name: String,
     val chatEngine: AimoChatEngine,
-    val options: AimoChatOptions,
     val isPrimary: Boolean = false,
     val context: AimoChatContext = AimoChatContext(),
 )

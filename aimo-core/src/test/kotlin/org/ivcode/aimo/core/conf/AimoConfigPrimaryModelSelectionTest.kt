@@ -121,7 +121,6 @@ class AimoConfigPrimaryModelSelectionTest {
         AimoChatModelConfig(
             name = name,
             chatEngine = TestEngine(),
-            options = AimoChatOptions(model = name),
             isPrimary = isPrimary,
             context = AimoChatContext(size = 8192),
         )

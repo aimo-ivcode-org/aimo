@@ -9,9 +9,10 @@ import kotlin.test.assertFalse
 class AimoChatModelConfigTest {
 
     @Test
-    fun `AimoChatModelConfig stores AimoChatOptions directly`() {
+    fun `AimoChatModelConfig stores chatEngine with options`() {
+        val engineOptions = AimoChatOptions(model = "engine-default")
         val engine = object : AimoChatEngine {
-            override val options: AimoChatOptions = AimoChatOptions(model = "engine-default")
+            override val options: AimoChatOptions = engineOptions
 
             override fun call(prompt: AimoPrompt): AimoChatResponse {
                 return AimoChatResponse(
@@ -26,25 +27,17 @@ class AimoChatModelConfigTest {
                 return call(prompt)
             }
         }
-        val options = AimoChatOptions(
-            model = "configured-model",
-            temperature = 0.6,
-            providerOptions = mapOf("format" to "json"),
-        )
 
         val model = AimoChatModelConfig(
             name = "chatbot",
             chatEngine = engine,
-            options = options,
             isPrimary = false,
             context = AimoChatContext(size = 4096),
         )
 
         assertEquals("chatbot", model.name)
-        assertEquals(AimoChatOptions::class, model.options::class)
-        assertEquals("configured-model", model.options.model)
-        assertEquals(0.6, model.options.temperature)
-        assertEquals("json", model.options.providerOptions["format"])
+        assertEquals(engine, model.chatEngine)
+        assertEquals("engine-default", model.chatEngine.options.model)
         assertFalse(model.isPrimary)
         assertEquals(4096, model.context.size)
     }

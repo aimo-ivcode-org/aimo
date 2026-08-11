@@ -446,7 +446,6 @@ class AimoChatClientImplMessageIdTest {
     ): AimoChatModelConfig = AimoChatModelConfig(
         name = "test",
         chatEngine = engine,
-        options = AimoChatOptions(),
         context = AimoChatContext(
             size = contextSize,
             excludeThinking = excludeThinking,
