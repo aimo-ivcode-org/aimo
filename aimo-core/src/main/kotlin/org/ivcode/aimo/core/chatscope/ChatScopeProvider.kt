@@ -1,14 +1,13 @@
 package org.ivcode.aimo.core.chatscope
 
 /**
- * Provider for retrieving available ChatScopes with optional access control.
- *
- * Supports an optional interceptor chain for filtering scopes based on user context
- * (e.g., preventing non-admin users from accessing admin scope). Interceptors are
- * applied during scope retrieval.
+ * Provider for retrieving available ChatScopes.
  *
  * The provider always offers a built-in global scope that includes tools and system
  * messages with no scope restrictions (available to all scopes).
+ *
+ * Access control and request-scoped visibility checks belong in server/host modules
+ * where security context is available, not in core.
  */
 interface ChatScopeProvider {
     companion object {
@@ -44,4 +43,3 @@ interface ChatScopeProvider {
      */
      fun getGlobalScope(): ChatScope
 }
-
