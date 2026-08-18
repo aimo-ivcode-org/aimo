@@ -21,17 +21,17 @@ internal class ChatClientProviderImpl(
 ): ChatClientProvider {
 
     override fun createClient(
-        model: AimoChatModelConfig,
-        conversation: Conversation,
-        scope: ChatScope?,
-        interceptors: List<ChatClientInterceptor>,
-        includeDefaultInterceptors: Boolean,
-    ): AimoChatClient {
-        val effectiveInterceptors = if (includeDefaultInterceptors) {
-            defaultInterceptors + interceptors
-        } else {
-            interceptors
-        }
+         model: AimoChatModelConfig,
+         conversation: Conversation,
+         scope: ChatScope?,
+         interceptors: List<ChatClientInterceptor>,
+         includeDefaultInterceptors: Boolean,
+     ): AimoChatClient {
+         val effectiveInterceptors = if (includeDefaultInterceptors) {
+             interceptors + defaultInterceptors
+         } else {
+             interceptors
+         }
 
         val chatScope = scope ?: chatScopeProvider.getGlobalScope()
 
@@ -47,29 +47,27 @@ internal class ChatClientProviderImpl(
         if (effectiveInterceptors.isEmpty()) return coreClient
 
         // Compose the interceptor chain into a single callable for non-streaming calls.
-        // For streaming calls we capture the provided callback in the base function so
-        // that interceptors wrap the full stream lifecycle as intended.
-        return object : AimoChatClient {
-            override val chatId = coreClient.chatId
+         // For streaming calls we capture the provided callback in the base function so
+         // that interceptors wrap the full stream lifecycle as intended.
+         return object : AimoChatClient {
+             override val chatId = coreClient.chatId
 
-            override fun chat(request: org.ivcode.aimo.core.model.AimoChatRequest): org.ivcode.aimo.core.model.AimoChatResponse {
-                val base: (org.ivcode.aimo.core.model.AimoChatRequest, MutableMap<String, Any>) -> org.ivcode.aimo.core.model.AimoChatResponse = { req, ctx ->
-                    coreClient.chat(req)
-                }
-                val chain = composeChatInterceptors(effectiveInterceptors, base)
-                val ctx = mutableMapOf<String, Any>()
-                return chain(request, ctx)
-            }
+             override fun chat(request: org.ivcode.aimo.core.model.AimoChatRequest): org.ivcode.aimo.core.model.AimoChatResponse {
+                 val base: (org.ivcode.aimo.core.model.AimoChatRequest) -> org.ivcode.aimo.core.model.AimoChatResponse = { req ->
+                     coreClient.chat(req)
+                 }
+                 val chain = composeChatInterceptors(effectiveInterceptors, base)
+                 return chain(request)
+             }
 
-            override fun chatStream(request: org.ivcode.aimo.core.model.AimoChatRequest, callback: (org.ivcode.aimo.core.model.AimoChatResponse) -> Unit): org.ivcode.aimo.core.model.AimoChatResponse {
-                val base: (org.ivcode.aimo.core.model.AimoChatRequest, MutableMap<String, Any>) -> org.ivcode.aimo.core.model.AimoChatResponse = { req, ctx ->
-                    coreClient.chatStream(req, callback)
-                }
-                val chain = composeChatInterceptors(effectiveInterceptors, base)
-                val ctx = mutableMapOf<String, Any>()
-                return chain(request, ctx)
-            }
-        }
+             override fun chatStream(request: org.ivcode.aimo.core.model.AimoChatRequest, callback: (org.ivcode.aimo.core.model.AimoChatResponse) -> Unit): org.ivcode.aimo.core.model.AimoChatResponse {
+                 val base: (org.ivcode.aimo.core.model.AimoChatRequest) -> org.ivcode.aimo.core.model.AimoChatResponse = { req ->
+                     coreClient.chatStream(req, callback)
+                 }
+                 val chain = composeChatInterceptors(effectiveInterceptors, base)
+                 return chain(request)
+             }
+         }
     }
 
     override fun getDefaultInterceptors(): List<ChatClientInterceptor> {

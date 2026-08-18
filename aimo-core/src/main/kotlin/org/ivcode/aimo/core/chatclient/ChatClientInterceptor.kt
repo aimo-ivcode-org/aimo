@@ -23,25 +23,26 @@ interface ChatClientInterceptor {
     /**
      * Around-style interception using continuation pattern.
      *
-     * Intercept a chat request, optionally modifying the request and context before
+     * Intercept a chat request, optionally modifying the request before
      * delegating to the core operation (or next interceptor).
      *
      * Interceptors are invoked once per chat operation. For streaming chat, the interceptor
      * wraps the entire stream lifecycle (not individual chunks).
      *
-     * @param request The chat request; may be modified by the interceptor
-     * @param context Mutable operation context containing parameters like `chatId`, `requestId`,
-     *                `userId`, `requestMetadata`, etc. Modifications are visible to downstream
-     *                handlers.
-     * @param next Continuation callback that receives the (possibly modified) request and context
+     * Request already contains a `context` map (see [AimoChatRequest.context]) with parameters
+     * like `chatId`, `requestId`, `userId`, `requestMetadata`, etc. If an interceptor needs to
+     * modify context, it should create a new request with an updated context map.
+     *
+     * @param request The chat request containing the prompt and context; interceptor may build
+     *                a new request if modifications are needed.
+     * @param next Continuation callback that receives the (possibly modified) request
      *             and performs the core chat operation or calls the next interceptor.
      * @return the [AimoChatResponse] from the operation
      */
     fun aroundChat(
         request: AimoChatRequest,
-        context: MutableMap<String, Any> = mutableMapOf(),
-        next: (request: AimoChatRequest, context: MutableMap<String, Any>) -> AimoChatResponse
-    ): AimoChatResponse = next(request, context)
+        next: (request: AimoChatRequest) -> AimoChatResponse
+    ): AimoChatResponse = next(request)
 }
 
 /**
@@ -51,11 +52,11 @@ interface ChatClientInterceptor {
  */
 internal fun composeChatInterceptors(
     interceptors: List<ChatClientInterceptor>,
-    base: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-): (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse {
+    base: (AimoChatRequest) -> AimoChatResponse
+): (AimoChatRequest) -> AimoChatResponse {
     return interceptors.foldRight(base) { interceptor, next ->
-        { request: AimoChatRequest, context: MutableMap<String, Any> ->
-            interceptor.aroundChat(request, context) { req, ctx -> next(req, ctx) }
+        { request: AimoChatRequest ->
+            interceptor.aroundChat(request) { req -> next(req) }
         }
     }
 }

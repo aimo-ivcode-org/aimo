@@ -3,6 +3,7 @@ package org.ivcode.aimo.core.chatclient
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.conversation.Conversation
@@ -13,20 +14,19 @@ import java.util.UUID
 class ChatClientProviderImplIntegrationTest {
 
     @Test
-    fun `createClient applies interceptors and invokes aroundChat when chat is called`() {
-        val interceptorCalled = mutableListOf<Boolean>()
+     fun `createClient applies interceptors and invokes aroundChat when chat is called`() {
+         val interceptorCalled = mutableListOf<Boolean>()
 
-        val testInterceptor = object : ChatClientInterceptor {
-            override fun aroundChat(
-                request: AimoChatRequest,
-                context: MutableMap<String, Any>,
-                next: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-            ): AimoChatResponse {
-                interceptorCalled.add(true)
-                // allow call to proceed
-                return next(request, context)
-            }
-        }
+         val testInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 interceptorCalled.add(true)
+                 // allow call to proceed
+                 return next(request)
+             }
+         }
 
         // Minimal ChatScope and provider
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
@@ -98,35 +98,33 @@ class ChatClientProviderImplIntegrationTest {
         assertTrue(interceptorCalled.isNotEmpty(), "Interceptor should have been invoked")
     }
 
-    @Test
-    fun `multiple interceptors execute in registration order`() {
-        val callOrder = mutableListOf<String>()
+     @Test
+     fun `multiple interceptors execute in registration order`() {
+         val callOrder = mutableListOf<String>()
 
-        val int1 = object : ChatClientInterceptor {
-            override fun aroundChat(
-                request: AimoChatRequest,
-                context: MutableMap<String, Any>,
-                next: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-            ): AimoChatResponse {
-                callOrder.add("int1-before")
-                val result = next(request, context)
-                callOrder.add("int1-after")
-                return result
-            }
-        }
+         val int1 = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 callOrder.add("int1-before")
+                 val result = next(request)
+                 callOrder.add("int1-after")
+                 return result
+             }
+         }
 
-        val int2 = object : ChatClientInterceptor {
-            override fun aroundChat(
-                request: AimoChatRequest,
-                context: MutableMap<String, Any>,
-                next: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-            ): AimoChatResponse {
-                callOrder.add("int2-before")
-                val result = next(request, context)
-                callOrder.add("int2-after")
-                return result
-            }
-        }
+         val int2 = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 callOrder.add("int2-before")
+                 val result = next(request)
+                 callOrder.add("int2-after")
+                 return result
+             }
+         }
 
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
@@ -156,33 +154,31 @@ class ChatClientProviderImplIntegrationTest {
         )
     }
 
-    @Test
-    fun `interceptor can modify request and context before passing to next`() {
-        var contextModified = false
+     @Test
+     fun `interceptor can modify request before passing to next`() {
+         var modifiedPromptSeen = false
 
-        val modifyingInterceptor = object : ChatClientInterceptor {
-            override fun aroundChat(
-                request: AimoChatRequest,
-                context: MutableMap<String, Any>,
-                next: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-            ): AimoChatResponse {
-                // Modify the context to demonstrate interceptor can modify state
-                context["interceptor-ran"] = true
-                return next(request, context)
-            }
-        }
+         val modifyingInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 // Modify the request to demonstrate interceptor can modify the request
+                 val modifiedRequest = request.copy(prompt = request.prompt + " [modified]")
+                 return next(modifiedRequest)
+             }
+         }
 
-        val captureInterceptor = object : ChatClientInterceptor {
-            override fun aroundChat(
-                request: AimoChatRequest,
-                context: MutableMap<String, Any>,
-                next: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-            ): AimoChatResponse {
-                // Second interceptor verifies context modifications from first
-                contextModified = context["interceptor-ran"] as? Boolean ?: false
-                return next(request, context)
-            }
-        }
+         val captureInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 // Second interceptor verifies request modifications from first
+                 modifiedPromptSeen = request.prompt.contains("[modified]")
+                 return next(request)
+             }
+         }
 
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
@@ -203,25 +199,24 @@ class ChatClientProviderImplIntegrationTest {
             includeDefaultInterceptors = false
         )
 
-        client.chat(AimoChatRequest(prompt = "hello", context = emptyMap()))
+         client.chat(AimoChatRequest(prompt = "hello", context = emptyMap()))
 
-        // Verify first interceptor modified context, and second interceptor saw the modification
-        assertTrue(contextModified, "Second interceptor should see context modifications from first interceptor")
-    }
+         // Verify first interceptor modified request, and second interceptor saw the modification
+         assertTrue(modifiedPromptSeen, "Second interceptor should see request modifications from first interceptor")
+     }
 
-    @Test
-    fun `exception in interceptor propagates to caller`() {
-        val testException = RuntimeException("Interceptor error")
+     @Test
+     fun `exception in interceptor propagates to caller`() {
+         val testException = RuntimeException("Interceptor error")
 
-        val errorInterceptor = object : ChatClientInterceptor {
-            override fun aroundChat(
-                request: AimoChatRequest,
-                context: MutableMap<String, Any>,
-                next: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-            ): AimoChatResponse {
-                throw testException
-            }
-        }
+         val errorInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 throw testException
+             }
+         }
 
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
@@ -252,21 +247,20 @@ class ChatClientProviderImplIntegrationTest {
         assertEquals(testException, caughtException, "Interceptor exception should propagate to caller")
     }
 
-    @Test
-    fun `interceptor wraps streaming callbacks correctly`() {
-        val interceptorCallCount = mutableListOf<Int>()
-        val callbackInvocations = mutableListOf<String>()
+     @Test
+     fun `interceptor wraps streaming callbacks correctly`() {
+         val interceptorCallCount = mutableListOf<Int>()
+         val callbackInvocations = mutableListOf<String>()
 
-        val trackingInterceptor = object : ChatClientInterceptor {
-            override fun aroundChat(
-                request: AimoChatRequest,
-                context: MutableMap<String, Any>,
-                next: (AimoChatRequest, MutableMap<String, Any>) -> AimoChatResponse
-            ): AimoChatResponse {
-                interceptorCallCount.add(1)
-                return next(request, context)
-            }
-        }
+         val trackingInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 interceptorCallCount.add(1)
+                 return next(request)
+             }
+         }
 
         val streamingEngine = object : AimoChatEngine {
             override val options: AimoChatOptions = AimoChatOptions()
@@ -321,12 +315,172 @@ class ChatClientProviderImplIntegrationTest {
         }
 
         // Verify interceptor was called for streaming
-        assertEquals(1, interceptorCallCount.size, "Interceptor should be called once for streaming")
-        assertEquals(1, callbackInvocations.size, "Streaming callback should have been invoked")
-        assertEquals("streamed", response.messages[0].content)
-    }
+         assertEquals(1, interceptorCallCount.size, "Interceptor should be called once for streaming")
+         assertEquals(1, callbackInvocations.size, "Streaming callback should have been invoked")
+         assertEquals("streamed", response.messages[0].content)
+     }
 
-    private fun createTestConversation(convId: UUID): Conversation {
+     @Test
+     fun `default interceptors and provided interceptors execute in correct order`() {
+         val callOrder = mutableListOf<String>()
+
+         val defaultInt1 = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 callOrder.add("default1-before")
+                 val result = next(request)
+                 callOrder.add("default1-after")
+                 return result
+             }
+         }
+
+         val providedInt1 = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 callOrder.add("provided1-before")
+                 val result = next(request)
+                 callOrder.add("provided1-after")
+                 return result
+             }
+         }
+
+         val scope = ChatScope(id = "global", displayName = "global", description = "global")
+         val scopeProvider = object : ChatScopeProvider {
+             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
+             override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
+             override fun getGlobalScope(): ChatScope = scope
+         }
+
+         val convId = UUID.randomUUID()
+         val conversation = createTestConversation(convId)
+         val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
+         
+         // Create provider with default interceptor
+         val providerFactory = ChatClientProviderImpl(
+             chatScopeProvider = scopeProvider,
+             defaultInterceptors = listOf(defaultInt1)
+         )
+
+         val client = providerFactory.createClient(
+             model = modelConfig,
+             conversation = conversation,
+             interceptors = listOf(providedInt1),
+             includeDefaultInterceptors = true
+         )
+
+         client.chat(AimoChatRequest(prompt = "test", context = emptyMap()))
+
+         // Verify order: provided runs first (outermost), default runs second (innermost)
+         // Execution: provided1-before -> default1-before -> core -> default1-after -> provided1-after
+         assertEquals(
+             listOf("provided1-before", "default1-before", "default1-after", "provided1-after"),
+             callOrder
+         )
+     }
+
+     @Test
+     fun `interceptor can access request context and modify if needed`() {
+         var capturedContextValue: Any? = null
+
+         val capturingInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 // Capture the custom context value from request
+                 capturedContextValue = request.context["custom-key"]
+                 return next(request)
+             }
+         }
+
+         val scope = ChatScope(id = "global", displayName = "global", description = "global")
+         val scopeProvider = object : ChatScopeProvider {
+             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
+             override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
+             override fun getGlobalScope(): ChatScope = scope
+         }
+
+         val convId = UUID.randomUUID()
+         val conversation = createTestConversation(convId)
+         val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
+         val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+
+         // Create request with custom context values
+         val customContextValue = "test-metadata"
+         val requestContext = mapOf("custom-key" to customContextValue)
+
+         val client = providerFactory.createClient(
+             model = modelConfig,
+             conversation = conversation,
+             interceptors = listOf(capturingInterceptor),
+             includeDefaultInterceptors = false
+         )
+
+         // Call chat with context
+         client.chat(AimoChatRequest(prompt = "hello", context = requestContext))
+
+         // Verify interceptor received the context value via request.context
+         assertEquals(customContextValue, capturedContextValue, "Interceptor should be able to access custom context values from request")
+     }
+
+     @Test
+     fun `interceptor can build new request with modified context`() {
+         var modifiedContextSeen = false
+
+         val modifyingInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 // Build a new request with modified context
+                 val newContext = request.context.toMutableMap()
+                 newContext["modified"] = true
+                 val modifiedRequest = request.copy(context = newContext)
+                 return next(modifiedRequest)
+             }
+         }
+
+         val captureInterceptor = object : ChatClientInterceptor {
+             override fun aroundChat(
+                 request: AimoChatRequest,
+                 next: (AimoChatRequest) -> AimoChatResponse
+             ): AimoChatResponse {
+                 // Verify the modification
+                 modifiedContextSeen = request.context["modified"] as? Boolean ?: false
+                 return next(request)
+             }
+         }
+
+         val scope = ChatScope(id = "global", displayName = "global", description = "global")
+         val scopeProvider = object : ChatScopeProvider {
+             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
+             override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
+             override fun getGlobalScope(): ChatScope = scope
+         }
+
+         val convId = UUID.randomUUID()
+         val conversation = createTestConversation(convId)
+         val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
+         val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+
+         val client = providerFactory.createClient(
+             model = modelConfig,
+             conversation = conversation,
+             interceptors = listOf(modifyingInterceptor, captureInterceptor),
+             includeDefaultInterceptors = false
+         )
+
+         client.chat(AimoChatRequest(prompt = "hello", context = emptyMap()))
+
+         // Verify the context was modified and seen by the next interceptor
+         assertTrue(modifiedContextSeen, "Second interceptor should see context modifications from first interceptor")
+     }
+
+     private fun createTestConversation(convId: UUID): Conversation {
         return object : Conversation {
             override val chatId: UUID = convId
             override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = null

@@ -16,21 +16,21 @@ class AimoChatModelProviderImpl(
      * The order is deterministic based on the iteration order of the injected map.
      */
     override fun getModels(): List<AimoChatModelConfig> {
-        // Core operation: collect raw models from provider factories
-        val base: (MutableMap<String, Any>) -> List<AimoChatModelConfig> = { _ ->
-            val models = mutableListOf<AimoChatModelConfig>()
-            chatModelFactories.values.forEach { factory ->
-                factory.getNames().forEach { name ->
-                    factory.getModel(name)?.let { models.add(it) }
-                }
-            }
-            models
-        }
+         // Core operation: collect raw models from provider factories
+         val base: (MutableMap<String, Any>) -> List<AimoChatModelConfig> = { _ ->
+             val models = mutableListOf<AimoChatModelConfig>()
+             chatModelFactories.values.forEach { factory ->
+                 factory.getNames().forEach { name ->
+                     factory.getModel(name)?.let { models.add(it) }
+                 }
+             }
+             models.toList()  // Return immutable copy, not the mutable backing list
+         }
 
-        // Directly return collected models. Interceptor support was removed from core
-        // to keep policy and request-scoped access control in server modules.
-        return base(mutableMapOf())
-    }
+         // Directly return collected models. Interceptor support was removed from core
+         // to keep policy and request-scoped access control in server modules.
+         return base(mutableMapOf())
+     }
 
     /**
      * Look up a single model by name by querying each provider factory in turn.
