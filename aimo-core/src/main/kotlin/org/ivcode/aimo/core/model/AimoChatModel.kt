@@ -71,6 +71,15 @@ interface AimoChatModelProviderFactory {
     fun getNames(): List<String>
 
     /**
+     * Gets all model configurations for this provider.
+     *
+     * Equivalent to calling getModel(name) for each name in getNames().
+     *
+     * @return immutable list of all models for this provider
+     */
+    fun getModels(): List<AimoChatModelConfig>
+
+    /**
      * Returns the provider-local primary model name when one is configured.
      *
      * This is provider-scoped only; it does not imply that the model is the application's

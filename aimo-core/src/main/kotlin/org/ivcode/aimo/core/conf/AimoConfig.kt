@@ -22,6 +22,8 @@ import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.core.conversation.ConversationFactoryImpl
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
+import org.ivcode.aimo.core.model.AimoChatModelFactory
+import org.ivcode.aimo.core.model.AimoChatModelFactoryImpl
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.properties.AimoProperties
 import org.ivcode.aimo.core.chatservice.ChatServiceProviderRegistry
@@ -275,32 +277,40 @@ class AimoConfig {
         override fun call(context: SystemMessageContext): String? = messageText
     }
 
-     // ...existing code...
-
-      @Bean
-      fun createConversationFactory(
-          conversationStore: AimoChatClientDao,
-      ): ConversationFactory {
-          return ConversationFactoryImpl(conversationStore)
-      }
-
-     @Bean
-     fun createAimoChatModelProvider(
-         chatModelFactories: Map<String, AimoChatModelProviderFactory>
-     ): org.ivcode.aimo.core.model.AimoChatModelProvider {
-         return org.ivcode.aimo.core.model.AimoChatModelProviderImpl(chatModelFactories)
-     }
+    @Bean
+    fun createConversationFactory(
+        conversationStore: AimoChatClientDao,
+    ): ConversationFactory {
+        return ConversationFactoryImpl(conversationStore)
+    }
 
 
-        @Bean
-        fun createChatClientProvider(
-            chatScopeProvider: ChatScopeProvider,
-            defaultInterceptors: List<ChatClientInterceptor>, // Spring auto-collects all ChatClientInterceptor beans
-        ): ChatClientProvider {
-            return ChatClientProviderImpl(
-                chatScopeProvider = chatScopeProvider,
-                defaultInterceptors = defaultInterceptors,
-            )
-        }
+    @Bean
+    fun createAimoChatModelFactory(
+        chatModelFactories: Map<String, AimoChatModelProviderFactory>
+    ): AimoChatModelFactory {
+        return AimoChatModelFactoryImpl(chatModelFactories)
+    }
+
+    /**
+     * Creates the chat client provider with library-user-supplied default interceptors.
+     *
+     * The [defaultInterceptors] list is populated via Spring's auto-collection of all
+     * [ChatClientInterceptor] beans registered by library users. This enables extensibility:
+     * library users can define their own @Bean implementations (e.g., logging, tracing, retry)
+     * to inject default behavior into all chat clients created by the provider.
+     *
+     * When no interceptors are registered, Spring will inject null, which is converted to an empty list.
+     */
+    @Bean
+    fun createChatClientProvider(
+        chatScopeProvider: ChatScopeProvider,
+        defaultInterceptors: List<ChatClientInterceptor>?, // Spring injects null when no beans exist
+    ): ChatClientProvider {
+        return ChatClientProviderImpl(
+            chatScopeProvider = chatScopeProvider,
+            defaultInterceptors = defaultInterceptors ?: emptyList(),
+        )
+    }
 }
 

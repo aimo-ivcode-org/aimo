@@ -59,6 +59,15 @@ class OllamaChatModelFactory (
 
     override fun getNames(): List<String> = properties.keys.toList()
 
+    override fun getModels(): List<AimoChatModelConfig> {
+        return getNames().mapNotNull { name ->
+            getModel(name) ?: throw IllegalStateException(
+                "Ollama provider reported model name '$name' via getNames() " +
+                    "but getModel('$name') returned null. This indicates a configuration inconsistency."
+            )
+        }
+    }
+
     override fun getPrimaryName(): String? {
         val primaryNames = properties
             .filterValues { it.primary }
