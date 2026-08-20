@@ -1,11 +1,8 @@
 package org.ivcode.aimo.core.conf
 
-import org.ivcode.aimo.core.chatclient.ChatClientBuilderFactory
-import org.ivcode.aimo.core.chatclient.ChatClientBuilderFactoryImpl
+import org.ivcode.aimo.core.chatclient.ChatClientProvider
+import org.ivcode.aimo.core.chatclient.ChatClientProviderImpl
 import org.ivcode.aimo.core.chatclient.ChatClientInterceptor
-import org.ivcode.aimo.core.chatclient.ErrorHandlingInterceptor
-import org.ivcode.aimo.core.chatclient.LoggingInterceptor
-import org.ivcode.aimo.core.chatclient.TracingInterceptor
 import org.springframework.core.annotation.AnnotationUtils
 
 import org.ivcode.aimo.core.chatservice.ChatService
@@ -25,18 +22,17 @@ import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.core.conversation.ConversationFactoryImpl
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
+import org.ivcode.aimo.core.model.AimoChatModelFactory
+import org.ivcode.aimo.core.model.AimoChatModelFactoryImpl
 import org.ivcode.aimo.core.model.ToolCallback
 import org.ivcode.aimo.core.properties.AimoProperties
 import org.ivcode.aimo.core.chatservice.ChatServiceProviderRegistry
 import org.ivcode.aimo.core.properties.AimoChatScopeProperties
-import org.springframework.beans.factory.support.GenericBeanDefinition
 import org.springframework.beans.factory.getBeansWithAnnotation
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.support.GenericApplicationContext
 import tools.jackson.databind.ObjectMapper
 
 @Configuration
@@ -131,13 +127,12 @@ class AimoConfig {
               providerManager = providerManager,
           )
 
-          return ChatScopeProviderImpl(
-             allTools = tools,
-             allSystemMessages = systemMessages,
-             predefinedScopes = predefinedScopes,
-             providerManager = providerManager,
-             interceptors = emptyList() // Phase 3 adds security interceptors
-          )
+            return ChatScopeProviderImpl(
+               allTools = tools,
+               allSystemMessages = systemMessages,
+               predefinedScopes = predefinedScopes,
+               providerManager = providerManager
+            )
       }
 
        private fun buildPredefinedScopes(
@@ -282,77 +277,40 @@ class AimoConfig {
         override fun call(context: SystemMessageContext): String? = messageText
     }
 
-    // ...existing interceptor beans...
+    @Bean
+    fun createConversationFactory(
+        conversationStore: AimoChatClientDao,
+    ): ConversationFactory {
+        return ConversationFactoryImpl(conversationStore)
+    }
 
-     @Bean
-     fun createConversationFactory(
-         conversationStore: AimoChatClientDao,
-     ): ConversationFactory {
-         return ConversationFactoryImpl(conversationStore)
-     }
 
-     @Bean
-     @ConditionalOnProperty(
-         prefix = "aimo.interceptors.logging",
-         name = ["enabled"],
-         havingValue = "true",
-         matchIfMissing = false
-     )
-     fun loggingInterceptor(properties: AimoProperties): ChatClientInterceptor {
-         val logLevel = when (properties.interceptors.logging.level.uppercase()) {
-             "DEBUG" -> LoggingInterceptor.LogLevel.DEBUG
-             "INFO" -> LoggingInterceptor.LogLevel.INFO
-             "WARN" -> LoggingInterceptor.LogLevel.WARN
-             "ERROR" -> LoggingInterceptor.LogLevel.ERROR
-             else -> LoggingInterceptor.LogLevel.INFO
-         }
-         return LoggingInterceptor(logLevel = logLevel, enabled = true)
-     }
+    @Bean
+    fun createAimoChatModelFactory(
+        chatModelFactories: Map<String, AimoChatModelProviderFactory>
+    ): AimoChatModelFactory {
+        return AimoChatModelFactoryImpl(chatModelFactories)
+    }
 
-     @Bean
-     @ConditionalOnProperty(
-         prefix = "aimo.interceptors.tracing",
-         name = ["enabled"],
-         havingValue = "true",
-         matchIfMissing = false
-     )
-     fun tracingInterceptor(properties: AimoProperties): ChatClientInterceptor {
-         return TracingInterceptor(
-             enabled = true,
-             serviceName = properties.interceptors.tracing.serviceName
-         )
-     }
-
-     @Bean
-     @ConditionalOnProperty(
-         prefix = "aimo.interceptors.error-handling",
-         name = ["enabled"],
-         havingValue = "true",
-         matchIfMissing = false
-     )
-     fun errorHandlingInterceptor(properties: AimoProperties): ChatClientInterceptor {
-         return ErrorHandlingInterceptor(
-             maxRetries = properties.interceptors.errorHandling.maxRetries,
-             retryBackoffMs = properties.interceptors.errorHandling.retryBackoffMs,
-             enabled = true
-         )
-     }
-
-       @Bean
-       fun createChatClientBuilderFactory(
-           chatModelFactories: Map<String, AimoChatModelProviderFactory>,
-           tools: List<ToolCallback>,
-           systemMessages: List<SystemMessageCallback>,
-           chatScopeProvider: ChatScopeProvider,
-           defaultInterceptors: List<ChatClientInterceptor>, // Spring auto-collects all ChatClientInterceptor beans
-       ): ChatClientBuilderFactory {
-           return ChatClientBuilderFactoryImpl(
-               modelProviderFactories = chatModelFactories,
-               toolCallbacks = tools,
-               systemMessages = systemMessages,
-               chatScopeProvider = chatScopeProvider,
-               defaultInterceptors = defaultInterceptors,
-           )
-       }
+    /**
+     * Creates the chat client provider with library-user-supplied default interceptors.
+     *
+     * The [defaultInterceptors] list is populated via Spring's auto-collection of all
+     * [ChatClientInterceptor] beans registered by library users. This enables extensibility:
+     * library users can define their own @Bean implementations (e.g., logging, tracing, retry)
+     * to inject default behavior into all chat clients created by the provider.
+     *
+     * When no interceptors are registered, Spring provides an empty list.
+     */
+    @Bean
+    fun createChatClientProvider(
+        chatScopeProvider: ChatScopeProvider,
+        defaultInterceptors: List<ChatClientInterceptor>, // Spring auto-collects; empty list if none registered
+    ): ChatClientProvider {
+        return ChatClientProviderImpl(
+            chatScopeProvider = chatScopeProvider,
+            defaultInterceptors = defaultInterceptors,
+        )
+    }
 }
 

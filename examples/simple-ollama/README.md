@@ -92,28 +92,39 @@ class ChatController(
 }
 ```
 
-### 2. Service Layer (Builder Pattern)
+### 2. Service Layer
 
-Under the hood, the service uses the builder pattern:
+The server provides a REST endpoint that integrates with the core chat orchestration:
 
 ```kotlin
 @Service
 class ChatService(
     private val conversationFactory: ConversationFactory,
-    private val chatClientBuilderFactory: ChatClientBuilderFactory
+    private val chatClientFactory: ChatClientProvider,
+    private val chatModelFactory: AimoChatModelFactory
 ) {
-    fun chat(chatId: UUID, request: ChatRequest, userId: String): StreamingResponseBody {
+    fun chat(chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream) {
         // 1. Load conversation
-        val conversation = conversationFactory.getConversation(chatId, userId)
+        val conversation = conversationFactory.getConversation(chatId)
             ?: throw NotFoundException("Conversation not found: chatId=$chatId")
         
-        // 2. Build chat client (with interceptors applied)
-        val chatClient = chatClientBuilderFactory.builder(conversation).build()
-        // 3. Execute chat with streaming
-        return StreamingResponseBody { outputStream ->
-            chatClient.chatStream(request.toAimoChatRequest()) { response ->
+        // 2. Get primary model (fails fast if no valid primary configured)
+        val primaryModel = chatModelFactory.getPrimaryModel()
+        
+        // 3. Create chat client with default interceptors
+        val chatClient = chatClientFactory.createClient(
+            model = primaryModel,
+            conversation = conversation
+        )
+        
+        // 4. Execute chat (streaming or non-streaming)
+        if (request.stream) {
+            chatClient.chatStream(request.toAimoChatRequest(context)) { response ->
                 // Stream NDJSON to client...
             }
+        } else {
+            val response = chatClient.chat(request.toAimoChatRequest(context))
+            // Send response...
         }
     }
 }
@@ -204,11 +215,14 @@ Tools are automatically discovered at startup.
 class CustomLoggingInterceptor : ChatClientInterceptor {
     private val logger = LoggerFactory.getLogger(javaClass)
     
-    override fun intercept(chain: ChatClientInterceptor.Chain, context: MutableMap<String, Any>): AimoChatResponse {
-        val chatId = context["chatId"]
+    override fun aroundChat(
+        request: AimoChatRequest,
+        next: (request: AimoChatRequest) -> AimoChatResponse
+    ): AimoChatResponse {
+        val chatId = request.context["chatId"]
         logger.info("Chat starting for: $chatId")
         
-        val response = chain.proceed(context)
+        val response = next(request)
         
         logger.info("Chat completed: ${response.messages.size} messages")
         return response
@@ -216,9 +230,11 @@ class CustomLoggingInterceptor : ChatClientInterceptor {
 }
 ```
 
-All `ChatClientInterceptor` beans are automatically registered.
+All `ChatClientInterceptor` beans are automatically registered as default interceptors.
 
 ### Configure a Different Model
+
+In `application.yml`:
 
 ```yaml
 aimo:
@@ -232,14 +248,7 @@ aimo:
           temperature: 0.3
 ```
 
-Then programmatically select it:
-
-```kotlin
-val chatClient = chatClientBuilderFactory
-    .builder(conversation)
-    .withModel("llama-fast")
-    .build()
-```
+At runtime, only the model marked with `primary: true` is used. Multiple models can be configured; exactly one must be marked as primary.
 
 ## Troubleshooting
 

@@ -26,8 +26,7 @@ class ChatScopeProviderImpl(
     private val allTools: List<ToolCallback>,
     private val allSystemMessages: List<SystemMessageCallback>,
     private val predefinedScopes: Map<String, ChatScope> = emptyMap(),
-    private val providerManager: ChatServiceProviderManager,
-    private val interceptors: List<ChatScopeProviderInterceptor> = emptyList()
+    private val providerManager: ChatServiceProviderManager
 ) : ChatScopeProvider {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -68,67 +67,18 @@ class ChatScopeProviderImpl(
     override fun getScopes(context: Map<String, Any>): List<ChatScope> {
         val allScopes = listOf(globalScope) + predefinedScopes.values
 
-        if (interceptors.isEmpty()) return allScopes
-
-        val mutableContext = mutableMapOf<String, Any>(
-            "operation" to "getScopes",
-            "scopes" to allScopes
-        )
-        mutableContext.putAll(context)
-
-        val chain = buildChain(interceptors, 0) { ctx ->
-            // Ensure we return a properly-typed list from the final action to avoid
-            // unchecked casts in the interceptor chain. If the context value is not
-            // a list, fall back to an empty list. Use filterIsInstance to safely
-            // coerce the items to ChatScope.
-            val raw = ctx["scopes"] as? List<*>
-            raw?.filterIsInstance<ChatScope>() ?: emptyList<ChatScope>()
-        }
-
-        val result = chain.proceed(mutableContext)
-        return when (result) {
-            is List<*> -> result.filterIsInstance<ChatScope>()
-            else -> emptyList()
-        }
+        // Interceptor support was removed from core; return collected scopes directly.
+        return allScopes
     }
 
     override fun getScope(id: String, context: Map<String, Any>): ChatScope? {
         val scope = if (id == ChatScopeProvider.GLOBAL_SCOPE_ID) globalScope else predefinedScopes[id]
         if (scope == null) return null
 
-        if (interceptors.isEmpty()) return scope
-
-        val mutableContext = mutableMapOf<String, Any>(
-            "operation" to "getScope",
-            "scopeId" to id,
-            "scope" to scope
-        )
-        mutableContext.putAll(context)
-
-        val chain = buildChain(interceptors, 0) { ctx ->
-            ctx["scope"]
-        }
-
-        return chain.proceed(mutableContext) as? ChatScope
+        // Interceptor support was removed from core; return scope directly.
+        return scope
     }
 
     override fun getGlobalScope(): ChatScope = globalScope
-
-    private fun buildChain(
-        interceptors: List<ChatScopeProviderInterceptor>,
-        index: Int,
-        finalAction: (MutableMap<String, Any>) -> Any?
-    ): ChatScopeProviderInterceptor.Chain {
-        return object : ChatScopeProviderInterceptor.Chain {
-            override fun proceed(context: MutableMap<String, Any>): Any? {
-                return if (index < interceptors.size) {
-                    val nextChain = buildChain(interceptors, index + 1, finalAction)
-                    interceptors[index].intercept(nextChain, context)
-                } else {
-                    finalAction(context)
-                }
-            }
-        }
-    }
 }
 

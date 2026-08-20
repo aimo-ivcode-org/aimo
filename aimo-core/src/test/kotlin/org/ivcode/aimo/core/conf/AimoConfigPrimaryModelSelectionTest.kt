@@ -113,6 +113,8 @@ class AimoConfigPrimaryModelSelectionTest {
 
             override fun getNames(): List<String> = models.map { it.name }
 
+            override fun getModels(): List<AimoChatModelConfig> = models.toList()
+
             override fun getPrimaryName(): String? = models.singleOrNull { it.isPrimary }?.name
         }
     }

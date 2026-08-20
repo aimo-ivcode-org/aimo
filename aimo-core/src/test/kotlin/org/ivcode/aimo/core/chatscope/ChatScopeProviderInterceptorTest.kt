@@ -15,134 +15,74 @@ import kotlin.test.assertTrue
 class ChatScopeProviderInterceptorTest {
 
     @Test
-    fun `interceptor is called when getScope is invoked`() {
-        var interceptorCalled = false
-        var capturedOperation: String? = null
-        var capturedScopeId: String? = null
-
-        val testInterceptor = TestChatScopeProviderInterceptor { ctx ->
-            interceptorCalled = true
-            capturedOperation = ctx["operation"] as? String
-            capturedScopeId = ctx["scopeId"] as? String
-        }
-
-        val provider = createTestProvider(listOf(testInterceptor))
-
-        // Invoke getScope
-        val scope = provider.getScope("public")
-
-        assertTrue(interceptorCalled, "Interceptor should be called for getScope")
-        assertEquals("getScope", capturedOperation)
-        assertEquals("public", capturedScopeId)
-        assertEquals("public", scope?.id)
-    }
-
-    @Test
-    fun `interceptor is called when getScopes is invoked`() {
-        var interceptorCalled = false
-        var capturedOperation: String? = null
-
-        val testInterceptor = TestChatScopeProviderInterceptor { ctx ->
-            interceptorCalled = true
-            capturedOperation = ctx["operation"] as? String
-        }
-
-        val provider = createTestProvider(listOf(testInterceptor))
-
-        // Invoke getScopes
-        val scopes = provider.getScopes()
-
-        assertTrue(interceptorCalled, "Interceptor should be called for getScopes")
-        assertEquals("getScopes", capturedOperation)
-        assertTrue(scopes.isNotEmpty(), "Should have returned scopes")
-    }
-
-    @Test
-    fun `multiple interceptors are called in order`() {
-        val callOrder = mutableListOf<String>()
-
-        val interceptor1 = TestChatScopeProviderInterceptor { _ ->
-            callOrder.add("interceptor1")
-        }
-
-        val interceptor2 = TestChatScopeProviderInterceptor { _ ->
-            callOrder.add("interceptor2")
-        }
-
-        val provider = createTestProvider(listOf(interceptor1, interceptor2))
-
-        // Invoke getScope
-        provider.getScope("public")
-
-        assertEquals(listOf("interceptor1", "interceptor2"), callOrder)
-    }
-
-    @Test
-    fun `interceptor can access and modify scope selection`() {
-        var scopeFromContext: ChatScope? = null
-
-        val testInterceptor = TestChatScopeProviderInterceptor { ctx ->
-            scopeFromContext = ctx["scope"] as? ChatScope
-        }
-
-        val provider = createTestProvider(listOf(testInterceptor))
-
-        // Invoke getScope
-        val scope = provider.getScope("admin")
-
-        assertEquals("admin", scopeFromContext?.id)
-        assertEquals("admin", scope?.id)
-    }
-
-    @Test
-    fun `global scope is always available`() {
-        val provider = createTestProvider(emptyList())
-
-        val globalScope = provider.getGlobalScope()
-
-        assertEquals(ChatScopeProvider.GLOBAL_SCOPE_ID, globalScope.id)
-    }
-
-    // Helper classes and functions
-
-    private fun createTestProvider(interceptors: List<ChatScopeProviderInterceptor>): ChatScopeProvider {
-        // Create minimal test scopes
+    fun `getScope returns predefined scope`() {
         val testScopes = mutableMapOf<String, ChatScope>()
+        testScopes["public"] = ChatScope(
+            id = "public",
+            displayName = "Public",
+            description = "Test public scope",
+            providers = null,
+            tools = emptyList(),
+            systemMessages = emptyList()
+        )
 
-        for (scopeId in listOf("public", "admin", "research")) {
-            testScopes[scopeId] = ChatScope(
-                id = scopeId,
-                displayName = scopeId.replaceFirstChar { it.uppercase() },
-                description = "Test $scopeId scope",
-                providers = null,
-                tools = emptyList(),
-                systemMessages = emptyList()
-            )
-        }
-
-        return ChatScopeProviderImpl(
+        val provider = ChatScopeProviderImpl(
             allTools = emptyList(),
             allSystemMessages = emptyList(),
             predefinedScopes = testScopes,
             providerManager = object : org.ivcode.aimo.core.chatservice.ChatServiceProviderManager {
                 override fun getProviders() = emptyList<org.ivcode.aimo.core.chatservice.ChatServiceProvider>()
                 override fun getProvider(id: String) = null
-            },
-            interceptors = interceptors
+            }
         )
+
+        val scope = provider.getScope("public", emptyMap())
+        assertEquals("public", scope?.id)
     }
 
-    private class TestChatScopeProviderInterceptor(
-        val onIntercept: (context: MutableMap<String, Any>) -> Unit
-    ) : ChatScopeProviderInterceptor {
+    @Test
+    fun `getScopes includes global and predefined`() {
+        val testScopes = mapOf(
+            "admin" to ChatScope(
+                id = "admin",
+                displayName = "Admin",
+                description = "Admin scope",
+                providers = null,
+                tools = emptyList(),
+                systemMessages = emptyList()
+            )
+        )
 
-        override fun intercept(
-            chain: ChatScopeProviderInterceptor.Chain,
-            context: MutableMap<String, Any>
-        ): Any? {
-            onIntercept(context)
-            return chain.proceed(context)
-        }
+        val provider = ChatScopeProviderImpl(
+            allTools = emptyList(),
+            allSystemMessages = emptyList(),
+            predefinedScopes = testScopes,
+            providerManager = object : org.ivcode.aimo.core.chatservice.ChatServiceProviderManager {
+                override fun getProviders() = emptyList<org.ivcode.aimo.core.chatservice.ChatServiceProvider>()
+                override fun getProvider(id: String) = null
+            }
+        )
+
+        val scopes = provider.getScopes(emptyMap())
+        // must contain global scope and the predefined admin scope
+        assertTrue(scopes.any { it.id == ChatScopeProvider.GLOBAL_SCOPE_ID })
+        assertTrue(scopes.any { it.id == "admin" })
+    }
+
+    @Test
+    fun `global scope is always available`() {
+        val provider = ChatScopeProviderImpl(
+            allTools = emptyList(),
+            allSystemMessages = emptyList(),
+            predefinedScopes = emptyMap(),
+            providerManager = object : org.ivcode.aimo.core.chatservice.ChatServiceProviderManager {
+                override fun getProviders() = emptyList<org.ivcode.aimo.core.chatservice.ChatServiceProvider>()
+                override fun getProvider(id: String) = null
+            }
+        )
+
+        val globalScope = provider.getGlobalScope()
+        assertEquals(ChatScopeProvider.GLOBAL_SCOPE_ID, globalScope.id)
     }
 }
 

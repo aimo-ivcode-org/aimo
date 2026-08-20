@@ -1,7 +1,8 @@
 package org.ivcode.aimo.server.service
 
 import org.ivcode.aimo.core.chatclient.AimoChatClient
-import org.ivcode.aimo.core.chatclient.ChatClientBuilderFactory
+import org.ivcode.aimo.core.chatclient.ChatClientProvider
+import org.ivcode.aimo.core.model.AimoChatModelFactory
 import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.core.model.AimoChatRequest
 import org.ivcode.aimo.server.exceptions.NotFoundException
@@ -15,16 +16,21 @@ import java.util.UUID
 @Service
 class ChatService (
     private val conversationFactory: ConversationFactory,
-    private val chatClientFactory: ChatClientBuilderFactory,
+    private val chatClientFactory: ChatClientProvider,
+    private val chatModelFactory: AimoChatModelFactory,
     private val mapper: ObjectMapper,
 ) {
-    fun chat (chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream) {
+    fun chat(chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream) {
         val conversation = conversationFactory.getConversation(chatId)
             ?: throw NotFoundException("Conversation not found: chatId=$chatId")
 
-        val client = chatClientFactory
-            .builder(conversation)
-            .build()
+        // Resolve primary model (lazily computed and cached; will throw IllegalStateException if ambiguous)
+        val primaryModel = chatModelFactory.getPrimaryModel()
+
+        val client = chatClientFactory.createClient(
+            model = primaryModel,
+            conversation = conversation
+        )
 
         val mergedContext: MutableMap<String, Any> = HashMap(context)
         mergedContext.putAll(conversation.getChatMetadata())
