@@ -5,12 +5,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
 /**
- * Simplified tests for model config / engine helpers.
+ * Tests for [AimoChatModelConfig] creation and engine response behavior.
  *
- * The interceptor APIs were migrated out of core; these tests focus on
- * basic model config creation and engine behavior.
+ * Verifies that model configurations correctly capture names and primary flags,
+ * and that engines produce responses with proper UUIDs and timestamps.
  */
-class AimoChatModelProviderInterceptorTest {
+class AimoChatModelConfigEngineTest {
 
     @Test
     fun `createTestModel produces config with matching name and primary flag`() {

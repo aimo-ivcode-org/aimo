@@ -3,7 +3,6 @@ package org.ivcode.aimo.server.service
 import org.ivcode.aimo.core.chatclient.AimoChatClient
 import org.ivcode.aimo.core.chatclient.ChatClientProvider
 import org.ivcode.aimo.core.model.AimoChatModelFactory
-import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.core.model.AimoChatRequest
 import org.ivcode.aimo.server.exceptions.NotFoundException
@@ -25,12 +24,8 @@ class ChatService (
          val conversation = conversationFactory.getConversation(chatId)
              ?: throw NotFoundException("Conversation not found: chatId=$chatId")
 
-         // Resolve primary model (cached singleton bean; no per-request iteration)
-         val primaryModel = try {
-             chatModelFactory.getPrimaryModel()
-         } catch (e: IllegalStateException) {
-             throw IllegalStateException("No primary model configured", e)
-         }
+         // Resolve primary model (bean is singleton; getPrimaryModel() enforces invariants at startup)
+         val primaryModel = chatModelFactory.getPrimaryModel()
 
          val client = chatClientFactory.createClient(
              model = primaryModel,

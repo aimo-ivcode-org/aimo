@@ -6,14 +6,13 @@ import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.model.AimoChatModelConfig
 
 /**
- * Concrete implementation of [ChatClientProviderFactory].
+ * Concrete implementation of [ChatClientProvider].
  *
- * This factory creates immutable ChatClientProvider instances and manages default interceptors.
- * It also provides convenience methods for model discovery (primary model lookup, model by name).
+ * Creates [AimoChatClient] instances with support for request-level interceptor composition.
+ * Manages a list of default interceptors to be applied to all created clients when requested.
  *
- * @property modelProviderFactories Map of provider name → factory for creating models
- * @property chatScopeProvider Provider for retrieving chat scopes
- * @property defaultInterceptors Default interceptors applied to all providers (logging, tracing, error handling)
+ * @property chatScopeProvider Provides chat scopes for filtering tools/system messages by scope
+ * @property defaultInterceptors Default interceptors (logging, tracing, retry, etc.) to apply when creating clients
  */
 internal class ChatClientProviderImpl(
     private val chatScopeProvider: ChatScopeProvider,
@@ -43,31 +42,31 @@ internal class ChatClientProviderImpl(
             chatScope = chatScope,
         )
 
-        // If no interceptors are configured, return the core client directly.
-        if (effectiveInterceptors.isEmpty()) return coreClient
+         // If no interceptors are configured, return the core client directly.
+         if (effectiveInterceptors.isEmpty()) return coreClient
 
-        // Compose the interceptor chain into a single callable for non-streaming calls.
-         // For streaming calls we capture the provided callback in the base function so
-         // that interceptors wrap the full stream lifecycle as intended.
-         return object : AimoChatClient {
-             override val chatId = coreClient.chatId
+         // Pre-compose the interceptor chain for non-streaming calls (reused per client).
+         val nonStreamingChain = composeChatInterceptors(
+             effectiveInterceptors,
+             { req -> coreClient.chat(req) }
+         )
 
-             override fun chat(request: org.ivcode.aimo.core.model.AimoChatRequest): org.ivcode.aimo.core.model.AimoChatResponse {
-                 val base: (org.ivcode.aimo.core.model.AimoChatRequest) -> org.ivcode.aimo.core.model.AimoChatResponse = { req ->
-                     coreClient.chat(req)
-                 }
-                 val chain = composeChatInterceptors(effectiveInterceptors, base)
-                 return chain(request)
-             }
+         // Return a wrapped client that reuses the pre-composed chain and composes streaming chain per-call.
+          return object : AimoChatClient {
+              override val chatId = coreClient.chatId
 
-             override fun chatStream(request: org.ivcode.aimo.core.model.AimoChatRequest, callback: (org.ivcode.aimo.core.model.AimoChatResponse) -> Unit): org.ivcode.aimo.core.model.AimoChatResponse {
-                 val base: (org.ivcode.aimo.core.model.AimoChatRequest) -> org.ivcode.aimo.core.model.AimoChatResponse = { req ->
-                     coreClient.chatStream(req, callback)
-                 }
-                 val chain = composeChatInterceptors(effectiveInterceptors, base)
-                 return chain(request)
-             }
-         }
+              override fun chat(request: org.ivcode.aimo.core.model.AimoChatRequest): org.ivcode.aimo.core.model.AimoChatResponse {
+                  return nonStreamingChain(request)
+              }
+
+              override fun chatStream(request: org.ivcode.aimo.core.model.AimoChatRequest, callback: (org.ivcode.aimo.core.model.AimoChatResponse) -> Unit): org.ivcode.aimo.core.model.AimoChatResponse {
+                  val base: (org.ivcode.aimo.core.model.AimoChatRequest) -> org.ivcode.aimo.core.model.AimoChatResponse = { req ->
+                      coreClient.chatStream(req, callback)
+                  }
+                  val chain = composeChatInterceptors(effectiveInterceptors, base)
+                  return chain(request)
+              }
+          }
     }
 
     override fun getDefaultInterceptors(): List<ChatClientInterceptor> {

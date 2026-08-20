@@ -8,10 +8,18 @@ package org.ivcode.aimo.core.model
  * single global primary model is selected and provides non-null access to it.
  *
  * Model discovery and primary selection are delegated to provider-local factories.
+ * The primary model result is cached after first resolution to avoid repeated computation.
  */
 internal class AimoChatModelFactoryImpl(
     private val chatModelFactories: Map<String, AimoChatModelProviderFactory>
 ) : AimoChatModelFactory {
+
+    // Cached primary model; computed once on first call, reused thereafter
+    @Volatile
+    private var cachedPrimaryModel: AimoChatModelConfig? = null
+
+    @Volatile
+    private var primaryResolutionAttempted = false
 
     /**
      * Return all model configurations from all provider factories.
@@ -58,44 +66,68 @@ internal class AimoChatModelFactoryImpl(
      * 2. If no explicit primary exists and exactly one model is configured, return it
      * 3. Otherwise throw IllegalStateException with clear diagnostic message
      *
+     * Result is cached after first computation to avoid repeated model instantiation/engine creation.
+     *
      * @throws IllegalStateException if primary model selection is ambiguous or fails
      */
     override fun getPrimaryModel(): AimoChatModelConfig {
-        val factories: List<AimoChatModelProviderFactory> = chatModelFactories.values.toList()
+        // Double-checked locking for thread-safe lazy initialization
+        if (primaryResolutionAttempted) {
+            return cachedPrimaryModel ?: throw IllegalStateException(
+                "Primary model resolution previously failed; see logs for details"
+            )
+        }
 
-        // Collect all models marked with isPrimary=true
-        val primaryModels: List<AimoChatModelConfig> = factories.mapNotNull { factory ->
-            factory.getPrimaryName()?.let { primaryName ->
-                factory.getModel(primaryName) ?: throw IllegalStateException(
-                    "Provider '${factory.provider}' reported primary model name '$primaryName' " +
-                        "but getModel('$primaryName') returned null. This indicates a configuration inconsistency."
+        synchronized(this) {
+            if (primaryResolutionAttempted) {
+                return cachedPrimaryModel ?: throw IllegalStateException(
+                    "Primary model resolution previously failed; see logs for details"
                 )
             }
-        }
 
-        // Enforce at most one global primary
-        require(primaryModels.size <= 1) {
-            "Only one model can be marked primary=true globally. " +
-                "Found ${primaryModels.size} primary models: ${primaryModels.map { it.name }}"
-        }
+            val factories: List<AimoChatModelProviderFactory> = chatModelFactories.values.toList()
 
-        // If a primary exists, return it
-        if (primaryModels.isNotEmpty()) {
-            return primaryModels.first()
-        }
+            // Collect all models marked with isPrimary=true
+            val primaryModels: List<AimoChatModelConfig> = factories.mapNotNull { factory ->
+                factory.getPrimaryName()?.let { primaryName ->
+                    factory.getModel(primaryName) ?: throw IllegalStateException(
+                        "Provider '${factory.provider}' reported primary model name '$primaryName' " +
+                            "but getModel('$primaryName') returned null. This indicates a configuration inconsistency."
+                    )
+                }
+            }
 
-        // No explicit primary: try to use a single model as default
-        val allModels = getModels()
-        if (allModels.size == 1) {
-            return allModels.first()
-        }
+            // Enforce at most one global primary
+            require(primaryModels.size <= 1) {
+                "Only one model can be marked primary=true globally. " +
+                    "Found ${primaryModels.size} primary models: ${primaryModels.map { it.name }}"
+            }
 
-        // Multiple models with no explicit primary: ambiguous
-        throw IllegalStateException(
-            "No primary model is configured. " +
-                "Multiple models exist: ${allModels.map { it.name }}. " +
-                "Mark exactly one with primary=true in configuration."
-        )
+            // If a primary exists, cache and return it
+            if (primaryModels.isNotEmpty()) {
+                val primaryModel = primaryModels.first()
+                cachedPrimaryModel = primaryModel
+                primaryResolutionAttempted = true
+                return primaryModel
+            }
+
+            // No explicit primary: try to use a single model as default
+            val allModels = getModels()
+            if (allModels.size == 1) {
+                val primaryModel = allModels.first()
+                cachedPrimaryModel = primaryModel
+                primaryResolutionAttempted = true
+                return primaryModel
+            }
+
+            // Multiple models with no explicit primary: ambiguous
+            primaryResolutionAttempted = true
+            throw IllegalStateException(
+                "No primary model is configured. " +
+                    "Multiple models exist: ${allModels.map { it.name }}. " +
+                    "Mark exactly one with primary=true in configuration."
+            )
+        }
     }
 
     /**
