@@ -20,34 +20,34 @@ class ChatService (
     private val chatModelFactory: AimoChatModelFactory,
     private val mapper: ObjectMapper,
 ) {
-    fun chat (chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream) {
-         val conversation = conversationFactory.getConversation(chatId)
-             ?: throw NotFoundException("Conversation not found: chatId=$chatId")
+    fun chat(chatId: UUID, request: ChatRequest, context: Map<String, Any>, output: OutputStream) {
+        val conversation = conversationFactory.getConversation(chatId)
+            ?: throw NotFoundException("Conversation not found: chatId=$chatId")
 
-         // Resolve primary model (bean is singleton; getPrimaryModel() enforces invariants at startup)
-         val primaryModel = chatModelFactory.getPrimaryModel()
+        // Resolve primary model (lazily computed and cached; will throw IllegalStateException if ambiguous)
+        val primaryModel = chatModelFactory.getPrimaryModel()
 
-         val client = chatClientFactory.createClient(
-             model = primaryModel,
-             conversation = conversation
-         )
+        val client = chatClientFactory.createClient(
+            model = primaryModel,
+            conversation = conversation
+        )
 
-         val mergedContext: MutableMap<String, Any> = HashMap(context)
-         mergedContext.putAll(conversation.getChatMetadata())
+        val mergedContext: MutableMap<String, Any> = HashMap(context)
+        mergedContext.putAll(conversation.getChatMetadata())
 
-         if (request.stream) {
-             chatStream(client, request.toAimoChatRequest(mergedContext.toMap()), output)
-         } else {
-             val response = client.chat(request.toAimoChatRequest(mergedContext.toMap()))
-             response.toChatResponse().write(output, isNewlineDelimited = true)
-         }
-     }
+        if (request.stream) {
+            chatStream(client, request.toAimoChatRequest(mergedContext.toMap()), output)
+        } else {
+            val response = client.chat(request.toAimoChatRequest(mergedContext.toMap()))
+            response.toChatResponse().write(output, isNewlineDelimited = true)
+        }
+    }
 
-     private fun chatStream(client: AimoChatClient, request: AimoChatRequest, output: OutputStream) {
-         client.chatStream(request) { response ->
-             response.toChatResponse().write(output, isNewlineDelimited = true)
-         }
-     }
+    private fun chatStream(client: AimoChatClient, request: AimoChatRequest, output: OutputStream) {
+        client.chatStream(request) { response ->
+            response.toChatResponse().write(output, isNewlineDelimited = true)
+        }
+    }
 
     fun ChatResponse.write(output: OutputStream, isNewlineDelimited: Boolean) {
         val json = mapper.writeValueAsBytes(this)

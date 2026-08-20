@@ -118,11 +118,11 @@ internal class AimoChatModelFactoryImpl(
                 }
             }
 
-            // Enforce at most one global primary
-            require(primaryModels.size <= 1) {
-                "Only one model can be marked primary=true globally. " +
-                    "Found ${primaryModels.size} primary models: ${primaryModels.map { it.name }}"
-            }
+             // Enforce at most one global primary
+             check(primaryModels.size <= 1) {
+                 "Only one model can be marked primary=true globally. " +
+                     "Found ${primaryModels.size} primary models: ${primaryModels.map { it.name }}"
+             }
 
             // If a primary exists, cache and return it
             if (primaryModels.isNotEmpty()) {
@@ -132,22 +132,28 @@ internal class AimoChatModelFactoryImpl(
                 return primaryModel
             }
 
-            // No explicit primary: try to use a single model as default
-            val allModels = getModels()
-            if (allModels.size == 1) {
-                val primaryModel = allModels.first()
-                cachedPrimaryModel = primaryModel
-                primaryResolutionAttempted = true
-                return primaryModel
-            }
+             // No explicit primary: try to use a single model as default
+             val allModels = getModels()
+             if (allModels.isEmpty()) {
+                 primaryResolutionAttempted = true
+                 throw IllegalStateException(
+                     "No models are configured. Please add at least one model configuration."
+                 )
+             }
+             if (allModels.size == 1) {
+                 val primaryModel = allModels.first()
+                 cachedPrimaryModel = primaryModel
+                 primaryResolutionAttempted = true
+                 return primaryModel
+             }
 
-            // Multiple models with no explicit primary: ambiguous
-            primaryResolutionAttempted = true
-            throw IllegalStateException(
-                "No primary model is configured. " +
-                    "Multiple models exist: ${allModels.map { it.name }}. " +
-                    "Mark exactly one with primary=true in configuration."
-            )
+             // Multiple models with no explicit primary: ambiguous
+             primaryResolutionAttempted = true
+             throw IllegalStateException(
+                 "No primary model is configured. " +
+                     "Multiple models exist: ${allModels.map { it.name }}. " +
+                     "Mark exactly one with primary=true in configuration."
+             )
         }
     }
 
