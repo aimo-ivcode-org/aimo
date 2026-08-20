@@ -35,7 +35,11 @@ internal class AimoChatModelFactoryImpl(
 
     /**
      * Look up a single model by name by querying each provider factory in turn.
-     * Returns the first match or null when not found.
+     *
+     * Returns the first match or null when not found. Model name uniqueness is validated
+     * by [getNames()], which fails fast if duplicates are detected across providers.
+     *
+     * @return matching model or null when not found
      */
     override fun getModel(name: String): AimoChatModelConfig? {
         for (factory in chatModelFactories.values) {
@@ -49,11 +53,28 @@ internal class AimoChatModelFactoryImpl(
 
     /**
      * List all globally available model names.
+     *
+     * Verifies that no two providers expose the same model name (fails fast if duplicates detected).
+     *
+     * @throws IllegalStateException if duplicate model names are found across providers
      */
     override fun getNames(): List<String> {
         val names = mutableListOf<String>()
+        val seenNames = mutableMapOf<String, String>()  // modelName -> providerName
+
         chatModelFactories.values.forEach { factory ->
-            names.addAll(factory.getNames())
+            factory.getNames().forEach { name ->
+                val existingProvider = seenNames[name]
+                if (existingProvider != null) {
+                    throw IllegalStateException(
+                        "Duplicate model name '$name' exposed by providers " +
+                            "'$existingProvider' and '${factory.provider}'. " +
+                            "Model names must be unique across all providers."
+                    )
+                }
+                seenNames[name] = factory.provider
+                names.add(name)
+            }
         }
         return names.toList()
     }

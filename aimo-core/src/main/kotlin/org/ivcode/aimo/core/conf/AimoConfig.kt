@@ -300,16 +300,16 @@ class AimoConfig {
      * library users can define their own @Bean implementations (e.g., logging, tracing, retry)
      * to inject default behavior into all chat clients created by the provider.
      *
-     * When no interceptors are registered, Spring will inject null, which is converted to an empty list.
+     * When no interceptors are registered, Spring provides an empty list.
      */
     @Bean
     fun createChatClientProvider(
         chatScopeProvider: ChatScopeProvider,
-        defaultInterceptors: List<ChatClientInterceptor>?, // Spring injects null when no beans exist
+        defaultInterceptors: List<ChatClientInterceptor>, // Spring auto-collects; empty list if none registered
     ): ChatClientProvider {
         return ChatClientProviderImpl(
             chatScopeProvider = chatScopeProvider,
-            defaultInterceptors = defaultInterceptors ?: emptyList(),
+            defaultInterceptors = defaultInterceptors,
         )
     }
 }
