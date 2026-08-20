@@ -36,19 +36,32 @@ internal class AimoChatModelFactoryImpl(
     /**
      * Look up a single model by name by querying each provider factory in turn.
      *
-     * Returns the first match or null when not found. Model name uniqueness is validated
-     * by [getNames()], which fails fast if duplicates are detected across providers.
+     * Validates that the model name is unique across all providers (fails fast if duplicates detected).
+     * This ensures consistent model resolution regardless of provider iteration order.
      *
      * @return matching model or null when not found
+     * @throws IllegalStateException if the same model name is exposed by multiple providers
      */
     override fun getModel(name: String): AimoChatModelConfig? {
+        var foundModel: AimoChatModelConfig? = null
+        var foundProviderName: String? = null
+
         for (factory in chatModelFactories.values) {
             val model = factory.getModel(name)
             if (model != null) {
-                return model
+                if (foundModel != null) {
+                    // Duplicate model name detected across providers
+                    throw IllegalStateException(
+                        "Duplicate model name '$name' exposed by providers " +
+                            "'$foundProviderName' and '${factory.provider}'. " +
+                            "Model names must be unique across all providers."
+                    )
+                }
+                foundModel = model
+                foundProviderName = factory.provider
             }
         }
-        return null
+        return foundModel
     }
 
     /**
