@@ -7,7 +7,11 @@ import org.ivcode.aimo.server.mcp.annotation.McpTool
 import org.ivcode.aimo.server.mcp.schema.McpSchemaGenerator
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.springframework.context.support.GenericApplicationContext
 
 class MultiServiceScenariosTest {

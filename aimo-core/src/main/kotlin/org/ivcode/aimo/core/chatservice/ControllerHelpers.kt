@@ -31,32 +31,25 @@ internal fun computeActualScopes(
     declaredScopes: Set<String>,
     parentServiceScopes: Set<String>,
     componentName: String
-): Set<String> {
-    if (parentServiceScopes.isEmpty()) {
-        // Parent has no scope restrictions, use declared scopes as-is
-        return declaredScopes
-    }
+): Set<String> = when {
+    parentServiceScopes.isEmpty() -> declaredScopes
+    declaredScopes.isEmpty() -> parentServiceScopes
+    else -> {
+        // Non-empty declared: validate subset and compute intersection
+        val invalidScopes = declaredScopes - parentServiceScopes
+        require(invalidScopes.isEmpty()) {
+            "Component '$componentName' has scopes not in parent service: $invalidScopes. " +
+            "Parent service scopes: $parentServiceScopes, component scopes: $declaredScopes"
+        }
 
-    if (declaredScopes.isEmpty()) {
-        // Empty declared = inherit parent scopes
-        return parentServiceScopes
-    }
+        val intersection = declaredScopes.intersect(parentServiceScopes)
+        require(intersection.isNotEmpty()) {
+            "Component '$componentName' scopes $declaredScopes have zero intersection " +
+            "with parent service scopes $parentServiceScopes"
+        }
 
-    // Non-empty declared: validate subset and compute intersection
-    val invalidScopes = declaredScopes - parentServiceScopes
-    require(invalidScopes.isEmpty()) {
-        "Component '$componentName' has scopes not in parent service: $invalidScopes. " +
-        "Parent service scopes: $parentServiceScopes, component scopes: $declaredScopes"
+        intersection
     }
-
-    // Compute intersection
-    val intersection = declaredScopes.intersect(parentServiceScopes)
-    require(intersection.isNotEmpty()) {
-        "Component '$componentName' scopes $declaredScopes have zero intersection " +
-        "with parent service scopes $parentServiceScopes"
-    }
-
-    return intersection
 }
 
 internal fun toToolCallbacks(
@@ -248,7 +241,7 @@ internal fun toSystemMessageCallbacks(
         callbacks += PropertySystemMessageCallback(controller, property, name, actualScopes)
     }
 
-    // Methods
+     // Methods
     for (method in clazz.declaredMethods) {
         if (!method.isAnnotationPresent(SystemMessage::class.java)) continue
 
@@ -273,13 +266,19 @@ internal fun toSystemMessageCallbacks(
             0 -> false
             1 -> {
                 if (params[0] != SystemMessageContext::class.java) {
-                    throw IllegalStateException("Method ${method.name} in ${clazz.name} annotated with @SystemMessage has invalid parameters. Must have either no parameters or a single parameter of type SystemMessageContext.")
+                    val msg = "Method ${method.name} in ${clazz.name} annotated with @SystemMessage " +
+                        "has invalid parameters. Must have either no parameters or a single parameter " +
+                        "of type SystemMessageContext."
+                    throw IllegalStateException(msg)
                 }
                 true
             }
             else -> {
                 // invalid signature
-                throw IllegalStateException("Method ${method.name} in ${clazz.name} annotated with @SystemMessage has invalid parameters. Must have either no parameters or a single parameter of type SystemMessageContext.")
+                val msg = "Method ${method.name} in ${clazz.name} annotated with @SystemMessage " +
+                    "has invalid parameters. Must have either no parameters or a single parameter " +
+                    "of type SystemMessageContext."
+                throw IllegalStateException(msg)
             }
         }
 

@@ -3,11 +3,17 @@ package org.ivcode.aimo.core.chatclient
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.conversation.Conversation
-import org.ivcode.aimo.core.model.*
+import org.ivcode.aimo.core.model.AimoChatEngine
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatModelConfig
+import org.ivcode.aimo.core.model.AimoChatOptions
+import org.ivcode.aimo.core.model.AimoChatRequest
+import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoPrompt
 import java.time.Instant
 import java.util.UUID
 
@@ -41,10 +47,10 @@ class ChatClientProviderImplIntegrationTest {
         val conversation = object : Conversation {
             override val chatId: UUID = convId
             override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = null
-            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {}
+            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) = Unit
             override fun getChatMetadata(): Map<String, Any> = emptyMap()
             override fun getChatProperty(property: String): Any? = null
-            override fun writeChatProperty(property: String, value: Any) {}
+            override fun writeChatProperty(property: String, value: Any) = Unit
             override fun deleteChatProperty(property: String): Boolean = false
         }
 
@@ -310,7 +316,7 @@ class ChatClientProviderImplIntegrationTest {
 
         val response = client.chatStream(
             AimoChatRequest(prompt = "test", context = emptyMap())
-        ) { chunk ->
+        ) { _ ->
             callbackInvocations.add("chunk-received")
         }
 
@@ -358,7 +364,7 @@ class ChatClientProviderImplIntegrationTest {
          val convId = UUID.randomUUID()
          val conversation = createTestConversation(convId)
          val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
-         
+
          // Create provider with default interceptor
          val providerFactory = ChatClientProviderImpl(
              chatScopeProvider = scopeProvider,
@@ -484,10 +490,10 @@ class ChatClientProviderImplIntegrationTest {
         return object : Conversation {
             override val chatId: UUID = convId
             override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = null
-            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {}
+            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) = Unit
             override fun getChatMetadata(): Map<String, Any> = emptyMap()
             override fun getChatProperty(property: String): Any? = null
-            override fun writeChatProperty(property: String, value: Any) {}
+            override fun writeChatProperty(property: String, value: Any) = Unit
             override fun deleteChatProperty(property: String): Boolean = false
         }
     }

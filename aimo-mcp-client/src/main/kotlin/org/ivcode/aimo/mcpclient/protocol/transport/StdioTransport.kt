@@ -1,7 +1,11 @@
 package org.ivcode.aimo.mcpclient.protocol.transport
 
 import org.slf4j.LoggerFactory
-import java.io.*
+import java.io.BufferedWriter
+import java.io.BufferedReader
+import java.io.OutputStreamWriter
+import java.io.InputStreamReader
+import java.io.IOException
 
 /**
  * Transport abstraction for MCP communication.

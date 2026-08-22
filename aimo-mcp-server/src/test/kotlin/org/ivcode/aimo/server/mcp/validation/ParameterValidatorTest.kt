@@ -2,7 +2,8 @@ package org.ivcode.aimo.server.mcp.validation
 
 import org.ivcode.aimo.server.mcp.annotation.McpParam
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class ParameterValidatorTest {
 

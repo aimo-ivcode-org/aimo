@@ -2,7 +2,9 @@ package org.ivcode.aimo.server.mcp.registry
 
 import org.ivcode.aimo.server.mcp.protocol.ToolDefinition
 import org.ivcode.aimo.server.mcp.schema.McpSchemaGenerator
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
 import org.springframework.context.support.GenericApplicationContext

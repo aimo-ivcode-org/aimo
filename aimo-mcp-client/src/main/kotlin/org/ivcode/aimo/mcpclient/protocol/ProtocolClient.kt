@@ -7,7 +7,7 @@ import org.ivcode.aimo.mcpclient.protocol.jsonrpc.JsonRpcNotification
 import org.slf4j.LoggerFactory
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
-import java.util.*
+import java.util.UUID
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit

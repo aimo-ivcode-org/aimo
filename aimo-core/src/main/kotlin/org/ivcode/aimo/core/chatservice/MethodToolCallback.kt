@@ -84,17 +84,17 @@ class MethodToolCallback(
         return objectMapper.readTree(argumentsJson)
     }
 
-    /**
-     * Builds reflective invocation arguments from parsed JSON and context.
-     *
-     * Rules:
-     * - The instance parameter is always bound to [target].
-     * - A recognized context parameter receives [context].
-     * - Remaining parameters are bound by parameter name from [argumentsNode].
-     * - Missing required arguments and invalid nulls fail fast with
-     *   [IllegalArgumentException].
-     */
-    private fun buildInvocationArguments(
+     /**
+      * Builds reflective invocation arguments from parsed JSON and context.
+      *
+      * Rules:
+      * - The instance parameter is always bound to [target].
+      * - A recognized context parameter receives [context].
+      * - Remaining parameters are bound by parameter name from [argumentsNode].
+      * - Missing required arguments and invalid nulls fail fast with
+      *   [IllegalArgumentException].
+      */
+     private fun buildInvocationArguments(
         argumentsNode: JsonNode,
         context: Map<String, Any>,
     ): Map<KParameter, Any?> {

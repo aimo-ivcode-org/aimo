@@ -1,9 +1,10 @@
 package org.ivcode.aimo.server.mcp.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.ivcode.aimo.server.mcp.annotation.McpParam
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 
 class ParameterBindingTest {

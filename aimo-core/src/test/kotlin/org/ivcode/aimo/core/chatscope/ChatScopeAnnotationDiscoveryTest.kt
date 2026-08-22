@@ -170,39 +170,48 @@ class ChatScopeAnnotationDiscoveryTest {
     @ChatService  // No scope = available everywhere
     private class GeneralService {
         @Tool(name = "getHelp", description = "Get general help")
+        @Suppress("FunctionOnlyReturningConstant")
         fun getHelp(): String = "How can I help?"
 
         @SystemMessage
+        @Suppress("FunctionOnlyReturningConstant")
         fun generalPrompt(): String = "You are a helpful assistant."
     }
 
     @ChatService(scope = ["research", "admin"])  // Scoped service
     private class ResearchService {
         @Tool(name = "searchPapers", description = "Search research papers", scope = ["research"])
-        fun searchPapers(@ToolParam("Query") query: String): String = "Found papers matching: $query"
+        @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
+        fun searchPapers(@ToolParam("Query") query: String): String = "Found papers matching: test"
 
         @SystemMessage(scope = ["research"])
+        @Suppress("FunctionOnlyReturningConstant")
         fun researchPrompt(): String = "Focus on academic sources."
     }
 
     @ChatService(scope = ["admin"])
     private class AdminService {
         @Tool(name = "viewLogs", description = "View system logs")
+        @Suppress("FunctionOnlyReturningConstant")
         fun viewLogs(): String = "System logs..."
 
         @SystemMessage(name = "admin_rules", scope = ["admin"])
+        @Suppress("FunctionOnlyReturningConstant")
         fun adminRulesMethod(): String = "Admin rules apply."
     }
 
     @ChatService(scope = ["research", "admin"])
     private class MultiToolService {
         @Tool(name = "searchPapers", description = "Search", scope = ["research"])
+        @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
         fun searchPapers(@ToolParam("Query") query: String): String = "Papers"
 
         @Tool(name = "analyzeData", description = "Analyze", scope = ["admin"])
+        @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
         fun analyzeData(@ToolParam("Data") data: String): String = "Analysis"
 
         @Tool(name = "getHelp", description = "Help")
+        @Suppress("FunctionOnlyReturningConstant")
         fun getHelp(): String = "Help"
     }
 
@@ -210,12 +219,14 @@ class ChatScopeAnnotationDiscoveryTest {
     private class MisConfiguredService {
         // This tries to restrict to ["admin"] but parent service is ["research"]
         @Tool(name = "forbidden", description = "Should fail", scope = ["admin"])
+        @Suppress("FunctionOnlyReturningConstant")
         fun forbidden(): String = "This should not work"
     }
 
     @ChatService  // No scope annotation
     private class UnscopedService {
         @Tool(name = "scopedTool", description = "Tool with scope", scope = ["admin"])
+        @Suppress("FunctionOnlyReturningConstant")
         fun scopedTool(): String = "Allowed because parent has no scope restrictions"
     }
 }

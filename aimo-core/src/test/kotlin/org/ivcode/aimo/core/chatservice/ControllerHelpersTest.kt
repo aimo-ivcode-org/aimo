@@ -231,6 +231,7 @@ class ControllerHelpersTest {
         ): Double = x * y
 
         @Tool(description = "Divide two numbers")
+        @Suppress("UNUSED_PARAMETER")
         fun divide(a: Double, b: Double, context: Map<String, Any>): Double {
             // Context is auto-injected and should NOT appear in schema
             return a / b
@@ -246,45 +247,54 @@ class ControllerHelpersTest {
     @ChatService(scope = ["admin", "research"])
     class TestControllerWithScopes {
         @Tool(description = "Tool with inherited scope")
+        @Suppress("FunctionOnlyReturningConstant")
         fun protectedTool(): String = "protected"
 
         @Tool(scope = [], description = "Tool with empty scope (inherits parent)")
+        @Suppress("FunctionOnlyReturningConstant")
         fun inheritedTool(): String = "inherited"
     }
 
     @ChatService(scope = ["admin", "research", "public"])
     class TestControllerAdminOnly {
         @Tool(scope = ["admin"], description = "Admin-only tool")
+        @Suppress("FunctionOnlyReturningConstant")
         fun adminTool(): String = "admin"
     }
 
     @ChatService(scope = ["admin", "research"])
     class TestControllerInvalidScope {
         @Tool(scope = ["superadmin"], description = "Tool with invalid scope")
+        @Suppress("FunctionOnlyReturningConstant")
         fun invalidScopeTool(): String = "invalid"
     }
 
     @ChatService(scope = ["admin", "research"])
     class TestControllerIntersectionFail {
         @Tool(scope = ["superadmin", "superuser"], description = "Tool with zero intersection")
+        @Suppress("FunctionOnlyReturningConstant")
         fun intersectionFailTool(): String = "fail"
     }
 
     @ChatService
     class TestControllerSystemMessages {
         @SystemMessage(name = "custom_name")
+        @Suppress("FunctionOnlyReturningConstant")
         fun getCustomMessage(): String = "Custom system message"
 
         @SystemMessage
+        @Suppress("FunctionOnlyReturningConstant")
         fun greeting(): String = "Hello!"
     }
 
     @ChatService
     class TestControllerDuplicateSystemMessages {
         @SystemMessage(name = "duplicate")
+        @Suppress("FunctionOnlyReturningConstant")
         fun first(): String = "First"
 
         @SystemMessage(name = "duplicate")
+        @Suppress("FunctionOnlyReturningConstant")
         fun second(): String = "Second"
     }
 }

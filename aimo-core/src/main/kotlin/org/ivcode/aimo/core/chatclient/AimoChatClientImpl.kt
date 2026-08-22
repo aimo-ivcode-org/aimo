@@ -3,9 +3,9 @@ package org.ivcode.aimo.core.chatclient
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageContext
-import org.ivcode.aimo.core.client.chat.createSystemMessage
-import org.ivcode.aimo.core.client.chat.createToolMessage
-import org.ivcode.aimo.core.client.chat.createUserMessage
+import org.ivcode.aimo.core.chatclient.createSystemMessage
+import org.ivcode.aimo.core.chatclient.createToolMessage
+import org.ivcode.aimo.core.chatclient.createUserMessage
 import org.ivcode.aimo.core.conversation.Conversation
 import org.ivcode.aimo.core.model.AimoChatMessage
 import org.ivcode.aimo.core.model.AimoChatMessageType
@@ -129,32 +129,38 @@ internal class AimoChatClientImpl (
         return doChat(request, callback, this::stream)
     }
 
-    /**
-     * Core chat orchestration logic shared by both streaming and non-streaming endpoints.
-     *
-     * ### Algorithm
-     * 1. Initialize a response ID and load conversation history from cache (seeded on first call to budgeter's maxContextSize)
-     * 2. Prepare system messages via registered callbacks
-     * 3. Create initial user message from the request prompt
-     * 4. Loop while the assistant has not finished or has tool calls:
-     *    a. Fetch cached history (or lazy-seed from DAO if empty)
-     *    b. Pass history to the prompt budgeter to select messages that fit the context window
-     *    c. Call the model with the budgeted prompt
-     *    d. If the assistant has tool calls, invoke each tool and add results
-     *    e. Accumulate token usage from each model call (for multi-turn tool scenarios)
-     * 5. Persist all new messages (prompt + tasks) via the conversation
-     * 6. Return non-empty task messages to the caller with accumulated usage
-     *
-     * @param request The chat request (prompt + optional context)
-     * @param callback Optional callback for streaming updates (null for non-streaming)
-     * @param call Function reference to either [call] (non-streaming) or [stream] (streaming)
-     * @return The final response with assistant messages and accumulated token usage
-     */
-     private fun doChat (
-        request: AimoChatRequest,
-        callback: ((AimoChatResponse) -> Unit)? = null,
-        call: (responseId: UUID, messageId: Int, prompt: AimoPrompt, callback: ((AimoChatResponse) -> Unit)?) -> AimoChatResponse,
-     ): AimoChatResponse {
+     /**
+      * Core chat orchestration logic shared by both streaming and non-streaming endpoints.
+      *
+      * ### Algorithm
+      * 1. Initialize a response ID and load conversation history from cache
+      *    (seeded on first call to budgeter's maxContextSize)
+      * 2. Prepare system messages via registered callbacks
+      * 3. Create initial user message from the request prompt
+      * 4. Loop while the assistant has not finished or has tool calls:
+      *    a. Fetch cached history (or lazy-seed from DAO if empty)
+      *    b. Pass history to the prompt budgeter to select messages that fit the context window
+      *    c. Call the model with the budgeted prompt
+      *    d. If the assistant has tool calls, invoke each tool and add results
+      *    e. Accumulate token usage from each model call (for multi-turn tool scenarios)
+      * 5. Persist all new messages (prompt + tasks) via the conversation
+      * 6. Return non-empty task messages to the caller with accumulated usage
+      *
+      * @param request The chat request (prompt + optional context)
+      * @param callback Optional callback for streaming updates (null for non-streaming)
+      * @param call Function reference to either [call] (non-streaming) or [stream] (streaming)
+      * @return The final response with assistant messages and accumulated token usage
+      */
+      private fun doChat (
+         request: AimoChatRequest,
+         callback: ((AimoChatResponse) -> Unit)? = null,
+         call: (
+             responseId: UUID,
+             messageId: Int,
+             prompt: AimoPrompt,
+             callback: ((AimoChatResponse) -> Unit)?
+         ) -> AimoChatResponse,
+      ): AimoChatResponse {
          val responseId = UUID.randomUUID()
 
          // Prepare system messages from registered callbacks
@@ -250,8 +256,9 @@ internal class AimoChatClientImpl (
                                 toolName = toolCall.name,
                                 toolCallId = toolCall.id,
                             )
-                        } catch (e: Exception) {
-                            // Wrap exceptions in an error message
+                        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                            // Wrap exceptions in an error message. Any exception from user-defined tools
+                            // should be captured and returned as a tool error message to the LLM.
                             createToolMessage(
                                 messageId = 2 + taskMessages.size,
                                 content = "Error: ${e.message}",
@@ -594,3 +601,4 @@ internal class AimoChatClientImpl (
         else -> null
     }
 }
+

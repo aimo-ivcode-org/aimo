@@ -7,7 +7,8 @@ import org.ivcode.aimo.server.mcp.handler.PromptGetHandler
 import org.ivcode.aimo.server.mcp.handler.ParameterBinder
 import org.ivcode.aimo.server.mcp.registry.McpServiceRegistry
 import org.ivcode.aimo.server.mcp.schema.McpSchemaGenerator
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.context.support.StaticApplicationContext
 import java.io.ByteArrayInputStream

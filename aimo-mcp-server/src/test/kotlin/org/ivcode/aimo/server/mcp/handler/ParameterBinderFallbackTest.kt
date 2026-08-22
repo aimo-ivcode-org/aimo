@@ -2,7 +2,8 @@ package org.ivcode.aimo.server.mcp.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assumptions.assumeTrue
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
