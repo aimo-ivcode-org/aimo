@@ -4,8 +4,12 @@ plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("java-library")
+    id("dev.detekt")
 }
 
+detekt {
+    ignoreFailures = true
+}
 
 dependencies {
     api(project(":aimo-core"))

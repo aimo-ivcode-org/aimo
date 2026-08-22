@@ -1,3 +1,8 @@
+---
+name: Detekt Skill
+description: Use Detekt (static analysis) to identify and fix code quality issues in the aimo codebase. Focus on real refactoring rather than suppressing warnings.
+---
+
 # Detekt Skill: Fix Code Quality Issues
 
 **Purpose**: Use Detekt (static analysis) to identify and fix code quality issues in the aimo codebase. Focus on real refactoring rather than suppressing warnings.
@@ -6,18 +11,18 @@
 
 Run detekt on a specific module:
 ```bash
-./gradlew.bat :aimo-core:detekt          # Core module
-./gradlew.bat :aimo-server:detekt        # Server module
-./gradlew.bat :aimo-model-ollama:detekt  # Ollama model provider
-./gradlew.bat :aimo-model-bedrock:detekt # Bedrock model provider
-./gradlew.bat :aimo-mcp-client:detekt    # MCP client
-./gradlew.bat :aimo-mcp-server:detekt    # MCP server
-./gradlew.bat :aimo-plugin-ui:detekt     # UI plugin
+./gradlew.bat :aimo-core:clean :aimo-core:detekt          # Core module
+./gradlew.bat :aimo-server:clean :aimo-server:detekt        # Server module
+./gradlew.bat :aimo-model-ollama:clean :aimo-model-ollama:detekt  # Ollama model provider
+./gradlew.bat :aimo-model-bedrock:clean :aimo-model-bedrock:detekt # Bedrock model provider
+./gradlew.bat :aimo-mcp-client:clean :aimo-mcp-client:detekt    # MCP client
+./gradlew.bat :aimo-mcp-server:clean :aimo-mcp-server:detekt    # MCP server
+./gradlew.bat :aimo-plugin-ui:clean :aimo-plugin-ui:detekt     # UI plugin
 ```
 
 Run detekt on all modules:
 ```bash
-./gradlew.bat detekt
+./gradlew.bat clean detekt
 ```
 
 
@@ -65,7 +70,7 @@ Ask yourself: *"Why does this code need to violate the rule?"* If the answer is 
 5. **Verify after changes**:
    ```bash
    # Run the detekt check again to ensure no new issues were introduced. {module} is optional if you want to build a specific module.
-   ./gradlew.bat :{module}:detekt
+   ./gradlew.bat :{module}:clean :{module}:detekt
    
    # Run the full build to ensure no regressions. {module} is optional if you want to build a specific module.
    ./gradlew.bat :{module}:clean :{module}:build

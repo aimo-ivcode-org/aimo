@@ -49,17 +49,15 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         maxRequestCharacters: Long,
         scopeMetadata: Map<String, Any>,
     ): List<ChatRequestEntity> {
-        // Early validation checks
+        // Early validation: check conversation, max characters, and data availability
         if (getConversationIfMatches(chatId, scopeMetadata) == null ||
-            maxRequestCharacters <= 0
+            maxRequestCharacters <= 0 ||
+            requests[chatId] == null
         ) {
             return emptyList()
         }
 
-        val chatRequests = requests[chatId] ?: return emptyList()
-        if (chatRequests.isEmpty()) {
-            return emptyList()
-        }
+        val chatRequests = requests[chatId]!!
 
         var totalCharacters = 0L
         val selected = mutableListOf<ChatRequestEntity>()

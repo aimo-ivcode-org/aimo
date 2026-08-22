@@ -8,7 +8,7 @@ pluginManagement {
         id("org.jetbrains.dokka").version("2.2.0")
         id("org.jetbrains.dokka-javadoc").version("2.2.0")
         id("org.ivcode.core.gradle-gh-pages").version("0.1.0-SNAPSHOT")
-        id("dev.detekt") version "2.0.0-alpha.0"
+        id("dev.detekt").version("2.0.0-alpha.0")
     }
     repositories {
         gradlePluginPortal()

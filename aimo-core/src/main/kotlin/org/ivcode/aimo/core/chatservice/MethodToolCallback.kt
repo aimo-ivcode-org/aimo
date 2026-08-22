@@ -104,54 +104,79 @@ class MethodToolCallback(
 
         val valueParameters = function.parameters.filter { it.kind == KParameter.Kind.VALUE }
         val expectsJsonObject = valueParameters.any { !isContextParameter(it) }
+        validateArgumentsPayload(argumentsNode, expectsJsonObject)
+
+        valueParameters.forEach { parameter ->
+            if (isContextParameter(parameter)) {
+                invocationArguments[parameter] = context
+            } else {
+                bindParameterValue(parameter, argumentsNode, invocationArguments)
+            }
+        }
+
+        return invocationArguments
+    }
+
+    private fun validateArgumentsPayload(argumentsNode: JsonNode, expectsJsonObject: Boolean) {
         if (expectsJsonObject && !argumentsNode.isObject) {
             throw IllegalArgumentException(
                 "Tool '${toolDefinition.name}' expects JSON object arguments, but received ${argumentsNode.nodeType}"
             )
         }
+    }
 
-        valueParameters.forEach { parameter ->
-            if (isContextParameter(parameter)) {
-                invocationArguments[parameter] = context
-                return@forEach
-            }
-
-            val parameterName = parameter.name
-                ?: throw IllegalStateException(
-                    "Tool parameter names are required for method ${method.name} on ${method.declaringClass.name}"
-                )
-
-            val jsonValue = argumentsNode.get(parameterName)
-            if (jsonValue == null || jsonValue.isMissingNode) {
-                when {
-                    parameter.isOptional -> return@forEach
-                    parameter.type.isMarkedNullable -> {
-                        invocationArguments[parameter] = null
-                        return@forEach
-                    }
-                    else -> throw IllegalArgumentException(
-                        "Missing required tool argument '$parameterName' for tool '${toolDefinition.name}'"
-                    )
-                }
-            }
-
-            if (jsonValue.isNull) {
-                if (!parameter.type.isMarkedNullable) {
-                    throw IllegalArgumentException(
-                        "Tool argument '$parameterName' for tool '${toolDefinition.name}' cannot be null"
-                    )
-                }
-                invocationArguments[parameter] = null
-                return@forEach
-            }
-
-            invocationArguments[parameter] = objectMapper.convertValue(
-                jsonValue,
-                objectMapper.typeFactory.constructType(parameter.type.javaType)
+    private fun bindParameterValue(
+        parameter: KParameter,
+        argumentsNode: JsonNode,
+        invocationArguments: MutableMap<KParameter, Any?>,
+    ) {
+        val parameterName = parameter.name
+            ?: throw IllegalStateException(
+                "Tool parameter names are required for method ${method.name} on ${method.declaringClass.name}"
             )
+
+        val jsonValue = argumentsNode.get(parameterName)
+        if (jsonValue == null || jsonValue.isMissingNode) {
+            handleMissingArgument(parameter, parameterName, invocationArguments)
+            return
         }
 
-        return invocationArguments
+        if (jsonValue.isNull) {
+            handleNullArgument(parameter, parameterName, invocationArguments)
+            return
+        }
+
+        invocationArguments[parameter] = objectMapper.convertValue(
+            jsonValue,
+            objectMapper.typeFactory.constructType(parameter.type.javaType)
+        )
+    }
+
+    private fun handleMissingArgument(
+        parameter: KParameter,
+        parameterName: String,
+        invocationArguments: MutableMap<KParameter, Any?>,
+    ) {
+        when {
+            parameter.isOptional -> return
+            parameter.type.isMarkedNullable -> invocationArguments[parameter] = null
+            else -> throw IllegalArgumentException(
+                "Missing required tool argument '$parameterName' for tool '${toolDefinition.name}'"
+            )
+        }
+    }
+
+    private fun handleNullArgument(
+        parameter: KParameter,
+        parameterName: String,
+        invocationArguments: MutableMap<KParameter, Any?>,
+    ) {
+        if (!parameter.type.isMarkedNullable) {
+            throw IllegalArgumentException(
+                "Tool argument '$parameterName' for tool '${toolDefinition.name}' cannot be null"
+            )
+        }
+        invocationArguments[parameter] = null
     }
 
     /**

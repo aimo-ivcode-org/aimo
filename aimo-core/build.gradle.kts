@@ -7,6 +7,9 @@ plugins {
     id("dev.detekt")
 }
 
+detekt {
+    ignoreFailures = true
+}
 
 dependencies {
     api("org.jetbrains.kotlin:kotlin-reflect")

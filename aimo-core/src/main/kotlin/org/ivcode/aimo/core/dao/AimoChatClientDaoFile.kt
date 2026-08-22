@@ -104,17 +104,13 @@ class AimoChatClientDaoFile(
             }
 
             val requestsDir = filePaths.getRequestsDir(chatId)
-            if (!requestsDir.exists()) {
-                return emptyList()
-            }
-
-            val allRequests = requestsDir.listFiles()
-                ?.mapNotNull { file -> serializer.loadRequest(file) }
-                ?.sortedBy { it.createdAt }
-                ?: return emptyList()
-
-            if (allRequests.isEmpty()) {
-                return emptyList()
+            val allRequests = if (requestsDir.exists()) {
+                requestsDir.listFiles()
+                    ?.mapNotNull { file -> serializer.loadRequest(file) }
+                    ?.sortedBy { it.createdAt }
+                    ?: emptyList()
+            } else {
+                emptyList()
             }
 
             var totalCharacters = 0L

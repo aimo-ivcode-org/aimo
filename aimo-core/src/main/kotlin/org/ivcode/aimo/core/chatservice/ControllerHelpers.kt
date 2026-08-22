@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions") // Utility module for controller discovery with multiple related helpers
+
 package org.ivcode.aimo.core.chatservice
 
 import org.ivcode.aimo.core.model.ToolCallback
@@ -166,19 +168,34 @@ private fun createToolParameterSchema(parameter: KParameter, objectMapper: Objec
 
 private fun Class<*>.toJsonSchemaType(): String {
     return when {
-        this == String::class.java || this == Char::class.java || this.isEnum -> "string"
-        this == Boolean::class.java || this == java.lang.Boolean::class.java -> "boolean"
-        this == Int::class.java || this == java.lang.Integer::class.java ||
-            this == Long::class.java || this == java.lang.Long::class.java ||
-            this == Short::class.java || this == java.lang.Short::class.java ||
-            this == Byte::class.java || this == java.lang.Byte::class.java -> "integer"
-        this == Float::class.java || this == java.lang.Float::class.java ||
-            this == Double::class.java || this == java.lang.Double::class.java -> "number"
-        this.isArray || Iterable::class.java.isAssignableFrom(this) -> "array"
+        isStringType() -> "string"
+        isBooleanType() -> "boolean"
+        isIntegerType() -> "integer"
+        isNumberType() -> "number"
+        isArrayType() -> "array"
         Map::class.java.isAssignableFrom(this) -> "object"
         else -> "object"
     }
 }
+
+private fun Class<*>.isStringType(): Boolean =
+    this == String::class.java || this == Char::class.java || this.isEnum
+
+private fun Class<*>.isBooleanType(): Boolean =
+    this == Boolean::class.java || this == java.lang.Boolean::class.java
+
+private fun Class<*>.isIntegerType(): Boolean =
+    this == Int::class.java || this == java.lang.Integer::class.java ||
+    this == Long::class.java || this == java.lang.Long::class.java ||
+    this == Short::class.java || this == java.lang.Short::class.java ||
+    this == Byte::class.java || this == java.lang.Byte::class.java
+
+private fun Class<*>.isNumberType(): Boolean =
+    this == Float::class.java || this == java.lang.Float::class.java ||
+    this == Double::class.java || this == java.lang.Double::class.java
+
+private fun Class<*>.isArrayType(): Boolean =
+    this.isArray || Iterable::class.java.isAssignableFrom(this)
 
 /**
  * Scan the given controller instance and return callbacks for fields and methods
@@ -193,105 +210,137 @@ private fun Class<*>.toJsonSchemaType(): String {
  * - Scope restrictions are validated against parent @ChatService scopes and embedded in the callback
  * - Duplicate names within this controller will throw an error
  */
-internal fun toSystemMessageCallbacks(
-    controller: Any,
-    parentServiceScopes: Set<String> = emptySet()
-): List<SystemMessageCallback> {
-    val callbacks = mutableListOf<SystemMessageCallback>()
-    val observedNames = mutableSetOf<String>()
-    val clazz = controller::class.java
+ internal fun toSystemMessageCallbacks(
+     controller: Any,
+     parentServiceScopes: Set<String> = emptySet()
+ ): List<SystemMessageCallback> {
+     val callbacks = mutableListOf<SystemMessageCallback>()
+     val observedNames = mutableSetOf<String>()
+     val clazz = controller::class.java
 
-    // Fields
-    for (field in clazz.declaredFields) {
-        if (field.isAnnotationPresent(SystemMessage::class.java)) {
-            val annotation = field.getAnnotation(SystemMessage::class.java)
-            
-            // Extract or generate name
-            val name = annotation.name.takeIf { it.isNotBlank() } ?: field.name
-            require(!observedNames.contains(name)) {
-                "Duplicate system message name '$name' in ${clazz.name}"
-            }
-            observedNames.add(name)
-            
-            // Validate and compute scopes
-            val declaredScopes = annotation.scope.toSet()
-            val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
-            
-            // attempt to make field accessible; ignore failure (may be blocked by module system)
-            trySetAccessible(field)
-            callbacks += FieldSystemMessageCallback(controller, field, name, actualScopes)
-        }
-    }
+     // Fields
+     for (field in clazz.declaredFields) {
+         if (field.isAnnotationPresent(SystemMessage::class.java)) {
+             val annotation = field.getAnnotation(SystemMessage::class.java)
+             processFieldSystemMessage(
+                 annotation, field, controller, callbacks, observedNames, clazz, parentServiceScopes
+             )
+         }
+     }
 
-    // Kotlin properties
-    for (property in controller::class.memberProperties) {
-        val annotation = property.findAnnotation<SystemMessage>() ?: continue
-        
-        // Extract or generate name
-        val name = annotation.name.takeIf { it.isNotBlank() } ?: property.name
-        require(!observedNames.contains(name)) {
-            "Duplicate system message name '$name' in ${clazz.name}"
-        }
-        observedNames.add(name)
-        
-        // Validate and compute scopes
-        val declaredScopes = annotation.scope.toSet()
-        val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
-        
-        callbacks += PropertySystemMessageCallback(controller, property, name, actualScopes)
-    }
+     // Kotlin properties
+     for (property in controller::class.memberProperties) {
+         val annotation = property.findAnnotation<SystemMessage>() ?: continue
+         processPropertySystemMessage(
+             annotation, property, controller, callbacks, observedNames, clazz, parentServiceScopes
+         )
+     }
 
      // Methods
-    for (method in clazz.declaredMethods) {
-        if (!method.isAnnotationPresent(SystemMessage::class.java)) continue
+     for (method in clazz.declaredMethods) {
+         if (!method.isAnnotationPresent(SystemMessage::class.java)) continue
+         processMethodSystemMessage(
+             method, controller, callbacks, observedNames, clazz, parentServiceScopes
+         )
+     }
 
-        val annotation = method.getAnnotation(SystemMessage::class.java)
-        
-        // Extract or generate name
-        val name = annotation.name.takeIf { it.isNotBlank() } ?: method.name
-        require(!observedNames.contains(name)) {
-            "Duplicate system message name '$name' in ${clazz.name}"
-        }
-        observedNames.add(name)
+     return callbacks
+ }
 
-        // Validate return type: allow java.lang.String or kotlin.String (both are java.lang.String), and allow nullable
-        val returnType = method.returnType
-        if (returnType != String::class.java) {
-            // not a String return type - skip
-            continue
-        }
+ private fun processFieldSystemMessage(
+     annotation: SystemMessage,
+     field: java.lang.reflect.Field,
+     controller: Any,
+     callbacks: MutableList<SystemMessageCallback>,
+     observedNames: MutableSet<String>,
+     clazz: Class<*>,
+     parentServiceScopes: Set<String>
+ ) {
+     val name = annotation.name.takeIf { it.isNotBlank() } ?: field.name
+     require(!observedNames.contains(name)) {
+         "Duplicate system message name '$name' in ${clazz.name}"
+     }
+     observedNames.add(name)
 
-        val params = method.parameterTypes
-        val isContextual = when (params.size) {
-            0 -> false
-            1 -> {
-                if (params[0] != SystemMessageContext::class.java) {
-                    val msg = "Method ${method.name} in ${clazz.name} annotated with @SystemMessage " +
-                        "has invalid parameters. Must have either no parameters or a single parameter " +
-                        "of type SystemMessageContext."
-                    throw IllegalStateException(msg)
-                }
-                true
-            }
-            else -> {
-                // invalid signature
-                val msg = "Method ${method.name} in ${clazz.name} annotated with @SystemMessage " +
-                    "has invalid parameters. Must have either no parameters or a single parameter " +
-                    "of type SystemMessageContext."
-                throw IllegalStateException(msg)
-            }
-        }
+     val declaredScopes = annotation.scope.toSet()
+     val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
 
-        // attempt to make method accessible; if it fails we will surface a clearer error when invoking
-        trySetAccessible(method)
+     trySetAccessible(field)
+     callbacks += FieldSystemMessageCallback(controller, field, name, actualScopes)
+ }
 
-        // Validate and compute scopes
-        val declaredScopes = annotation.scope.toSet()
-        val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
+  private fun processPropertySystemMessage(
+      annotation: SystemMessage,
+      property: kotlin.reflect.KProperty<*>,
+      controller: Any,
+      callbacks: MutableList<SystemMessageCallback>,
+      observedNames: MutableSet<String>,
+      clazz: Class<*>,
+      parentServiceScopes: Set<String>
+  ) {
+      val name = annotation.name.takeIf { it.isNotBlank() } ?: property.name
+      require(!observedNames.contains(name)) {
+          "Duplicate system message name '$name' in ${clazz.name}"
+      }
+      observedNames.add(name)
 
-        callbacks += MethodSystemMessageCallback(controller, method, isContextual, name, actualScopes)
-    }
+      val declaredScopes = annotation.scope.toSet()
+      val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
 
-    return callbacks
-}
+      @Suppress("UNCHECKED_CAST")
+      callbacks += PropertySystemMessageCallback(controller, property as kotlin.reflect.KProperty1<Any, *>, name, actualScopes)
+  }
+
+ private fun processMethodSystemMessage(
+     method: java.lang.reflect.Method,
+     controller: Any,
+     callbacks: MutableList<SystemMessageCallback>,
+     observedNames: MutableSet<String>,
+     clazz: Class<*>,
+     parentServiceScopes: Set<String>
+ ) {
+     val annotation = method.getAnnotation(SystemMessage::class.java)
+
+     val name = annotation.name.takeIf { it.isNotBlank() } ?: method.name
+     require(!observedNames.contains(name)) {
+         "Duplicate system message name '$name' in ${clazz.name}"
+     }
+     observedNames.add(name)
+
+     val returnType = method.returnType
+     if (returnType != String::class.java) {
+         return
+     }
+
+     val isContextual = validateSystemMessageMethodParameters(method, clazz)
+
+     trySetAccessible(method)
+
+     val declaredScopes = annotation.scope.toSet()
+     val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
+
+     callbacks += MethodSystemMessageCallback(controller, method, isContextual, name, actualScopes)
+ }
+
+ private fun validateSystemMessageMethodParameters(method: java.lang.reflect.Method, clazz: Class<*>): Boolean {
+     val params = method.parameterTypes
+     return when (params.size) {
+         0 -> false
+         1 -> {
+             if (params[0] != SystemMessageContext::class.java) {
+                 val msg = "Method ${method.name} in ${clazz.name} annotated with @SystemMessage " +
+                     "has invalid parameters. Must have either no parameters or a single parameter " +
+                     "of type SystemMessageContext."
+                 throw IllegalStateException(msg)
+             }
+             true
+         }
+         else -> {
+             val msg = "Method ${method.name} in ${clazz.name} annotated with @SystemMessage " +
+                 "has invalid parameters. Must have either no parameters or a single parameter " +
+                 "of type SystemMessageContext."
+             throw IllegalStateException(msg)
+         }
+     }
+ }
 
