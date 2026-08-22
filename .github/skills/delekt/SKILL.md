@@ -74,6 +74,7 @@ Ask yourself: *"Why does this code need to violate the rule?"* If the answer is 
 
 ## When to Keep `@Suppress`
 
+### Production Code
 Only suppress when fixing would contradict the intentional design of that code:
 
 1. **Intentional generic exception catching** (architectural choice for robustness):
@@ -120,22 +121,68 @@ Only suppress when fixing would contradict the intentional design of that code:
 - ❌ Line over 120 chars just for brevity → break it up
 - ❌ Generic exception because "we don't care what failed" → be specific or document why generic is needed
 
+### Test Classes
+Test code has different priorities than production code. **It's more acceptable to use `@Suppress` in tests** when:
+- The test itself benefits from clarity and readability over strict style rules
+- Refactoring to satisfy detekt would obscure test intent or make setup/assertions harder to follow
+- The test needs to be concise to demonstrate a specific behavior
+- The complexity exists because the test is exercising complex interactions (not a sign of poor design)
+
+**Examples where suppressions are reasonable in tests**:
+```kotlin
+class MyServiceTest {
+    @Suppress("LongMethod")  // Test setup with many assertions is clear and acceptable
+    @Test
+    fun shouldHandleMultipleScenarios() {
+        val input = setupComplexFixture()
+        // ... multiple setup steps ...
+        
+        val result = service.process(input)
+        
+        assertThat(result).isNotNull()
+        assertThat(result.field1).isEqualTo("expected")
+        assertThat(result.field2).isEqualTo(42)
+        // ... many more assertions documenting behavior ...
+    }
+
+    @Suppress("TooManyFunctions")  // Test class with many focused test methods is good design
+    @Test
+    fun shouldHandleEdgeCase1() { }
+
+    @Test
+    fun shouldHandleEdgeCase2() { }
+
+    @Test
+    fun shouldHandleEdgeCase3() { }
+}
+```
+
+**Guideline**: In test classes, ask "Does fixing this detekt issue make the test clearer or harder to understand?" If harder, the suppression is acceptable.
+
 ## Best Practices
 
+**General (Production & Test Code)**:
 - ✅ **Do**: Fix structural issues (TooManyFunctions, LongMethod) proactively—they indicate real design problems
 - ✅ **Do**: Extract helpers when a method has multiple concerns
 - ✅ **Do**: Use `when` expressions to consolidate returns
 - ✅ **Do**: Ask "Why does this code need to violate the rule?" before suppressing
-- ✅ **Do**: Document every `@Suppress` with a comment explaining the architectural reason (not just "it's complicated")
+- ✅ **Do**: Document every `@Suppress` with a comment explaining the reason
 - ✅ **Do**: Run build + detekt together to verify fixes don't break tests
 - ✅ **Do**: Review suppressions during code review—they're red flags for design decisions
 
-- ❌ **Don't**: Suppress without attempting a real fix first
+**Test-Specific**:
+- ✅ **Do**: Use suppressions in tests when they improve readability and test clarity
+- ✅ **Do**: Prefer test clarity over strict adherence to production code rules
+- ✅ **Do**: Document suppressions in tests too—explain why the test structure is the right choice
+- ✅ **Do**: Still aim for reasonably concise tests, but prioritize demonstrating behavior clearly
+
+**Avoid in All Code**:
+- ❌ **Don't**: Suppress without attempting a real fix first (especially in production code)
 - ❌ **Don't**: Add suppressions for style preferences (use `when`, break lines, extract helpers instead)
 - ❌ **Don't**: Ignore structural warnings (TooManyFunctions means the class has too many concerns)
-- ❌ **Don't**: Add suppressions without explaining the design reason in a comment
+- ❌ **Don't**: Add suppressions without explaining the reason in a comment
 - ❌ **Don't**: Let technical debt accumulate ("we'll refactor it later" → we won't)
-- ❌ **Don't**: Suppress because fixing would be "tedious" (that's exactly when it matters most)
+- ❌ **Don't**: Suppress because fixing would be "tedious" in production code
 - ❌ **Don't**: Update detekt configuration to relax limits in order to make issues go away
 
 ## Configuration
