@@ -100,7 +100,11 @@ class ChatScopeYamlDefinitionTest {
         // research_tool scopes from annotation
         assertEquals(setOf("research"), researchTool!!.scopes, "Research tool should have declared scope")
         // general_tool has no explicit scope, so it inherits parent scopes
-        assertEquals(setOf("research", "admin"), generalTool!!.scopes, "General tool without scope inherits parent scopes")
+        assertEquals(
+            setOf("research", "admin"),
+            generalTool!!.scopes,
+            "General tool without scope inherits parent scopes"
+        )
     }
 
     @Test

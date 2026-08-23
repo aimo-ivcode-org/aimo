@@ -275,7 +275,11 @@ class ConversationInterceptorChainTest {
 
         val metadata = mutableMapOf<String, Any>()
 
-        val result = buildAndExecuteChain(listOf(shortCircuitInterceptor, neverCalledInterceptor), chatId, metadata) { _, _ ->
+        val result = buildAndExecuteChain(
+            listOf(shortCircuitInterceptor, neverCalledInterceptor),
+            chatId,
+            metadata,
+        ) { _, _ ->
             callLog.add("final-action")
             null
         }

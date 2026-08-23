@@ -79,7 +79,8 @@ class ControllerHelpersTest {
         val schema = multiply.toolDefinition.inputSchema
         val properties = schema.get("properties")
 
-        // multiply has signature: multiply(x: Double @ToolParam("First operand"), y: Double @ToolParam("Second operand"))
+        // multiply has signature:
+        // multiply(x: Double @ToolParam("First operand"), y: Double @ToolParam("Second operand"))
         assertEquals("First operand", properties.get("x").get("description").asText())
         assertEquals("Second operand", properties.get("y").get("description").asText())
     }

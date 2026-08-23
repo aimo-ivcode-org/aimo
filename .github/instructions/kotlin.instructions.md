@@ -11,6 +11,18 @@ Key expectations
 - Use coroutines for asynchronous flows where present; prefer suspend functions over blocking threads.
 - Public APIs may be unstable during this pre-1.0 development phase: prefer simplicity, clarity, and minimal surface area for public APIs over backward-compatibility. It is acceptable to make breaking changes during active development as long as the change is documented (KDoc + PR description) and rationale is recorded.
 
+Documentation expectations
+--------------------------
+- Document every class, interface, and object with KDoc when it introduces behavior, state, or a reusable contract. The KDoc should say what the type owns, why it exists, and any important invariants.
+- Document every function and method with KDoc when it is public or internal. Use the term *function* for both top-level and member functions; if you prefer *method*, treat it as the member-function equivalent.
+- For each documented function or method, include:
+  - a short summary line,
+  - `@param` entries for every parameter,
+  - `@return` when the function returns a value,
+  - side effects or thread-safety notes when those details matter.
+- Private helpers do not need exhaustive KDoc if the name and structure are already obvious, but add KDoc whenever a helper encodes important rules, transforms data, or exists to make non-obvious control flow easier to read.
+- If a function is so small that a comment would add no value, keep the implementation simple and still prefer a brief one-line KDoc when the code is likely to be read outside its immediate context.
+
   When the project approaches a stable release, follow stricter versioning and compatibility practices; until then prioritize developer productivity and clear, small APIs.
 - Preserve package declarations, license headers, and existing file-level annotations.
 
@@ -19,8 +31,11 @@ Object-oriented principles and method-level guidance
 - Prefer clear object-oriented design. Keep classes focused (Single Responsibility Principle): each class should have one reason to change.
 - Keep methods short and focused. Aim for methods that are easy to understand at a glance (recommended guideline: prefer methods under ~40 lines; when a method grows beyond this, extract private helper methods with descriptive names).
 - Favor composition over deep inheritance hierarchies. Use interfaces for behavior contracts and small concrete implementations.
-- Document all methods with KDoc (public and internal). KDoc should include a brief summary line, parameter descriptions, and the return value when applicable. For non-trivial methods, include a short note about side effects and thread-safety when relevant.
+- Document all classes, methods, and functions with KDoc when they are visible beyond a tiny local scope. Keep the language direct: describe the responsibility, the contract, and any non-obvious constraints.
+- KDoc for functions and methods should include a brief summary line, parameter descriptions, and the return value when applicable. For non-trivial functions, include a short note about side effects and thread-safety when relevant.
 - Inside methods, add inline comments that document each major code chunk or decision point. Comments should explain "why" (intent) not just "what" — the code shows what; the comment explains intent and important invariants.
+- Treat a "major code block" as a contiguous section of logic that does one meaningful job, such as loading inputs, validating state, building data, invoking external dependencies, or persisting results. In practice, a major block is usually separated by a blank line, a guard clause, a loop, or a distinct transition in responsibility.
+- Do not comment every small statement; comment the start of each meaningful block so the reader can follow the method at a high level without re-reading every line.
 - Use private helper methods to make the top-level method read like a sequence of high-level steps; each helper should have a clear name and a short KDoc if non-trivial.
 - When modifying existing code, don't remove existing explanatory comments unless they are obsolete — update them to reflect the new behavior.
 

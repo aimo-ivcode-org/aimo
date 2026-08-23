@@ -182,7 +182,8 @@ class ChatScopeDemoTest {
             assertTrue(hasGlobalTools, "power_user scope should include global tools when inherit-global=true")
             assertTrue(
                 toolRefsCount == toolRefs.size,
-                "power_user scope should include all configured tool-refs (expected=${toolRefs.size}, actual=$toolRefsCount)"
+                "power_user scope should include all configured tool-refs " +
+                    "(expected=${toolRefs.size}, actual=$toolRefsCount)"
             )
             println("Has global tools: $hasGlobalTools (tools: ${toolNames.filter { it in globalTools }})")
             println(
@@ -323,7 +324,10 @@ class ChatScopeDemoTest {
             println("Power user scope system messages: $systemMessageCount")
             println()
 
-            assertTrue(systemMessageCount >= 1, "power_user scope should have inline system message 'power_user_inline'")
+            assertTrue(
+                systemMessageCount >= 1,
+                "power_user scope should have inline system message 'power_user_inline'"
+            )
             println("✓ power_user scope includes inline system message!")
         } else {
             println("Power user scope not configured - skipping test")
