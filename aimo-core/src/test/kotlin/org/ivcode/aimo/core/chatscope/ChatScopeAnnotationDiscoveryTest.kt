@@ -34,7 +34,10 @@ class ChatScopeAnnotationDiscoveryTest {
         val globalTool = scopedTools[0]
         assertEquals("getHelp", globalTool.toolDefinition.name)
         // Parent has no scopes, and tool has no explicit scope -> tool gets empty scope set
-        assertTrue(globalTool.scopes.isEmpty(), "Tool without scope in unrestricted parent should be available everywhere")
+        assertTrue(
+            globalTool.scopes.isEmpty(),
+            "Tool without scope in unrestricted parent should be available everywhere",
+        )
     }
 
     @Test
@@ -47,7 +50,11 @@ class ChatScopeAnnotationDiscoveryTest {
         assertEquals(1, scopedTools.size)
         val scopedTool = scopedTools[0]
         assertEquals("searchPapers", scopedTool.toolDefinition.name)
-        assertEquals(setOf("research"), scopedTool.scopes, "Tool scoped to [research] should match parent scopes")
+        assertEquals(
+            setOf("research"),
+            scopedTool.scopes,
+            "Tool scoped to [research] should match parent scopes",
+        )
     }
 
      @Test
@@ -59,7 +66,11 @@ class ChatScopeAnnotationDiscoveryTest {
 
          assertEquals(1, scopedMessages.size)
          val globalMessage = scopedMessages[0]
-         assertEquals("generalPrompt", globalMessage.name, "Auto-generated name uses method name as-is")
+          assertEquals(
+              "generalPrompt",
+              globalMessage.name,
+              "Auto-generated name uses method name as-is",
+          )
          assertTrue(globalMessage.scopes.isEmpty(), "System message without scope should have empty scope set")
      }
 
@@ -88,7 +99,7 @@ class ChatScopeAnnotationDiscoveryTest {
 
         assertTrue(
             exception.message?.contains("has scopes not in parent service") == true,
-            "Should validate that tool scopes are subset of parent service scopes: ${exception.message}"
+            "Should validate that tool scopes are subset of parent service scopes: ${exception.message}",
         )
     }
 
@@ -101,7 +112,10 @@ class ChatScopeAnnotationDiscoveryTest {
 
          // generalPrompt method should get name "generalPrompt" (method name as-is)
          val message = scopedMessages.find { it.name == "generalPrompt" }
-         assertTrue(message != null, "System message should have auto-generated name from method name")
+          assertTrue(
+              message != null,
+              "System message should have auto-generated name from method name",
+          )
      }
 
      @Test
@@ -113,7 +127,10 @@ class ChatScopeAnnotationDiscoveryTest {
 
          // adminRulesMethod has explicit @SystemMessage(name = "admin_rules")
          val message = scopedMessages.find { it.name == "admin_rules" }
-         assertTrue(message != null, "System message should use explicit name from annotation")
+          assertTrue(
+              message != null,
+              "System message should use explicit name from annotation",
+          )
      }
 
     @Test
@@ -138,7 +155,11 @@ class ChatScopeAnnotationDiscoveryTest {
         val helpTool = scopedTools.find { it.toolDefinition.name == "getHelp" }
         assertTrue(helpTool != null, "getHelp tool should exist")
         // Tool with no scope annotation inherits parent service scopes
-        assertEquals(setOf("research", "admin"), helpTool!!.scopes, "Tool without scope annotation inherits parent scopes")
+        assertEquals(
+            setOf("research", "admin"),
+            helpTool!!.scopes,
+            "Tool without scope annotation inherits parent scopes",
+        )
     }
 
     @Test

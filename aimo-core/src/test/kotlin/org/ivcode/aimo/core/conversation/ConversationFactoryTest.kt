@@ -439,7 +439,11 @@ class ConversationFactoryTest {
         val dao = AimoChatClientDaoMemory()
 
         val blockingInterceptor = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 return chain.proceed(chatId, metadata)
             }
 

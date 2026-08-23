@@ -36,6 +36,10 @@ Formatting & linting
 - Match the repository's existing formatting. Do not change indentation style (tabs vs spaces) in a file.
 - If you add or suggest formatting tools (e.g., ktfmt, ktlint), include configuration and a Gradle task, and add CI steps to validate them.
 
+Formatting note (Detekt long-method rule)
+---------------------------------------
+- This repository uses Detekt for static analysis. Reference the `detekt.yml` configuration for rules and thresholds.
+
 Testing & validation guidance
 ----------------------------
 - Add unit tests for behavior changes under the same package in `src/test/kotlin`.
@@ -56,5 +60,5 @@ Examples of preferred phrasing for Copilot suggestions
 - "Generate an idiomatic Kotlin data class with kotlinx.serialization (or Jackson) annotations, using `val` for properties and a concise constructor." 
 - "Create a suspend function that uses coroutines to call the model provider and returns a typed result." 
 
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 

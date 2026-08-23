@@ -288,7 +288,8 @@ private fun Class<*>.isArrayType(): Boolean =
       val actualScopes = computeActualScopes(declaredScopes, parentServiceScopes, "system message '$name'")
 
       @Suppress("UNCHECKED_CAST")
-      callbacks += PropertySystemMessageCallback(controller, property as kotlin.reflect.KProperty1<Any, *>, name, actualScopes)
+      val typedProperty = property as kotlin.reflect.KProperty1<Any, *>
+      callbacks += PropertySystemMessageCallback(controller, typedProperty, name, actualScopes)
   }
 
  private fun processMethodSystemMessage(
