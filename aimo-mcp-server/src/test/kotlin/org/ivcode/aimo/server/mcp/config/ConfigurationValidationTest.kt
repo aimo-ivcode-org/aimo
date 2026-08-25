@@ -1,9 +1,17 @@
 package org.ivcode.aimo.server.mcp.config
 
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import org.ivcode.aimo.server.mcp.annotation.McpService
+import org.ivcode.aimo.server.mcp.annotation.McpTool
+import org.ivcode.aimo.server.mcp.transport.HttpMcpTransport
+import org.ivcode.aimo.server.mcp.transport.TransportCoordinator
+import org.springframework.context.annotation.AnnotationConfigApplicationContext
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 
 class ConfigurationValidationTest {
 
@@ -28,6 +36,38 @@ class ConfigurationValidationTest {
         assertFalse(props.errorHandling.includeStackTrace)
         assertTrue(props.errorHandling.includeErrorData)
         assertTrue(props.errorHandling.failOnValidationError)
+    }
+
+    @Test
+    fun `EnableMcpServer imports transport wiring and activates HTTP transport`() {
+        // Boot the smallest possible MCP server context to verify the opt-in annotation
+        // still imports every runtime bean after the auto-configuration split.
+        AnnotationConfigApplicationContext(TestServerConfiguration::class.java).use { context ->
+            val coordinator = context.getBean(TransportCoordinator::class.java)
+            val httpTransport = context.getBean(HttpMcpTransport::class.java)
+
+            // Assert the imported runtime beans exist and the startup listener activated HTTP.
+            assertNotNull(context.getBean(McpServerStartupListener::class.java))
+            assertTrue(coordinator.isTransportActive("http"))
+            assertTrue(httpTransport.isActive())
+        }
+    }
+
+    @Configuration
+    @EnableMcpServer
+    private class TestServerConfiguration {
+        @Bean
+        fun testService(): TestMcpService {
+            return TestMcpService(response = "pong")
+        }
+    }
+
+    @McpService
+    private class TestMcpService(private val response: String) {
+        @McpTool(name = "ping", description = "Simple test tool")
+        fun ping(): String {
+            return response
+        }
     }
 }
 

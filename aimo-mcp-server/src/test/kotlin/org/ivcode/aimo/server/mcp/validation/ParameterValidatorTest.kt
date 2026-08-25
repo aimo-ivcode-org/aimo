@@ -14,7 +14,6 @@ class ParameterValidatorTest {
         val method = TestClass::class.java.getMethod("add", Double::class.java, Double::class.java)
 
         val result = validator.validateParameters(
-            methodName = "add",
             methodParameters = method.parameters,
             providedArguments = mapOf("a" to 5.0, "b" to 3.0)
         )
@@ -28,7 +27,6 @@ class ParameterValidatorTest {
         val method = TestClass::class.java.getMethod("add", Double::class.java, Double::class.java)
 
         val result = validator.validateParameters(
-            methodName = "add",
             methodParameters = method.parameters,
             providedArguments = mapOf("a" to 5.0)  // Missing 'b'
         )
@@ -42,7 +40,6 @@ class ParameterValidatorTest {
         val method = TestClass::class.java.getMethod("add", Double::class.java, Double::class.java)
 
         val result = validator.validateParameters(
-            methodName = "add",
             methodParameters = method.parameters,
             providedArguments = mapOf("a" to "5.0", "b" to "3.0")
         )
@@ -55,7 +52,6 @@ class ParameterValidatorTest {
         val method = TestClass::class.java.getMethod("add", Double::class.java, Double::class.java)
 
         val result = validator.validateParameters(
-            methodName = "add",
             methodParameters = method.parameters,
             providedArguments = mapOf("a" to "not-a-number", "b" to 3.0)
         )

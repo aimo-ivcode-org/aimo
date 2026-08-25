@@ -13,7 +13,7 @@ class TransportCoordinator(
     private val properties: McpServerProperties,
     private val httpTransportProvider: ObjectProvider<HttpMcpTransport>,
     private val sseTransportProvider: ObjectProvider<SseMcpTransport>,
-    private val stdioTransportProvider: ObjectProvider<McpTransport>
+    private val stdioTransportProvider: ObjectProvider<out McpTransport>
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val activeTransports = mutableListOf<McpTransport>()
@@ -56,8 +56,8 @@ class TransportCoordinator(
                 try {
                     stdioTransport.initialize()
                     activeTransports.add(stdioTransport)
-                } catch (e: Exception) {
-                    logger.error("Error initializing Stdio transport", e)
+                } catch (exception: IllegalStateException) {
+                    logger.error("Error initializing Stdio transport", exception)
                 }
             } else {
                 logger.warn("Stdio transport is enabled in configuration but no stdio transport bean is available")
@@ -83,8 +83,8 @@ class TransportCoordinator(
         activeTransports.forEach { transport ->
             try {
                 transport.shutdown()
-            } catch (e: Exception) {
-                logger.error("Error shutting down {} transport", transport.name, e)
+            } catch (exception: IllegalStateException) {
+                logger.error("Error shutting down {} transport", transport.name, exception)
             }
         }
         activeTransports.clear()

@@ -44,9 +44,9 @@ class StdioMcpTransportTest {
 
             val parameterBinder = ParameterBinder(objectMapper)
             val toolCallHandler = ToolCallHandler(serviceRegistry, parameterBinder)
-            val promptGetHandler = PromptGetHandler(serviceRegistry, parameterBinder, objectMapper)
+            val promptGetHandler = PromptGetHandler(serviceRegistry, parameterBinder)
 
-            val requestHandler = McpRequestHandler(serviceRegistry, toolCallHandler, promptGetHandler, objectMapper)
+            val requestHandler = McpRequestHandler(serviceRegistry, toolCallHandler, promptGetHandler)
 
             val transport = StdioMcpTransport(requestHandler, objectMapper)
 
@@ -71,7 +71,10 @@ class StdioMcpTransportTest {
             System.out.flush()
 
             val outStr = baos.toString(Charsets.UTF_8.name())
-            assertTrue(outStr.contains("POST_STOP_CHECK"), "System.out should remain open and usable after transport.stop()")
+            assertTrue(
+                outStr.contains("POST_STOP_CHECK"),
+                "System.out should remain open and usable after transport.stop()"
+            )
         } finally {
             // Restore original streams
             System.setIn(originalIn)
