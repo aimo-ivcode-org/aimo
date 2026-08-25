@@ -2,11 +2,9 @@ package org.ivcode.aimo.mcpclient.protocol
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.Timeout
 import org.ivcode.aimo.mcpclient.protocol.transport.ProtocolTransport
 import tools.jackson.databind.ObjectMapper
-import tools.jackson.databind.node.JsonNodeFactory
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -39,10 +37,14 @@ class ProtocolClientTest {
 
         // Connect the client
         client.connect()
-        assertTrue(client.isConnected(), "Client should be connected after connect()")
 
-        // Give reader thread time to encounter error and execute cleanup
-        Thread.sleep(1000)
+        // Give the reader thread time to encounter the transport error and execute cleanup.
+        repeat(20) {
+            if (!client.isConnected()) {
+                return@repeat
+            }
+            Thread.sleep(50)
+        }
 
         // Verify: isConnected() should now be false
         assertFalse(

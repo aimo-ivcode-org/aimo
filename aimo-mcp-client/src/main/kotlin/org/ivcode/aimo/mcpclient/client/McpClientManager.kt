@@ -43,135 +43,96 @@ class McpClientManager(
         log.info("Starting initialization of ${serverConfig.servers.size} MCP server(s)")
 
         for (server in serverConfig.servers) {
-            try {
+            runCatching {
                 log.debug("Initializing server '${server.id}' from config...")
                 val (tools, prompts) = initializeServer(server)
                 allCallbacks[server.id] = tools
                 log.info("✓ Server '${server.id}' initialized with ${tools.size} tools and ${prompts.size} prompts")
-            } catch (e: Exception) {
+            }.onFailure { error ->
                 if (mcpRequired) {
-                    log.error("✗ Failed to initialize required server '${server.id}'", e)
-                    throw e
-                } else {
-                    log.warn("✗ Failed to initialize optional server '${server.id}': ${e.message}. Will retry on refresh.", e)
-                    // Create a placeholder connection with empty callbacks so the server can be retried on refresh
-                    createFailedServerPlaceholder(server)
-                    allCallbacks[server.id] = emptyList()
+                    log.error("✗ Failed to initialize required server '${server.id}'", error)
+                    throw error
                 }
+
+                log.warn(
+                    "✗ Failed to initialize optional server '${server.id}': ${error.message}. " +
+                        "Will retry on refresh.",
+                    error,
+                )
+                // Create a placeholder connection with empty callbacks so the server can be retried on refresh.
+                createFailedServerPlaceholder(server, objectMapper, serverClients)
+                allCallbacks[server.id] = emptyList()
             }
         }
 
         val successCount = serverClients.values.count { it.protocolClient != null }
         val failedCount = serverClients.size - successCount
-        log.info("MCP initialization complete: $successCount/${serverConfig.servers.size} servers initialized, $failedCount will retry on refresh")
+        log.info(
+            "MCP initialization complete: " +
+                "$successCount/${serverConfig.servers.size} servers initialized, " +
+                "$failedCount will retry on refresh",
+        )
 
         return allCallbacks
-    }
-
-    /**
-     * Create a placeholder ServerConnection for a server that failed initialization.
-     * This allows the server to be included in provider discovery and retried on refresh.
-     */
-    private fun createFailedServerPlaceholder(server: McpServerConfig.Server) {
-        // Create minimal factories that can be retried on refresh
-        val toolCallbackFactory = McpToolCallbackFactory(
-            serverId = server.id,
-            protocolClient = null,  // Will be created on successful initialization
-            objectMapper = objectMapper,
-            scopes = server.scope.toSet(),
-        )
-
-        val promptCallbackFactory = McpSystemMessageCallbackFactory(
-            serverId = server.id,
-            protocolClient = null,  // Will be created on successful initialization
-            objectMapper = objectMapper,
-            scopes = server.scope.toSet(),
-        )
-
-        val connection = ServerConnection(
-            serverId = server.id,
-            protocolClient = null,  // Placeholder
-            lifecycleManager = null,  // Placeholder
-            toolDiscovery = null,  // Placeholder
-            promptDiscovery = null,  // Placeholder
-            toolCallbackFactory = toolCallbackFactory,
-            promptCallbackFactory = promptCallbackFactory,
-            cachedCallbacks = emptyList(),
-            cachedSystemMessages = emptyList(),
-        )
-
-        serverClients[server.id] = connection
-        log.debug("Created placeholder for server '${server.id}' (waiting for successful initialization on refresh)")
     }
 
     /**
      * Register notification handlers for a connected server.
      */
     private fun registerNotificationHandlers(server: McpServerConfig.Server, connection: ServerConnection) {
-        val protocolClient = connection.protocolClient ?: return
-        val toolDiscovery = connection.toolDiscovery ?: return
-        val promptDiscovery = connection.promptDiscovery ?: return
-        val toolCallbackFactory = connection.toolCallbackFactory
-        val promptCallbackFactory = connection.promptCallbackFactory
+        val protocolClient = connection.protocolClient
+        val toolDiscovery = connection.toolDiscovery
+        val promptDiscovery = connection.promptDiscovery
 
-        protocolClient.onNotification("tools/listChanged") { params ->
-            try {
-                log.debug("Received tools/listChanged notification for server '${server.id}'")
+        if (protocolClient == null || toolDiscovery == null || promptDiscovery == null) {
+            return
+        }
+
+        protocolClient.onNotification("tools/listChanged") {
+            log.debug("Received tools/listChanged notification for server '${server.id}'")
+            runCatching {
                 val newToolDefinitions = toolDiscovery.discoverTools()
-                val newCallbacks = newToolDefinitions.map { toolCallbackFactory.createCallback(it) }
+                val newCallbacks = newToolDefinitions.map { connection.toolCallbackFactory.createCallback(it) }
                 connection.cachedCallbacks = newCallbacks
                 log.info("✓ Server '${server.id}' tools updated via notification: ${newCallbacks.size} tools")
-            } catch (e: Exception) {
-                log.error("Failed to process tools/listChanged notification for server '${server.id}'", e)
+            }.onFailure {
+                log.error("Failed to process tools/listChanged notification for server '${server.id}'", it)
             }
         }
 
-        protocolClient.onNotification("prompts/listChanged") { params ->
-            try {
-                log.debug("Received prompts/listChanged notification for server '${server.id}'")
+        protocolClient.onNotification("prompts/listChanged") {
+            log.debug("Received prompts/listChanged notification for server '${server.id}'")
+            runCatching {
                 val newPromptDefinitions = promptDiscovery.discoverPrompts()
-                val newSystemMessages = newPromptDefinitions.map { promptCallbackFactory.createCallback(it) }
+                val newSystemMessages = newPromptDefinitions.map { connection.promptCallbackFactory.createCallback(it) }
                 connection.cachedSystemMessages = newSystemMessages
                 log.info("✓ Server '${server.id}' prompts updated via notification: ${newSystemMessages.size} prompts")
-            } catch (e: Exception) {
-                log.error("Failed to process prompts/listChanged notification for server '${server.id}'", e)
+            }.onFailure {
+                log.error("Failed to process prompts/listChanged notification for server '${server.id}'", it)
             }
         }
     }
 
-    private fun initializeServer(server: McpServerConfig.Server): Pair<List<ToolCallback>, List<SystemMessageCallback>> {
-        val transport: ProtocolTransport = when (server.transport) {
-            is McpServerConfig.Transport.StdioTransport -> {
-                val stdio = server.transport as McpServerConfig.Transport.StdioTransport
-                StdioTransport(stdio.command, stdio.args)
-            }
-            is McpServerConfig.Transport.HttpTransport -> {
-                val http = server.transport as McpServerConfig.Transport.HttpTransport
-                HttpTransport(http.url, http.authToken, "2025-11-25", objectMapper)
-            }
-            is McpServerConfig.Transport.SseTransport -> {
-                val sse = server.transport as McpServerConfig.Transport.SseTransport
-                // Treat SSE transport as Streamable HTTP with SSE response support.
-                HttpTransport(sse.url, sse.authToken, "2025-11-25", objectMapper)
-            }
-        }
+    private fun initializeServer(
+        server: McpServerConfig.Server,
+    ): Pair<List<ToolCallback>, List<SystemMessageCallback>> {
+        val transport: ProtocolTransport = createTransport(server)
 
         val protocolClient = ProtocolClient(transport, objectMapper)
         protocolClient.connect()
 
         val lifecycleManager = LifecycleManager(protocolClient, objectMapper)
-        try {
+        runCatching {
             lifecycleManager.initialize(
                 ClientInfo("aimo", "0.1"),
-                ClientCapabilities()
+                ClientCapabilities(),
             )
-        } catch (e: Exception) {
+        }.onFailure {
             protocolClient.disconnect()
-            throw e
-        }
+        }.getOrThrow()
 
-        val toolDiscovery = ToolDiscovery(protocolClient, objectMapper)
-        val promptDiscovery = PromptDiscovery(protocolClient, objectMapper)
+        val toolDiscovery = ToolDiscovery(protocolClient)
+        val promptDiscovery = PromptDiscovery(protocolClient)
 
         val toolCallbackFactory = McpToolCallbackFactory(
             serverId = server.id,
@@ -192,12 +153,9 @@ class McpClientManager(
         val toolCallbacks = toolDefinitions.map { toolCallbackFactory.createCallback(it) }
 
         // Discover prompts (system messages)
-        val promptDefinitions = try {
-            promptDiscovery.discoverPrompts()
-        } catch (e: Exception) {
-            log.warn("Failed to discover prompts for server '${server.id}': ${e.message}")
-            emptyList()
-        }
+        val promptDefinitions = runCatching { promptDiscovery.discoverPrompts() }
+            .onFailure { log.warn("Failed to discover prompts for server '${server.id}': ${it.message}") }
+            .getOrDefault(emptyList())
         val systemMessageCallbacks = promptDefinitions.map { promptCallbackFactory.createCallback(it) }
 
         val connection = ServerConnection(
@@ -226,57 +184,26 @@ class McpClientManager(
 
         log.debug("Starting refresh of failed servers (only retrying placeholders)")
 
-         for (server in serverConfig.servers) {
-             val serverId = server.id
-             val connection = serverClients[serverId]
-
-             try {
-                 if (connection == null) {
-                     // Server wasn't initialized (e.g. optional startup failure) — try to initialize now.
-                     log.debug("Retrying initialization of uninitialized server '$serverId'...")
-                     try {
-                         val (tools, prompts) = initializeServer(server)
-                         results[serverId] = RefreshResult.Success(tools.size)
-                         log.info("✓ Server '$serverId' successfully initialized on retry with ${tools.size} tools and ${prompts.size} prompts")
-                     } catch (retryException: Exception) {
-                         results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
-                         log.warn("✗ Failed to initialize server '$serverId' on retry: ${retryException.message}", retryException)
-                     }
-                 } else if (connection.protocolClient == null || connection.toolDiscovery == null) {
-                     // Placeholder exists - try to initialize from config
-                     log.debug("Retrying initialization of placeholder server '$serverId'...")
-                     val serverConfig = serverConfigMap[serverId]
-
-                     if (serverConfig == null) {
-                         results[serverId] = RefreshResult.Failure("Server config not found")
-                         log.warn("Server config not found for '$serverId', cannot retry")
-                     } else {
-                         try {
-                             log.debug("Attempting to initialize server '$serverId'...")
-                             val (tools, prompts) = initializeServer(serverConfig)
-                             results[serverId] = RefreshResult.Success(tools.size)
-                             log.info("✓ Server '$serverId' successfully initialized on retry with ${tools.size} tools and ${prompts.size} prompts")
-                         } catch (retryException: Exception) {
-                             log.warn("✗ Failed to initialize server '$serverId' on retry: ${retryException.message}", retryException)
-                             results[serverId] = RefreshResult.Failure(retryException.message ?: "Unknown error during retry")
-                             // Don't rethrow - keep the placeholder for next retry
-                         }
-                      }
-                  } else {
-                      // Server is healthy - skip; tool and prompt changes are handled via notifications
-                      log.debug("Server '$serverId' is healthy, skipping refresh (tool/prompt changes handled via notifications)")
-                      results[serverId] = RefreshResult.Success(connection.cachedCallbacks.size)
-                  }
-              } catch (e: Exception) {
-                 results[serverId] = RefreshResult.Failure(e.message ?: "Unknown error")
-                 log.error("Unexpected error during refresh of server '$serverId'", e)
-             }
-         }
+        for (server in serverConfig.servers) {
+            results[server.id] = refreshServer(
+                server = server,
+                connection = serverClients[server.id],
+                serverConfigMap = serverConfigMap,
+                initializeServer = ::initializeServer,
+                log = log,
+            )
+        }
 
         val healthyCount = serverClients.count { it.value.protocolClient != null && it.value.toolDiscovery != null }
         val failedCount = serverClients.size - healthyCount
         val retriedCount = results.size
-        log.info("Refresh completed: retried $retriedCount failed server(s), skipped $healthyCount healthy server(s). Results: ${results.map { "${it.key}=${if (it.value is RefreshResult.Success) "OK(${(it.value as RefreshResult.Success).toolCount} tools)" else "FAILED: ${(it.value as RefreshResult.Failure).error}"}" }.joinToString(", ")}")
+        val refreshSummary = results.map { (serverId, result) ->
+            result.toSummary(serverId)
+        }.joinToString(", ")
+        log.info(
+            "Refresh completed: retried $retriedCount failed server(s) and skipped $healthyCount healthy server(s), " +
+                "$failedCount connection(s) remain unresolved. Results: $refreshSummary",
+        )
 
         return results
     }
@@ -297,9 +224,8 @@ class McpClientManager(
         return serverClients[serverId]?.cachedSystemMessages ?: emptyList()
     }
 
-    fun getServerIds(): List<String> {
-        return serverClients.keys.toList()
-    }
+    val serverIds: List<String>
+        get() = serverClients.keys.toList()
 
     fun getServerScopes(serverId: String): Set<String> {
         return serverClients[serverId]?.toolCallbackFactory?.getScopes() ?: emptySet()
@@ -307,15 +233,134 @@ class McpClientManager(
 
     fun shutdown() {
         for ((serverId, connection) in serverClients) {
-            try {
+            runCatching {
                 connection.lifecycleManager?.terminate()
                 connection.protocolClient?.disconnect()
                 log.info("Server '$serverId' shutdown")
-            } catch (e: Exception) {
-                log.warn("Error shutting down server '$serverId'", e)
-            }
+            }.onFailure { log.warn("Error shutting down server '$serverId'", it) }
         }
         serverClients.clear()
+    }
+}
+
+/**
+ * Creates the placeholder connection used for servers that fail initial startup.
+ *
+ * @param server the server that failed to initialize.
+ * @param objectMapper shared mapper used by the callback factories.
+ * @param serverClients registry that stores the placeholder connection.
+ */
+private fun createFailedServerPlaceholder(
+    server: McpServerConfig.Server,
+    objectMapper: ObjectMapper,
+    serverClients: ConcurrentHashMap<String, McpClientManager.ServerConnection>,
+) {
+    val toolCallbackFactory = McpToolCallbackFactory(
+        serverId = server.id,
+        protocolClient = null,
+        objectMapper = objectMapper,
+        scopes = server.scope.toSet(),
+    )
+    val promptCallbackFactory = McpSystemMessageCallbackFactory(
+        serverId = server.id,
+        protocolClient = null,
+        objectMapper = objectMapper,
+        scopes = server.scope.toSet(),
+    )
+
+    serverClients[server.id] = McpClientManager.ServerConnection(
+        serverId = server.id,
+        protocolClient = null,
+        lifecycleManager = null,
+        toolDiscovery = null,
+        promptDiscovery = null,
+        toolCallbackFactory = toolCallbackFactory,
+        promptCallbackFactory = promptCallbackFactory,
+        cachedCallbacks = emptyList(),
+        cachedSystemMessages = emptyList(),
+    )
+}
+
+/**
+ * Creates the transport implementation for a configured MCP server.
+ *
+ * @param server the server to translate into a transport.
+ * @param objectMapper shared mapper for HTTP and SSE transports.
+ * @return the transport instance for the server.
+ */
+private fun createTransport(server: McpServerConfig.Server): ProtocolTransport {
+    return when (val transport = server.transport) {
+        is McpServerConfig.Transport.StdioTransport -> StdioTransport(transport.command, transport.args)
+        is McpServerConfig.Transport.HttpTransport -> HttpTransport(transport.url, transport.authToken, "2025-11-25")
+        is McpServerConfig.Transport.SseTransport -> HttpTransport(transport.url, transport.authToken, "2025-11-25")
+    }
+}
+
+/**
+ * Refreshes one MCP server entry using its current connection state.
+ *
+ * @param server the server to refresh.
+ * @param connection the current cached connection, if any.
+ * @param serverConfigMap lookup table for the configured servers.
+ * @param initializeServer initializer used when a server must be retried.
+ * @return the refresh result for the server.
+ */
+private fun refreshServer(
+    server: McpServerConfig.Server,
+    connection: McpClientManager.ServerConnection?,
+    serverConfigMap: Map<String, McpServerConfig.Server>,
+    initializeServer: (McpServerConfig.Server) -> Pair<List<ToolCallback>, List<SystemMessageCallback>>,
+    log: org.slf4j.Logger,
+): RefreshResult {
+    val serverId = server.id
+    return when {
+        connection == null -> {
+            log.debug("Retrying initialization of uninitialized server '$serverId'...")
+            runCatching { initializeServer(server) }.fold(
+                onSuccess = { (tools, prompts) ->
+                    log.info(
+                        "✓ Server '$serverId' successfully initialized on retry with " +
+                            "${tools.size} tools and ${prompts.size} prompts",
+                    )
+                    RefreshResult.Success(tools.size)
+                },
+                onFailure = { error ->
+                    val retryError = error.message ?: "Unknown error during retry"
+                    log.warn("✗ Failed to initialize server '$serverId' on retry: $retryError", error)
+                    RefreshResult.Failure(retryError)
+                },
+            )
+        }
+
+        connection.protocolClient == null || connection.toolDiscovery == null -> {
+            val serverConfig = serverConfigMap[serverId] ?: run {
+                log.warn("Server config not found for '$serverId', cannot retry")
+                return RefreshResult.Failure("Server config not found")
+            }
+            log.debug("Retrying initialization of placeholder server '$serverId'...")
+            runCatching { initializeServer(serverConfig) }.fold(
+                onSuccess = { (tools, prompts) ->
+                    log.info(
+                        "✓ Server '$serverId' successfully initialized on retry with " +
+                            "${tools.size} tools and ${prompts.size} prompts",
+                    )
+                    RefreshResult.Success(tools.size)
+                },
+                onFailure = { error ->
+                    val retryError = error.message ?: "Unknown error during retry"
+                    log.warn("✗ Failed to initialize server '$serverId' on retry: $retryError", error)
+                    RefreshResult.Failure(retryError)
+                },
+            )
+        }
+
+        else -> {
+            log.debug(
+                "Server '$serverId' is healthy, skipping refresh " +
+                    "(tool/prompt changes handled via notifications)",
+            )
+            RefreshResult.Success(connection.cachedCallbacks.size)
+        }
     }
 }
 
@@ -323,3 +368,10 @@ sealed class RefreshResult {
     data class Success(val toolCount: Int) : RefreshResult()
     data class Failure(val error: String) : RefreshResult()
 }
+
+private fun RefreshResult.toSummary(serverId: String): String =
+    when (this) {
+        is RefreshResult.Success -> "$serverId=OK(${toolCount} tools)"
+        is RefreshResult.Failure -> "$serverId=FAILED: $error"
+    }
+

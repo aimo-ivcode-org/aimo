@@ -2,7 +2,6 @@ package org.ivcode.aimo.mcpclient.protocol.lifecycle
 
 import org.ivcode.aimo.mcpclient.protocol.ProtocolClient
 import org.slf4j.LoggerFactory
-import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 
 /**
@@ -40,13 +39,10 @@ class LifecycleManager(
     }
 
     fun terminate() {
-        try {
-            log.info("Terminating MCP client")
-            // Per spec, shutdown is handled at transport level, not via RPC notification
-            protocolClient.disconnect()
-        } catch (e: Exception) {
-            log.warn("Error during terminate", e)
-        }
+        log.info("Terminating MCP client")
+        // Per spec, shutdown is handled at transport level, not via RPC notification.
+        runCatching { protocolClient.disconnect() }
+            .onFailure { log.warn("Error during terminate", it) }
     }
 }
 
@@ -57,7 +53,12 @@ data class ClientCapabilities(
 )
 data class ServerInfo(val protocolVersion: String, val serverInfo: ServerDetails, val capabilities: ServerCapabilities)
 data class ServerDetails(val name: String, val version: String)
-data class ServerCapabilities(val tools: ToolsCapability? = null, val resources: Map<String, Any>? = null, val prompts: Map<String, Any>? = null, val experimental: Map<String, Any>? = null)
+data class ServerCapabilities(
+    val tools: ToolsCapability? = null,
+    val resources: Map<String, Any>? = null,
+    val prompts: Map<String, Any>? = null,
+    val experimental: Map<String, Any>? = null,
+)
 data class ToolsCapability(val listChanged: Boolean? = null)
 
 class LifecycleException(message: String, cause: Throwable? = null) : Exception(message, cause)
