@@ -18,7 +18,7 @@ class ParameterBinderFallbackTest {
 
     class KotlinService {
         fun greet(city: String, days: Int): String {
-            return "${'$'}city:${'$'}days"
+            return "$city:$days"
         }
     }
 
@@ -44,4 +44,3 @@ class ParameterBinderFallbackTest {
         assertEquals(3, (result.values["days"] as Number).toInt())
     }
 }
-

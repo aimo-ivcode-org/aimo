@@ -13,6 +13,8 @@ import java.nio.charset.StandardCharsets
 private const val DEFAULT_URL = "http://localhost:11434"
 private const val CHAT_PATH = "/api/chat"
 private const val ERROR_BODY_SNIPPET_LIMIT = 512
+private const val HTTP_SUCCESS_STATUS_CODE_MIN = 200
+private const val HTTP_SUCCESS_STATUS_CODE_MAX = 299
 
 internal class OllamaChatClient (
     url: String = DEFAULT_URL,
@@ -43,7 +45,19 @@ internal class OllamaChatClient (
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .build()
 
-        val response = try {
+        val response = sendRequest(httpRequest, request.model)
+        requireSuccessfulResponse(response, request.model)
+        readChatResponses(response.body(), request.model, parts, callback)
+
+        val merged = concatResponses(parts)
+        if (log.isTraceEnabled) {
+            log.trace("Ollama chat response merged model={} payload={}", request.model, asLogValue(merged))
+        }
+        return merged
+    }
+
+    private fun sendRequest(httpRequest: HttpRequest, model: String): HttpResponse<InputStream> {
+        return try {
             client.send(
                 httpRequest,
                 HttpResponse.BodyHandlers.ofInputStream()
@@ -51,53 +65,56 @@ internal class OllamaChatClient (
         } catch (ie: InterruptedException) {
             // Preserve interrupt status and translate to an IO error suitable for higher layers
             Thread.currentThread().interrupt()
-            log.warn("Thread interrupted while waiting for Ollama HTTP response for model={}", request.model)
+            log.warn("Thread interrupted while waiting for Ollama HTTP response for model={}", model)
             throw java.io.IOException("Interrupted while waiting for Ollama response", ie)
         }
+    }
 
+    private fun requireSuccessfulResponse(response: HttpResponse<InputStream>, model: String) {
         log.debug(
             "Ollama chat response status={} model={}",
             response.statusCode(),
-            request.model,
+            model,
         )
 
-        if (response.statusCode() !in 200..299) {
+        if (response.statusCode() !in HTTP_SUCCESS_STATUS_CODE_MIN..HTTP_SUCCESS_STATUS_CODE_MAX) {
             val errorBodySnippet = response.body().readBodySnippet()
             log.error(
                 "Ollama chat request failed status={} model={} errorBodySnippet={}",
                 response.statusCode(),
-                request.model,
+                model,
                 errorBodySnippet,
             )
             throw IllegalStateException(
                 "Ollama chat request failed with HTTP ${response.statusCode()}: $errorBodySnippet"
             )
         }
+    }
 
-        response.body().bufferedReader(StandardCharsets.UTF_8).use { reader ->
+    private fun readChatResponses(
+        body: InputStream,
+        model: String,
+        parts: MutableList<ChatResponse>,
+        callback: ChatCallback?,
+    ) {
+        body.bufferedReader(StandardCharsets.UTF_8).use { reader ->
             var line: String?
 
             while (reader.readLine().also { line = it } != null) {
                 val responseLine = line!!.trim()
                 if (responseLine.isEmpty()) continue
                 if (log.isTraceEnabled) {
-                    log.trace("Ollama chat response ndjson line model={} payload={}", request.model, responseLine)
+                    log.trace("Ollama chat response ndjson line model={} payload={}", model, responseLine)
                 }
 
                 val chatResponse = mapper.readValue(responseLine, ChatResponse::class.java)
                 parts.add(chatResponse)
                 if (log.isTraceEnabled) {
-                    log.trace("Ollama chat response event model={} payload={}", request.model, asLogValue(chatResponse))
+                    log.trace("Ollama chat response event model={} payload={}", model, asLogValue(chatResponse))
                 }
                 callback?.invoke(chatResponse)
             }
         }
-
-        val merged = concatResponses(parts)
-        if (log.isTraceEnabled) {
-            log.trace("Ollama chat response merged model={} payload={}", request.model, asLogValue(merged))
-        }
-        return merged
     }
 
     private fun concatResponses(responses: List<ChatResponse>): ChatResponse {

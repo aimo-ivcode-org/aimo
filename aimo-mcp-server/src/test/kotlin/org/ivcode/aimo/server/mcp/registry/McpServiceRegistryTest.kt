@@ -12,8 +12,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
-import org.junit.jupiter.api.Assertions.assertSame
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.springframework.context.support.GenericApplicationContext
 
 class McpServiceRegistryTest {
@@ -389,6 +387,8 @@ class McpServiceRegistryTest {
     // Test service implementations
     @McpService
     class TestCalculatorService {
+        private val helpText = "Use 'add' or 'multiply' to perform calculations"
+
         @McpTool
         fun add(
             @McpParam(description = "First number") a: Double,
@@ -402,7 +402,7 @@ class McpServiceRegistryTest {
         ): Double = a * b
 
         @McpPrompt
-        fun calculationHelp(): String = "Use 'add' or 'multiply' to perform calculations"
+        fun calculationHelp(): String = helpText
     }
 
     @McpService
@@ -418,78 +418,103 @@ class McpServiceRegistryTest {
 
     @McpService
     class ServiceWithPrivateTool {
+        private val privateToolText = "This is private"
+
         @McpTool
-        private fun privateTool(): String = "This is private"
+        private fun privateTool(): String = privateToolText
     }
 
     @McpService
-    class ServiceWithProtectedTool {
+    open class ServiceWithProtectedTool {
+        private val protectedToolText = "This is protected"
+
         @McpTool
-        protected fun protectedTool(): String = "This is protected"
+        protected fun protectedTool(): String = protectedToolText
     }
 
     @McpService
     class ServiceWithPrivatePrompt {
+        private val privatePromptText = "This is a private prompt"
+
         @McpPrompt
-        private fun privatePrompt(): String = "This is a private prompt"
+        private fun privatePrompt(): String = privatePromptText
     }
 
     @McpService(name = "weather")
     class ServiceWithName {
+        private val temperature = 72.5
+
         @McpTool
-        fun getTemp(): Double = 72.5
+        fun getTemp(): Double = temperature
     }
 
 
     @McpService(name = "forecast")
     class ServiceWithNameForecast {
+        private val temperature = 75.0
+
         @McpTool
-        fun getTemp(): Double = 75.0
+        fun getTemp(): Double = temperature
     }
 
     @McpService(name = "history")
     class ServiceWithNameHistory {
+        private val temperature = 65.0
+
         @McpTool
-        fun getTemp(): Double = 65.0
+        fun getTemp(): Double = temperature
     }
 
     @McpService(name = "weather")
     class ServiceWithNameAndPrompt {
+        private val temperature = 72.5
+        private val weatherHelpText = "Get current weather temperature"
+
         @McpTool
-        fun getTemp(): Double = 72.5
+        fun getTemp(): Double = temperature
 
         @McpPrompt
-        fun weatherHelp(): String = "Get current weather temperature"
+        fun weatherHelp(): String = weatherHelpText
     }
 
     @McpService(name = "forecast")
     class ServiceWithNameForecastConflict {
+        private val temperature = 75.0
+
         @McpTool
-        fun getTemp(): Double = 75.0
+        fun getTemp(): Double = temperature
     }
 
     // Services for conflict detection tests
     @McpService
     class ServiceUnnamedWithGetWeather {
+        private val weatherSummary = "Sunny, 72F"
+
         @McpTool
-        fun getWeather(): String = "Sunny, 72F"
+        fun getWeather(): String = weatherSummary
     }
 
     @McpService
     class ServiceUnnamedConflictingGetWeather {
+        private val weatherSummary = "Rainy, 65F"
+
         @McpTool
-        fun getWeather(): String = "Rainy, 65F"
+        fun getWeather(): String = weatherSummary
     }
 
     @McpService
     class ServiceUnnamedWithPrompt {
+        private val helpText = "Get help"
+
         @McpPrompt
-        fun help(): String = "Get help"
+        fun help(): String = helpText
     }
 
     @McpService
     class ServiceUnnamedConflictingPrompt {
+        private val helpText = "More help"
+
         @McpPrompt
-        fun help(): String = "More help"
+        fun help(): String = helpText
     }
 }

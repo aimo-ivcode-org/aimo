@@ -3,6 +3,7 @@ package org.ivcode.aimo.server.mcp.transport
 import org.ivcode.aimo.server.mcp.config.McpServerProperties
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 import org.springframework.beans.factory.ObjectProvider
 
 /**
@@ -18,7 +19,9 @@ class TransportCoordinatorTest {
         override fun initialize() { initialized = true }
         override fun shutdown() { shutdownCalled = true }
         override fun isActive(): Boolean = initialized && !shutdownCalled
-        override fun handleRequest(request: org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest): org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse {
+        override fun handleRequest(
+            request: org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest
+        ): org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse {
             throw UnsupportedOperationException()
         }
     }
@@ -69,14 +72,9 @@ class TransportCoordinatorTest {
             FixedProvider<McpTransport>(null)
         )
 
-        var thrown = false
-        try {
+        assertFailsWith<IllegalStateException> {
             coordinator.initializeTransports()
-        } catch (e: IllegalStateException) {
-            thrown = true
         }
-
-        assertTrue(thrown, "TransportCoordinator should throw IllegalStateException when no transports are active")
     }
 }
 

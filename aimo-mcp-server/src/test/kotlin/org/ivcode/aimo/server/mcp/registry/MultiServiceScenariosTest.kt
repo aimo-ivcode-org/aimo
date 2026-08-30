@@ -209,6 +209,8 @@ class MultiServiceScenariosTest {
 
     @McpService
     class MathService {
+        private val mathHelpText = "Math help guide"
+
         @McpTool
         fun add(
             @McpParam(description = "First number") a: Double,
@@ -222,11 +224,13 @@ class MultiServiceScenariosTest {
         ): Double = a * b
 
         @McpPrompt
-        fun mathHelp(): String = "Math help guide"
+        fun mathHelp(): String = mathHelpText
     }
 
     @McpService
     class StringService {
+        private val stringHelpText = "String help guide"
+
         @McpTool
         fun reverse(@McpParam(description = "Text to reverse") text: String): String = text.reversed()
 
@@ -234,7 +238,7 @@ class MultiServiceScenariosTest {
         fun uppercase(@McpParam(description = "Text to uppercase") text: String): String = text.uppercase()
 
         @McpPrompt
-        fun stringHelp(): String = "String help guide"
+        fun stringHelp(): String = stringHelpText
     }
 
     @McpService

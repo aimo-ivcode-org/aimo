@@ -101,7 +101,12 @@ class ParameterBindingTest {
 
     @Test
     fun `should successfully bind mixed numeric types`() {
-        val method = TestService::class.java.getMethod("mixedTypes", Int::class.java, Long::class.java, Double::class.java)
+        val method = TestService::class.java.getMethod(
+            "mixedTypes",
+            Int::class.java,
+            Long::class.java,
+            Double::class.java
+        )
         val arguments = mapOf("intVal" to "100", "longVal" to 500L, "doubleVal" to "3.14")
         val context = emptyMap<String, Any?>()
 

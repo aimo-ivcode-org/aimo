@@ -247,9 +247,17 @@ internal fun <T> findConflictingBeanName(
     index: Map<String, T>,
     visibleNameSelector: (String, T) -> String
 ): String? {
+    fun beanNameFrom(registry: T): String {
+        return when (registry) {
+            is ToolRegistry -> registry.beanName
+            is PromptRegistry -> registry.beanName
+            else -> error("Unsupported registry type: ${registry!!::class.java.name}")
+        }
+    }
+
     return index.entries.firstOrNull { (internalId, registry) ->
-        visibleNameSelector(internalId, registry) == clientVisibleName && extractBeanName(registry) != beanName
-    }?.let { (_, registry) -> extractBeanName(registry) }
+        visibleNameSelector(internalId, registry) == clientVisibleName && beanNameFrom(registry) != beanName
+    }?.let { (_, registry) -> beanNameFrom(registry) }
 }
 
 /**
@@ -273,13 +281,5 @@ internal fun nameConflictException(
             "'$existingBean' and '$newBean'. Either use different service names " +
             "or rename one of the ${memberLabel.lowercase()}s."
     )
-}
-
-private fun <T> extractBeanName(registry: T): String {
-    return when (registry) {
-        is ToolRegistry -> registry.beanName
-        is PromptRegistry -> registry.beanName
-        else -> error("Unsupported registry type: ${registry!!::class.java.name}")
-    }
 }
 

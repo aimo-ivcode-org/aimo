@@ -58,6 +58,8 @@ class McpSchemaGeneratorTest {
 
     companion object {
         class TestService {
+            private val info = "Info"
+
             @McpTool
             fun add(
                 @McpParam(description = "First number") a: Double,
@@ -65,9 +67,7 @@ class McpSchemaGeneratorTest {
             ): Double = a + b
 
             @McpTool
-            fun getInfo(): String = "Info"
+            fun getInfo(): String = info
         }
     }
 }
-
-

@@ -56,8 +56,18 @@ class SyntheticParameterNamesTest {
             // dynamically compiled method so detectSyntheticParameterNames() can
             // inspect the java.lang.reflect.Parameter objects.
             val toolDef = ToolDefinition(name = "foo")
-            val toolInfo = ToolInfo(id = "synthetic:foo", beanName = "synthetic", method = method, schema = toolDef)
-            val managed = ManagedMcpService(beanName = "synthetic", bean = instance, tools = listOf(toolInfo), prompts = emptyList())
+            val toolInfo = ToolInfo(
+                id = "synthetic:foo",
+                beanName = "synthetic",
+                method = method,
+                schema = toolDef
+            )
+            val managed = ManagedMcpService(
+                beanName = "synthetic",
+                bean = instance,
+                tools = listOf(toolInfo),
+                prompts = emptyList()
+            )
 
             // Insert into the registry's private services map via reflection
             val servicesField = McpServiceRegistry::class.java.getDeclaredField("services")
