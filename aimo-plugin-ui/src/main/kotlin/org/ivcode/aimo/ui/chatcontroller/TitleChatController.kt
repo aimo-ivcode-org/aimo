@@ -58,12 +58,17 @@ class TitleChatController(
      * Scope: Available to all scopes.
      * To restrict to specific scopes: @Tool(..., scope=["admin"])
      */
-    @Tool(name = TITLE_TOOL_NAME, description = "Set the chat title with source=ASSISTANT. Returns TitleResponse JSON: { title: string, source: \"USER\" | \"ASSISTANT\" } (USER = user-set, ASSISTANT = LLM-set).")
+    @Tool(
+        name = TITLE_TOOL_NAME,
+        description = "Set the chat title with source=ASSISTANT. Returns TitleResponse JSON: " +
+            "{ title: string, source: \"USER\" | \"ASSISTANT\" } (USER = user-set, ASSISTANT = LLM-set)."
+    )
     fun setTitle(
         @ToolParam(description = "The new title") title: String,
         context: Map<String, Any>
     ): TitleResponse {
-        val conversation = context.getConversationClient() ?: throw IllegalStateException("Title cannot be set. No conversation found in context")
+        val conversation = context.getConversationClient()
+            ?: throw IllegalStateException("Title cannot be set. No conversation found in context")
         return setTitle(title, conversation, AimoChatMessageType.ASSISTANT.name)
     }
 
@@ -76,7 +81,11 @@ class TitleChatController(
     }
 
     /** Sets title for a Conversation and records a TOOL message for model context. */
-    fun setTitle(title: String, conversation: Conversation, source: String = AimoChatMessageType.USER.name): TitleResponse {
+    fun setTitle(
+        title: String,
+        conversation: Conversation,
+        source: String = AimoChatMessageType.USER.name,
+    ): TitleResponse {
         val currentTitle = conversation.getTitle()
         if (currentTitle?.source == AimoChatMessageType.USER.name && source == AimoChatMessageType.ASSISTANT.name) {
             throw IllegalStateException("Cannot overwrite a USER-set title with source ASSISTANT")
@@ -90,18 +99,19 @@ class TitleChatController(
 
         // If set by the user, tell the LLM that the title was set
         if (source == AimoChatMessageType.USER.name) {
-             conversation.addMessages(
-                 requestId = java.util.UUID.randomUUID(),
-                 messages = listOf(
-                     AimoChatMessage(
-                         messageId = 1,
-                         type = AimoChatMessageType.TOOL,
-                         content = objectMapper.writeValueAsString(response),
-                         thinking = null,
-                         toolName = TITLE_TOOL_NAME,
-                         done = true
-                     )
-             ))
+            conversation.addMessages(
+                requestId = UUID.randomUUID(),
+                messages = listOf(
+                    AimoChatMessage(
+                        messageId = 1,
+                        type = AimoChatMessageType.TOOL,
+                        content = objectMapper.writeValueAsString(response),
+                        thinking = null,
+                        toolName = TITLE_TOOL_NAME,
+                        done = true
+                    )
+                )
+            )
         }
 
         return response

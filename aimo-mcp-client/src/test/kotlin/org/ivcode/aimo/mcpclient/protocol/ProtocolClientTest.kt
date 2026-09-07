@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Timeout
 import org.ivcode.aimo.mcpclient.protocol.transport.ProtocolTransport
 import tools.jackson.databind.ObjectMapper
+import java.io.IOException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -35,18 +37,15 @@ class ProtocolClientTest {
         mockTransportImpl.throwOnReceive = true
         mockTransportImpl.throwOnSend = false
 
-        // Connect the client
+        // Connect the client and wait until the reader thread is blocked in receive().
         client.connect()
+        assertTrue(mockTransportImpl.receiveStarted.await(1, TimeUnit.SECONDS))
 
-        // Give the reader thread time to encounter the transport error and execute cleanup.
-        repeat(20) {
-            if (!client.isConnected()) {
-                return@repeat
-            }
-            Thread.sleep(50)
-        }
+        // Release the reader so it fails and runs its cleanup path.
+        mockTransportImpl.failReceive.countDown()
 
-        // Verify: isConnected() should now be false
+        // Verify: isConnected() should now be false.
+        assertTrue(awaitDisconnected())
         assertFalse(
             client.isConnected(),
             "Client should be disconnected after reader thread encounters transport error"
@@ -56,17 +55,16 @@ class ProtocolClientTest {
     @Test
     @Timeout(5, unit = TimeUnit.SECONDS)
     fun `pending request should complete with exception when reader thread exits`() {
-        // Setup: make transport throw IOException only on receive (not send)
+        // Setup: make transport fail only after the request has been sent.
         val mockTransportImpl = mockTransport as MockProtocolTransport
         mockTransportImpl.throwOnReceive = true
         mockTransportImpl.throwOnSend = false
 
-        // Connect the client
+        // Connect the client and wait until the reader thread is actively waiting on receive.
         client.connect()
-        assertTrue(client.isConnected())
+        assertTrue(mockTransportImpl.receiveStarted.await(1, TimeUnit.SECONDS))
 
-        // Start a thread to send a request with a short timeout
-        // This will complete exceptionally because reader thread will fail
+        // Start a thread to send a request and wait until it has been issued.
         var exceptionCaught: Exception? = null
         val requestThread = Thread {
             try {
@@ -76,11 +74,16 @@ class ProtocolClientTest {
             }
         }
         requestThread.start()
+        assertTrue(mockTransportImpl.sendStarted.await(1, TimeUnit.SECONDS))
+
+        // Now let the reader fail so the pending request is completed exceptionally.
+        mockTransportImpl.failReceive.countDown()
         requestThread.join()
 
         assertNotNull(exceptionCaught, "Request should fail with exception")
 
         // Connection should now be marked as closed
+        assertTrue(awaitDisconnected())
         assertFalse(client.isConnected(), "Connection should be closed after reader error")
     }
 
@@ -111,6 +114,10 @@ class ProtocolClientTest {
         @Volatile
         var lastSendSucceeded = false
 
+        val receiveStarted = CountDownLatch(1)
+        val sendStarted = CountDownLatch(1)
+        val failReceive = CountDownLatch(1)
+
         override fun connect() {
             // No-op for mock
         }
@@ -120,25 +127,36 @@ class ProtocolClientTest {
         }
 
         override fun send(message: String) {
+            sendStarted.countDown()
             if (throwOnSend) {
-                throw java.io.IOException("Mock transport send error")
+                throw IOException("Mock transport send error")
             }
             lastSendSucceeded = true
         }
 
         override fun receive(): String {
+            receiveStarted.countDown()
             if (throwOnReceive) {
-                throw java.io.IOException("Mock transport error")
+                failReceive.await()
+                throw IOException("Mock transport error")
             }
             // Block to simulate waiting for message
             Thread.sleep(100)
             return "{}"
         }
     }
+
+    private fun awaitDisconnected(timeoutMs: Long = 1_000): Boolean {
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs)
+        while (System.nanoTime() < deadlineNanos) {
+            if (!client.isConnected()) {
+                return true
+            }
+            Thread.sleep(25)
+        }
+        return !client.isConnected()
+    }
 }
-
-
-
 
 
 

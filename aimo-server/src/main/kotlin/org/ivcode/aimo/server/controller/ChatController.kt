@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody
+import java.io.IOException
 import java.util.UUID
 
 @RestController
@@ -38,7 +39,7 @@ class ChatController (
                 chatClientService.chat(chatId, request, mapOf(
                     PROPERTY_NAME_REQUEST_METADATA to requestMetadata
                 ), output)
-            } catch (ex: Exception) {
+            } catch (ex: IOException) {
                 log.error("Error while streaming chat for chatId=$chatId", ex)
             }
         }

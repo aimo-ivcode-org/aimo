@@ -63,11 +63,12 @@ class RequestMetadataTest {
                     enumeration(values)
                 }
                 "toString" -> "MockHttpServletRequest($requestUri)"
-                else -> throw UnsupportedOperationException("Method ${method.name} is not implemented by this test mock")
+                else -> throw UnsupportedOperationException(
+                    "Method ${method.name} is not implemented by this test mock"
+                )
             }
         } as HttpServletRequest
     }
 
     private fun enumeration(values: List<String>): Enumeration<String> = Collections.enumeration(values)
 }
-
