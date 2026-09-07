@@ -21,28 +21,27 @@ internal class ToolUseState {
         if (partial.inputDocument != null) inputDocument = partial.inputDocument
     }
 
-    fun toToolUse(mapper: ObjectMapper): ToolUse? {
-        val resolvedId = toolUseId?.takeIf { it.isNotBlank() } ?: return null
-        val resolvedName = name?.takeIf { it.isNotBlank() } ?: return null
-        val input = when {
-            inputDocument != null -> DocumentConverter.documentToMap(inputDocument!!)
-            inputChunks.isNotBlank() -> parseToolInput(mapper, inputChunks.toString())
-            else -> emptyMap()
+    fun toToolUse(mapper: ObjectMapper): ToolUse? =
+        toolUseId?.takeIf { it.isNotBlank() }?.let { resolvedId ->
+            name?.takeIf { it.isNotBlank() }?.let { resolvedName ->
+                val input = when {
+                    inputDocument != null -> DocumentConverter.documentToMap(inputDocument!!)
+                    inputChunks.isNotBlank() -> parseToolInput(mapper, inputChunks.toString())
+                    else -> emptyMap()
+                }
+
+                ToolUse(
+                    toolUseId = resolvedId,
+                    name = resolvedName,
+                    input = input,
+                )
+            }
         }
 
-        return ToolUse(
-            toolUseId = resolvedId,
-            name = resolvedName,
-            input = input,
-        )
-    }
-
-    private fun parseToolInput(mapper: ObjectMapper, raw: String): Map<String, Any?> {
-        return try {
+    private fun parseToolInput(mapper: ObjectMapper, raw: String): Map<String, Any?> =
+        runCatching {
             mapper.readValue(raw, object : TypeReference<Map<String, Any?>>() {})
-        } catch (_: Exception) {
+        }.getOrElse {
             mapOf("raw" to raw)
         }
-    }
 }
-

@@ -1,9 +1,10 @@
 package org.ivcode.aimo.server.mcp.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.ivcode.aimo.server.mcp.annotation.McpParam
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 
 class ParameterBindingTest {
@@ -100,7 +101,12 @@ class ParameterBindingTest {
 
     @Test
     fun `should successfully bind mixed numeric types`() {
-        val method = TestService::class.java.getMethod("mixedTypes", Int::class.java, Long::class.java, Double::class.java)
+        val method = TestService::class.java.getMethod(
+            "mixedTypes",
+            Int::class.java,
+            Long::class.java,
+            Double::class.java
+        )
         val arguments = mapOf("intVal" to "100", "longVal" to 500L, "doubleVal" to "3.14")
         val context = emptyMap<String, Any?>()
 

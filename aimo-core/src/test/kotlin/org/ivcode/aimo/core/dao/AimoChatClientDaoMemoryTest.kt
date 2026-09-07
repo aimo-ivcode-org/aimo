@@ -83,7 +83,10 @@ class AimoChatClientDaoMemoryTest {
 
         val result = dao.getChatRequests(chatId, maxRequestCharacters = 8)
 
-        assertEquals(listOf(listOf("r2-user", "r2-assistant")), result.map { request -> request.messages.map { it.content } })
+        assertEquals(
+            listOf(listOf("r2-user", "r2-assistant")),
+            result.map { request -> request.messages.map { it.content } }
+        )
     }
 
     @Test

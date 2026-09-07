@@ -3,7 +3,10 @@ package org.ivcode.aimo.server.mcp.schema
 import org.ivcode.aimo.server.mcp.annotation.McpParam
 import org.ivcode.aimo.server.mcp.annotation.McpTool
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertNull
 
 class McpSchemaGeneratorTest {
 
@@ -55,6 +58,8 @@ class McpSchemaGeneratorTest {
 
     companion object {
         class TestService {
+            private val info = "Info"
+
             @McpTool
             fun add(
                 @McpParam(description = "First number") a: Double,
@@ -62,9 +67,7 @@ class McpSchemaGeneratorTest {
             ): Double = a + b
 
             @McpTool
-            fun getInfo(): String = "Info"
+            fun getInfo(): String = info
         }
     }
 }
-
-

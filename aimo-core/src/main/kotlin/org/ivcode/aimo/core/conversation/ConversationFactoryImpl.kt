@@ -12,25 +12,25 @@ class ConversationFactoryImpl(
         return ConversationFactoryImpl(conversationStore, interceptors + interceptor)
     }
 
-    override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
+    override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? =
         if (interceptors.isEmpty()) {
             // No interceptors: check DAO and build conversation directly
             if (conversationStore.getChatConversation(chatId, metadata) == null) {
-                return null
+                null
+            } else {
+                ConversationImpl(chatId, conversationStore, metadata)
             }
-            return ConversationImpl(chatId, conversationStore, metadata)
-        }
-
-        // Build the interceptor chain for get operation and proceed
-        // Interceptors can mutate metadata before DAO scoping occurs
-        val chain = buildGetChain(interceptors, 0) { cid, md ->
-            if (conversationStore.getChatConversation(cid, md) == null) {
-                return@buildGetChain null
+        } else {
+            // Build the interceptor chain for get operation and proceed
+            // Interceptors can mutate metadata before DAO scoping occurs
+            val chain = buildGetChain(interceptors, 0) { cid, md ->
+                if (conversationStore.getChatConversation(cid, md) == null) {
+                    return@buildGetChain null
+                }
+                ConversationImpl(cid, conversationStore, md.toMap())
             }
-            ConversationImpl(cid, conversationStore, md.toMap())
+            chain.proceed(chatId, metadata.toMutableMap())
         }
-        return chain.proceed(chatId, metadata.toMutableMap())
-    }
 
     override fun deleteConversation(chatId: UUID, metadata: Map<String, Any>): Boolean {
         if (interceptors.isEmpty()) {

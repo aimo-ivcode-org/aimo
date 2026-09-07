@@ -89,7 +89,8 @@ internal class ContextWindowPromptBudgeter(
      * @param taskMessages    Messages generated during the current request loop (assistant/tool).
      * @param tools           Tool callbacks available to this model call.
      * @param history         Conversation history (pre-fetched up to maxContextSize by caller).
-     * @param execute         A lambda function that performs the actual model call with the constructed prompt messages.
+     * @param execute         A lambda function that performs the actual model call with
+     *                        the constructed prompt messages.
      * @return The response from the model call as an `AimoChatResponse` object.
      */
     override fun withPromptForCall(
@@ -123,7 +124,9 @@ internal class ContextWindowPromptBudgeter(
     private fun truncateHistoryByTokens(history: List<AimoChatMessage>, tokenBudget: Int): List<AimoChatMessage> {
         if (tokenBudget <= 0) {
             if (logger.isDebugEnabled) {
-                logger.debug("History budget is $tokenBudget (≤ 0); returning empty history. Available messages: ${history.size}")
+                val msg = "History budget is $tokenBudget (≤ 0); returning empty history. " +
+                    "Available messages: ${history.size}"
+                logger.debug(msg)
             }
             return emptyList()
         }
@@ -137,23 +140,29 @@ internal class ContextWindowPromptBudgeter(
                 if (logger.isDebugEnabled) {
                     logger.debug(
                         "Stopping history inclusion - next message would exceed budget. " +
-                        "Current tokens: $tokenCount, next message tokens: $messageTokens, budget: $tokenBudget. " +
-                        "Included ${result.size} messages so far."
+                            "Current tokens: $tokenCount, next message tokens: $messageTokens, budget: $tokenBudget. " +
+                            "Included ${result.size} messages so far."
                     )
                 }
-                return result.asReversed() // Return what fits; don't add this message
+                break  // Stop here; don't add this message
             }
             result.add(message)
             tokenCount += messageTokens
             if (logger.isDebugEnabled) {
-                logger.debug("Added message to history (tokens: $messageTokens, running total: $tokenCount/$tokenBudget)")
+                val msg = "Added message to history (tokens: $messageTokens, " +
+                    "running total: $tokenCount/$tokenBudget)"
+                logger.debug(msg)
             }
         }
 
+        val selectedMessages = result.asReversed()
         if (logger.isDebugEnabled) {
-            logger.debug("Included all ${result.size} history messages (total tokens: $tokenCount/$tokenBudget)")
+            val totalTokens = selectedMessages.sumOf { estimateTokens(messagePayloadForBudgeting(it)) }
+            val msg = "Included all ${selectedMessages.size} history messages " +
+                "(total tokens: $totalTokens/$tokenBudget)"
+            logger.debug(msg)
         }
-        return result.asReversed()
+        return selectedMessages
     }
 
     /**

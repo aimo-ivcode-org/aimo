@@ -109,7 +109,12 @@ class AimoChatClientImplMessageIdTest {
         val client = AimoChatClientImpl(
             chatId = chatId,
             conversation = TestSessionClient(chatId, dao),
-            model = testModel(engine = FixedResponseEngine(responseWithThinking("I thought about it", "the answer")), contextSize = 4000),
+            model = testModel(
+                engine = FixedResponseEngine(
+                    responseWithThinking("I thought about it", "the answer")
+                ),
+                contextSize = 4000,
+            ),
             chatScope = testScope(),
         )
 
@@ -208,8 +213,16 @@ class AimoChatClientImplMessageIdTest {
             model = testModel(
                 engine = SequencedResponseEngine(
                     listOf(
-                        responseWithToolCall(toolName = "echo", arguments = "{\"value\":\"hello\"}", toolCallId = "call-1"),
-                        responseWithToolCall(toolName = "echo", arguments = "{\"value\":\"hello\"}", toolCallId = "call-1"),
+                        responseWithToolCall(
+                            toolName = "echo",
+                            arguments = "{\"value\":\"hello\"}",
+                            toolCallId = "call-1",
+                        ),
+                        responseWithToolCall(
+                            toolName = "echo",
+                            arguments = "{\"value\":\"hello\"}",
+                            toolCallId = "call-1",
+                        ),
                         simpleResponse(),
                     )
                 ),
@@ -502,32 +515,44 @@ class AimoChatClientImplMessageIdTest {
         createdAt = Instant.now(),
     )
 
-    private fun responseWithThinking(thinking: String, content: String, usage: AimoUsage? = null): AimoChatResponse = AimoChatResponse(
+    private fun responseWithThinking(
+        thinking: String,
+        content: String,
+        usage: AimoUsage? = null,
+    ): AimoChatResponse = AimoChatResponse(
         chatId = UUID.randomUUID(),
         responseId = UUID.randomUUID(),
-        messages = listOf(AimoChatMessage(
-            messageId = 0,
-            type = AimoChatMessageType.ASSISTANT,
-            content = content.ifBlank { null },
-            thinking = thinking.ifBlank { null },
-            toolName = null,
-            done = true,
-        )),
+        messages = listOf(
+            AimoChatMessage(
+                messageId = 0,
+                type = AimoChatMessageType.ASSISTANT,
+                content = content.ifBlank { null },
+                thinking = thinking.ifBlank { null },
+                toolName = null,
+                done = true,
+            )
+        ),
         createdAt = Instant.now(),
         usage = usage,
     )
 
-    private fun responseWithThinkingDone(thinking: String, content: String, done: Boolean): AimoChatResponse = AimoChatResponse(
+     private fun responseWithThinkingDone(
+        thinking: String,
+        content: String,
+        done: Boolean,
+    ): AimoChatResponse = AimoChatResponse(
         chatId = UUID.randomUUID(),
         responseId = UUID.randomUUID(),
-        messages = listOf(AimoChatMessage(
-            messageId = 0,
-            type = AimoChatMessageType.ASSISTANT,
-            content = content.ifBlank { null },
-            thinking = thinking.ifBlank { null },
-            toolName = null,
-            done = done,
-        )),
+        messages = listOf(
+            AimoChatMessage(
+                messageId = 0,
+                type = AimoChatMessageType.ASSISTANT,
+                content = content.ifBlank { null },
+                thinking = thinking.ifBlank { null },
+                toolName = null,
+                done = done,
+            )
+        ),
         createdAt = Instant.now(),
     )
 

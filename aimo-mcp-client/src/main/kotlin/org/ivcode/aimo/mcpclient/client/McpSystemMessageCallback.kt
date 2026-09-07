@@ -15,18 +15,12 @@ class McpSystemMessageCallbackFactory(
     private val objectMapper: ObjectMapper,
     private val scopes: Set<String> = emptySet(),
 ) {
-    private val log = LoggerFactory.getLogger(javaClass)
-
-    fun getScopes(): Set<String> = scopes
-
     fun createCallback(promptDefinition: PromptDefinition): SystemMessageCallback {
         val namespacedName = "$serverId:${promptDefinition.name}"
         return McpSystemMessageCallback(
             namespacedName = namespacedName,
             serverId = serverId,
             promptName = promptDefinition.name,
-            description = promptDefinition.description,
-            argumentSchema = promptDefinition.argumentSchema,
             protocolClient = protocolClient,
             objectMapper = objectMapper,
             scopes = scopes,
@@ -42,11 +36,9 @@ class McpSystemMessageCallbackFactory(
  * map using the key "{serverId}:{promptName}:args".
  */
 class McpSystemMessageCallback(
-    private val namespacedName: String,
+    namespacedName: String,
     private val serverId: String,
     private val promptName: String,
-    private val description: String?,
-    private val argumentSchema: JsonNode?,
     private val protocolClient: org.ivcode.aimo.mcpclient.protocol.ProtocolClient?,
     private val objectMapper: ObjectMapper,
     override val scopes: Set<String>,
@@ -55,60 +47,71 @@ class McpSystemMessageCallback(
 
     override val name: String = namespacedName
 
-    override fun call(context: SystemMessageContext): String? {
-        return try {
-            if (protocolClient == null) {
+    override fun call(context: SystemMessageContext): String? =
+        when (val client = protocolClient) {
+            null -> {
                 log.warn("System message callback skipped: Server '$serverId' is not yet initialized")
-                return null
+                null
             }
 
-            // Build the prompts/get request
-            val params = objectMapper.createObjectNode().apply {
-                put("name", promptName)
+            else -> runCatching {
+                // Build the prompts/get request.
+                val params = objectMapper.createObjectNode().apply {
+                    put("name", promptName)
 
-                // Check if caller provided arguments for this prompt
-                val argsKey = "$serverId:$promptName:args"
-                val args = context.context[argsKey]
-                if (args != null) {
-                    set("arguments", objectMapper.valueToTree(args))
-                }
-            }
-
-            val response = protocolClient.sendRequest("prompts/get", params)
-
-            if (response.error != null) {
-                log.error("Prompt call failed: serverId=$serverId prompt=$promptName error=${response.error.message}")
-                return null
-            }
-
-            val result = response.result ?: run {
-                log.warn("Prompt execution returned no result: serverId=$serverId prompt=$promptName")
-                return null
-            }
-
-            // MCP prompts/get returns { messages: [...] } where each message has text content
-            val messages = result.get("messages")
-            if (messages != null && messages.isArray) {
-                messages.mapNotNull { msg ->
-                    msg.get("content")?.get("text")?.let {
-                        try {
-                            objectMapper.treeToValue(it, String::class.java)
-                        } catch (_: Exception) {
-                            null
-                        }
+                    // Check if caller provided arguments for this prompt.
+                    val argsKey = "$serverId:$promptName:args"
+                    val args = context.context[argsKey]
+                    if (args != null) {
+                        set("arguments", objectMapper.valueToTree(args))
                     }
-                }.joinToString("\n")
-            } else {
-                try {
-                    objectMapper.treeToValue(result, String::class.java)
-                } catch (_: Exception) {
-                    result.toString()
                 }
-            }
-        } catch (e: Exception) {
-            log.error("System message callback execution failed: serverId=$serverId prompt=$promptName", e)
-            null
+
+                val response = client.sendRequest("prompts/get", params)
+
+                when {
+                    response.error != null -> {
+                        log.error(
+                            "Prompt call failed: serverId=$serverId prompt=$promptName " +
+                                "error=${response.error.message}",
+                        )
+                        null
+                    }
+
+                    response.result == null -> {
+                        log.warn("Prompt execution returned no result: serverId=$serverId prompt=$promptName")
+                        null
+                    }
+
+                    else -> renderPromptResult(response.result)
+                }
+            }.onFailure { error ->
+                log.error("System message callback execution failed: serverId=$serverId prompt=$promptName", error)
+            }.getOrNull()
         }
+
+    private fun renderPromptResult(result: JsonNode): String {
+        // MCP prompts/get returns { messages: [...] } where each message has text content.
+        val messages = result.get("messages")
+        return if (messages != null && messages.isArray) {
+            messages.mapNotNull { msg ->
+                textValue(msg.get("content")?.get("text"))
+            }.joinToString("\n")
+        } else {
+            textValue(result) ?: result.toString()
+        }
+    }
+}
+
+private fun textValue(node: JsonNode?): String? {
+    return node?.takeUnless { it.isNull }?.toString()?.stripQuotes()
+}
+
+private fun String.stripQuotes(): String {
+    return if (length >= 2 && startsWith('"') && endsWith('"')) {
+        substring(1, length - 1)
+    } else {
+        this
     }
 }
 

@@ -72,8 +72,10 @@ interface ChatServiceProvider {
             if (tool.scopes.isNotEmpty()) {
                 val invalidScopes = tool.scopes - this.scopes
                 require(invalidScopes.isEmpty()) {
-                    "Provider '$id' has scopes ${this.scopes}, but tool '${tool.toolDefinition.name}' has invalid scopes: $invalidScopes. " +
-                    "Callback scopes must be a subset of provider scopes."
+                    val msg = "Provider '$id' has scopes ${this.scopes}, but tool " +
+                        "'${tool.toolDefinition.name}' has invalid scopes: $invalidScopes. " +
+                        "Callback scopes must be a subset of provider scopes."
+                    msg
                 }
             }
         }
@@ -83,8 +85,10 @@ interface ChatServiceProvider {
             if (message.scopes.isNotEmpty()) {
                 val invalidScopes = message.scopes - this.scopes
                 require(invalidScopes.isEmpty()) {
-                    "Provider '$id' has scopes ${this.scopes}, but system message '${message.name}' has invalid scopes: $invalidScopes. " +
-                    "Callback scopes must be a subset of provider scopes."
+                    val msg = "Provider '$id' has scopes ${this.scopes}, but system message " +
+                        "'${message.name}' has invalid scopes: $invalidScopes. " +
+                        "Callback scopes must be a subset of provider scopes."
+                    msg
                 }
             }
         }

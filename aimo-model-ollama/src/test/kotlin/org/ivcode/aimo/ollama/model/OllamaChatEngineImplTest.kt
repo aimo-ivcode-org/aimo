@@ -32,69 +32,9 @@ class OllamaChatEngineImplTest {
     private val mapper = jacksonObjectMapper()
 
     @Test
-    fun `buildRequest merges options and response mapping preserves tool metadata`() {
-        val engine = OllamaChatEngineImpl(
-            client = OllamaChatClient("http://localhost:11434"),
-            modelName = "fallback-model",
-            options = AimoChatOptions(
-                model = "configured-model",
-                temperature = 0.2,
-                maxTokens = 128,
-                topP = 0.9,
-                stopSequences = listOf("STOP"),
-                providerOptions = mapOf("format" to "json"),
-            ),
-        )
-
-        val prompt = AimoPrompt(
-            options = AimoChatOptions(
-                temperature = 0.7,
-                topK = 25,
-                stopSequences = emptyList(),
-            ),
-            messages = listOf(
-                AimoChatMessage(
-                    messageId = 1,
-                    type = AimoChatMessageType.USER,
-                    content = "What is the weather?",
-                    thinking = null,
-                    toolName = null,
-                    done = null,
-                )
-            ),
-            tools = listOf(
-                ToolDefinition(
-                    name = "lookupWeather",
-                    description = "Look up current weather",
-                    inputSchema = mapper.readTree(
-                        """
-                        {
-                          "type": "object",
-                          "required": ["city"],
-                          "properties": {
-                            "city": {
-                              "type": "string",
-                              "description": "City name"
-                            },
-                            "units": {
-                              "type": "string",
-                              "enum": ["metric", "imperial"]
-                            },
-                            "tags": {
-                              "type": "array",
-                              "items": {
-                                "type": "string"
-                              }
-                            }
-                          }
-                        }
-                        """.trimIndent()
-                    ),
-                )
-            ),
-        )
-
-        val request = buildRequest(engine, prompt)
+    fun `buildRequest merges options`() {
+        val engine = configuredEngine()
+        val request = buildRequest(engine, weatherPrompt())
         val requestJson = mapper.readTree(mapper.writeValueAsString(request))
 
         assertEquals("configured-model", requestJson["model"].getTextValue())
@@ -115,36 +55,14 @@ class OllamaChatEngineImplTest {
         assertEquals("City name", toolJson["parameters"]["properties"]["city"]["description"].getTextValue())
         assertEquals("metric", toolJson["parameters"]["properties"]["units"]["enum"][0].getTextValue())
         assertEquals("string", toolJson["parameters"]["properties"]["tags"]["items"]["type"].getTextValue().lowercase())
+    }
 
+    @Test
+    fun `response mapping preserves tool metadata`() {
+        val engine = configuredEngine()
         val mappedResponse = mapResponse(
             engine = engine,
-            response = ChatResponse(
-                model = "configured-model",
-                createdAt = Instant.parse("2026-05-06T00:00:00Z"),
-                message = Message(
-                    role = "assistant",
-                    content = "answer",
-                    thinking = "internal reasoning",
-                    toolCalls = listOf(
-                        ToolCall(
-                            function = ToolCallFunction(
-                                name = "lookupWeather",
-                                arguments = mapOf("city" to "Boston", "units" to "metric"),
-                            )
-                        )
-                    ),
-                    toolName = null,
-                ),
-                done = true,
-                doneReason = null,
-                totalDuration = null,
-                loadDuration = null,
-                promptEvalCount = null,
-                promptEvalDuration = null,
-                evalCount = null,
-                evalDuration = null,
-                logProbs = null,
-            ),
+            response = weatherResponse(),
             done = true,
         )
 
@@ -379,6 +297,103 @@ class OllamaChatEngineImplTest {
         return method.invoke(engine, prompt, null) as ChatRequest
     }
 
+    private fun configuredEngine(): OllamaChatEngineImpl {
+        return OllamaChatEngineImpl(
+            client = OllamaChatClient("http://localhost:11434"),
+            modelName = "fallback-model",
+            options = AimoChatOptions(
+                model = "configured-model",
+                temperature = 0.2,
+                maxTokens = 128,
+                topP = 0.9,
+                stopSequences = listOf("STOP"),
+                providerOptions = mapOf("format" to "json"),
+            ),
+        )
+    }
+
+    private fun weatherPrompt(): AimoPrompt {
+        return AimoPrompt(
+            options = AimoChatOptions(
+                temperature = 0.7,
+                topK = 25,
+                stopSequences = emptyList(),
+            ),
+            messages = listOf(
+                AimoChatMessage(
+                    messageId = 1,
+                    type = AimoChatMessageType.USER,
+                    content = "What is the weather?",
+                    thinking = null,
+                    toolName = null,
+                    done = null,
+                )
+            ),
+            tools = listOf(weatherToolDefinition()),
+        )
+    }
+
+    private fun weatherToolDefinition(): ToolDefinition {
+        return ToolDefinition(
+            name = "lookupWeather",
+            description = "Look up current weather",
+            inputSchema = mapper.readTree(
+                """
+                {
+                  "type": "object",
+                  "required": ["city"],
+                  "properties": {
+                    "city": {
+                      "type": "string",
+                      "description": "City name"
+                    },
+                    "units": {
+                      "type": "string",
+                      "enum": ["metric", "imperial"]
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+                """.trimIndent()
+            ),
+        )
+    }
+
+    private fun weatherResponse(): ChatResponse {
+        return ChatResponse(
+            model = "configured-model",
+            createdAt = Instant.parse("2026-05-06T00:00:00Z"),
+            message = Message(
+                role = "assistant",
+                content = "answer",
+                thinking = "internal reasoning",
+                toolCalls = listOf(
+                    ToolCall(
+                        function = ToolCallFunction(
+                            name = "lookupWeather",
+                            arguments = mapOf("city" to "Boston", "units" to "metric"),
+                        )
+                    )
+                ),
+                toolName = null,
+            ),
+            done = true,
+            doneReason = null,
+            totalDuration = null,
+            loadDuration = null,
+            promptEvalCount = null,
+            promptEvalDuration = null,
+            evalCount = null,
+            evalDuration = null,
+            logProbs = null,
+        )
+    }
+
     private fun mapResponse(
         engine: OllamaChatEngineImpl,
         response: ChatResponse,
@@ -461,16 +476,16 @@ class OllamaChatEngineImplTest {
                 check(next >= 0) { "Unexpected EOF while reading request headers" }
                 bytes.write(next)
                 val data = bytes.toByteArray()
-                val size = data.size
-                if (size >= 4 &&
-                    data[size - 4] == '\r'.code.toByte() &&
-                    data[size - 3] == '\n'.code.toByte() &&
-                    data[size - 2] == '\r'.code.toByte() &&
-                    data[size - 1] == '\n'.code.toByte()
-                ) {
+                if (hasHeaderTerminator(data)) {
                     return bytes.toString(StandardCharsets.UTF_8.name())
                 }
             }
+        }
+
+        private fun hasHeaderTerminator(data: ByteArray): Boolean {
+            val terminator = "\r\n\r\n".toByteArray(StandardCharsets.UTF_8)
+            if (data.size < terminator.size) return false
+            return data.copyOfRange(data.size - terminator.size, data.size).contentEquals(terminator)
         }
 
         private fun readBytes(input: BufferedInputStream, length: Int): ByteArray {
@@ -528,7 +543,3 @@ class OllamaChatEngineImplTest {
         }
     }
 }
-
-
-
-

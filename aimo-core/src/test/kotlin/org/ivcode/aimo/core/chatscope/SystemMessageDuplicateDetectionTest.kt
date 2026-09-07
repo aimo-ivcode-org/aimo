@@ -132,48 +132,58 @@ class SystemMessageDuplicateDetectionTest {
     @ChatService
     private class ServiceWithDuplicateNames {
         @SystemMessage(name = "admin_prompt")
+        @Suppress("FunctionOnlyReturningConstant")
         fun firstAdminPrompt(): String = "Admin rules 1"
 
         @SystemMessage(name = "admin_prompt")
+        @Suppress("FunctionOnlyReturningConstant")
         fun secondAdminPrompt(): String = "Admin rules 2"
     }
 
     @ChatService
     private class ServiceWithAmbiguousNames {
         @SystemMessage(name = "prompt1")
+        @Suppress("FunctionOnlyReturningConstant")
         fun firstPrompt(): String = "First"
 
         @SystemMessage
+        @Suppress("FunctionOnlyReturningConstant")
         fun prompt1(): String = "Second"
     }
 
     @ChatService
     private class ServiceWithUniqueNames {
         @SystemMessage
+        @Suppress("FunctionOnlyReturningConstant")
         fun prompt1(): String = "Unique 1"
 
         @SystemMessage
+        @Suppress("FunctionOnlyReturningConstant")
         fun prompt2(): String = "Unique 2"
     }
 
     @ChatService
     private class ServiceWithSingleMessage {
         @SystemMessage
+        @Suppress("FunctionOnlyReturningConstant")
         fun system_prompt(): String = "Single message"
     }
 
     @ChatService(scope = ["admin", "research"])
     private class ServiceWithScopedDuplicates {
         @SystemMessage(name = "important_rules", scope = ["admin"])
+        @Suppress("FunctionOnlyReturningConstant")
         fun rulesForAdmin(): String = "Admin rules"
 
         @SystemMessage(name = "important_rules", scope = ["research"])
+        @Suppress("FunctionOnlyReturningConstant")
         fun rulesForResearch(): String = "Research rules"
     }
 
     @ChatService
     private class ServiceWithoutMessages {
         @Tool(name = "justATool", description = "No messages")
+        @Suppress("FunctionOnlyReturningConstant")
         fun justATool(): String = "Tool"
     }
 }

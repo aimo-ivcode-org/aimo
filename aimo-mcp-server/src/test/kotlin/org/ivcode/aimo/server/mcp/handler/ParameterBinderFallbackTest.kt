@@ -2,7 +2,8 @@ package org.ivcode.aimo.server.mcp.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assumptions.assumeTrue
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -17,7 +18,7 @@ class ParameterBinderFallbackTest {
 
     class KotlinService {
         fun greet(city: String, days: Int): String {
-            return "${'$'}city:${'$'}days"
+            return "$city:$days"
         }
     }
 
@@ -43,4 +44,3 @@ class ParameterBinderFallbackTest {
         assertEquals(3, (result.values["days"] as Number).toInt())
     }
 }
-
