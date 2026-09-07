@@ -23,11 +23,11 @@ class ConversationFactoryImpl(
         } else {
             // Build the interceptor chain for get operation and proceed
             // Interceptors can mutate metadata before DAO scoping occurs
-            val chain = buildGetChain(interceptors, 0) { cid, md ->
-                if (conversationStore.getChatConversation(cid, md) == null) {
+            val chain = buildGetChain(interceptors, 0) { chatId, md ->
+                if (conversationStore.getChatConversation(chatId, md) == null) {
                     return@buildGetChain null
                 }
-                ConversationImpl(cid, conversationStore, md.toMap())
+                ConversationImpl(chatId, conversationStore, md.toMap())
             }
             chain.proceed(chatId, metadata.toMutableMap())
         }
@@ -38,8 +38,8 @@ class ConversationFactoryImpl(
         }
 
         // Build the interceptor chain for delete operation and proceed
-        val chain = buildDeleteChain(interceptors, 0) { cid, md ->
-            conversationStore.deleteChatConversation(cid, md)
+        val chain = buildDeleteChain(interceptors, 0) { chatId, md ->
+            conversationStore.deleteChatConversation(chatId, md)
         }
         return chain.proceed(chatId, metadata.toMutableMap())
     }
@@ -50,12 +50,12 @@ class ConversationFactoryImpl(
         finalAction: (UUID, MutableMap<String, Any>) -> Conversation?
     ): ConversationInterceptor.GetChain {
         return object : ConversationInterceptor.GetChain {
-            override fun proceed(cid: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
                 return if (index < interceptors.size) {
                     val nextChain = buildGetChain(interceptors, index + 1, finalAction)
-                    interceptors[index].interceptGet(nextChain, cid, metadata)
+                    interceptors[index].interceptGet(nextChain, chatId, metadata)
                 } else {
-                    finalAction(cid, metadata)
+                    finalAction(chatId, metadata)
                 }
             }
         }
@@ -67,12 +67,12 @@ class ConversationFactoryImpl(
         finalAction: (UUID, MutableMap<String, Any>) -> Boolean
     ): ConversationInterceptor.DeleteChain {
         return object : ConversationInterceptor.DeleteChain {
-            override fun proceed(cid: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun proceed(chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
                 return if (index < interceptors.size) {
                     val nextChain = buildDeleteChain(interceptors, index + 1, finalAction)
-                    interceptors[index].interceptDelete(nextChain, cid, metadata)
+                    interceptors[index].interceptDelete(nextChain, chatId, metadata)
                 } else {
-                    finalAction(cid, metadata)
+                    finalAction(chatId, metadata)
                 }
             }
         }

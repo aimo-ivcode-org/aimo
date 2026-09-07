@@ -166,20 +166,20 @@ class ConversationInterceptorChainTest {
         val capturingInterceptor = object : ConversationInterceptor {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Conversation? {
-                capturedChatId = cid
+                capturedChatId = chatId
                 capturedMetadata = metadata
-                return chain.proceed(cid, metadata)
+                return chain.proceed(chatId, metadata)
             }
 
             override fun interceptDelete(
                 chain: ConversationInterceptor.DeleteChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Boolean {
-                return chain.proceed(cid, metadata)
+                return chain.proceed(chatId, metadata)
             }
         }
 
@@ -216,19 +216,19 @@ class ConversationInterceptorChainTest {
         val capturingInterceptor = object : ConversationInterceptor {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Conversation? {
                 capturedMetadata = metadata
-                return chain.proceed(cid, metadata)
+                return chain.proceed(chatId, metadata)
             }
 
             override fun interceptDelete(
                 chain: ConversationInterceptor.DeleteChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Boolean {
-                return chain.proceed(cid, metadata)
+                return chain.proceed(chatId, metadata)
             }
         }
 
@@ -252,7 +252,7 @@ class ConversationInterceptorChainTest {
         val shortCircuitInterceptor = object : ConversationInterceptor {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Conversation? {
                 callLog.add("short-circuit")
@@ -262,7 +262,7 @@ class ConversationInterceptorChainTest {
 
             override fun interceptDelete(
                 chain: ConversationInterceptor.DeleteChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Boolean {
                 callLog.add("short-circuit-delete")
@@ -310,18 +310,18 @@ class ConversationInterceptorChainTest {
         val interceptor = object : ConversationInterceptor {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Conversation? {
-                return chain.proceed(cid, metadata)
+                return chain.proceed(chatId, metadata)
             }
 
             override fun interceptDelete(
                 chain: ConversationInterceptor.DeleteChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Boolean {
-                return chain.proceed(cid, metadata)
+                return chain.proceed(chatId, metadata)
             }
         }
 
@@ -340,27 +340,27 @@ class ConversationInterceptorChainTest {
         val trackingInterceptor = object : ConversationInterceptor {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Conversation? {
-                capturedChatIds.add(cid)
-                return chain.proceed(cid, metadata)
+                capturedChatIds.add(chatId)
+                return chain.proceed(chatId, metadata)
             }
 
             override fun interceptDelete(
                 chain: ConversationInterceptor.DeleteChain,
-                cid: UUID,
+                chatId: UUID,
                 metadata: MutableMap<String, Any>
             ): Boolean {
-                capturedChatIds.add(cid)
-                return chain.proceed(cid, metadata)
+                capturedChatIds.add(chatId)
+                return chain.proceed(chatId, metadata)
             }
         }
 
         val metadata = mutableMapOf<String, Any>()
 
-        buildAndExecuteChain(listOf(trackingInterceptor), originalChatId, metadata) { cid, _ ->
-            capturedChatIds.add(cid)
+        buildAndExecuteChain(listOf(trackingInterceptor), originalChatId, metadata) { chatId, _ ->
+            capturedChatIds.add(chatId)
             null
         }
 
@@ -582,15 +582,15 @@ class ConversationInterceptorChainTest {
          val shortCircuitInterceptor = object : ConversationInterceptor {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
-                 cid: UUID,
+                 chatId: UUID,
                  metadata: MutableMap<String, Any>
              ): Conversation? {
-                 return chain.proceed(cid, metadata)
+                 return chain.proceed(chatId, metadata)
              }
 
              override fun interceptDelete(
                  chain: ConversationInterceptor.DeleteChain,
-                 cid: UUID,
+                 chatId: UUID,
                  metadata: MutableMap<String, Any>
              ): Boolean {
                  callLog.add("short-circuit-delete")
@@ -656,26 +656,26 @@ class ConversationInterceptorChainTest {
          val trackingInterceptor = object : ConversationInterceptor {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
-                 cid: UUID,
+                 chatId: UUID,
                  metadata: MutableMap<String, Any>
              ): Conversation? {
-                 return chain.proceed(cid, metadata)
+                 return chain.proceed(chatId, metadata)
              }
 
              override fun interceptDelete(
                  chain: ConversationInterceptor.DeleteChain,
-                 cid: UUID,
+                 chatId: UUID,
                  metadata: MutableMap<String, Any>
              ): Boolean {
-                 capturedChatIds.add(cid)
-                 return chain.proceed(cid, metadata)
+                 capturedChatIds.add(chatId)
+                 return chain.proceed(chatId, metadata)
              }
          }
 
          val metadata = mutableMapOf<String, Any>()
 
-         buildAndExecuteDeleteChain(listOf(trackingInterceptor), originalChatId, metadata) { cid, _ ->
-             capturedChatIds.add(cid)
+         buildAndExecuteDeleteChain(listOf(trackingInterceptor), originalChatId, metadata) { chatId, _ ->
+             capturedChatIds.add(chatId)
              true
          }
 
