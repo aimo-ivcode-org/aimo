@@ -7,6 +7,7 @@ plugins {
 }
 
 detekt {
+    config.setFrom("${rootDir}/detekt.yml")
     ignoreFailures = true
 }
 

@@ -157,9 +157,8 @@ internal class ContextWindowPromptBudgeter(
 
         val selectedMessages = result.asReversed()
         if (logger.isDebugEnabled) {
-            val totalTokens = selectedMessages.sumOf { estimateTokens(messagePayloadForBudgeting(it)) }
-            val msg = "Included all ${selectedMessages.size} history messages " +
-                "(total tokens: $totalTokens/$tokenBudget)"
+            val msg = "Included ${selectedMessages.size} history messages " +
+                "(total tokens: $tokenCount/$tokenBudget)"
             logger.debug(msg)
         }
         return selectedMessages

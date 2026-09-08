@@ -7,6 +7,9 @@ tasks.register<Exec>("npmInstall") {
     group = "build"
     description = "Install npm dependencies in the www directory"
     workingDir = projectDir
+    
+    inputs.files("package.json", "package-lock.json")
+    outputs.dir("node_modules")
 
     val isWindows = System.getProperty("os.name").lowercase().contains("windows")
     if (isWindows) {
@@ -28,6 +31,9 @@ tasks.register<Exec>("build-resources") {
     description = "Run npm run build in the www directory"
     dependsOn("npmInstall")
     workingDir = projectDir
+    
+    inputs.files("package.json", "src")
+    outputs.dir("dist")
 
     val isWindows = System.getProperty("os.name").lowercase().contains("windows")
     if (isWindows) {
