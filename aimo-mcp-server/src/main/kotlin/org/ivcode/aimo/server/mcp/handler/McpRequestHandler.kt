@@ -27,10 +27,8 @@ class McpRequestHandler(
         try {
             logger.debug("Handling JSON-RPC request: method={}, id={}", request.method, request.id)
             dispatchRequest(request)
-        } catch (exception: IllegalArgumentException) {
-            logger.error("Error handling request: ${request.method}", exception)
-            internalErrorResponse(request, exception)
-        } catch (exception: IllegalStateException) {
+        } catch (@Suppress("TooGenericExceptionCaught") exception: Exception) {
+            // This handler sits at the JSON-RPC boundary, so every failure must become a protocol error.
             logger.error("Error handling request: ${request.method}", exception)
             internalErrorResponse(request, exception)
         }
@@ -132,4 +130,3 @@ class McpRequestHandler(
         )
     }
 }
-

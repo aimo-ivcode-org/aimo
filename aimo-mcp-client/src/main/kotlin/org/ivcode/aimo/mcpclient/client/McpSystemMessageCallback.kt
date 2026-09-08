@@ -3,8 +3,8 @@ package org.ivcode.aimo.mcpclient.client
 import org.ivcode.aimo.core.chatservice.SystemMessageCallback
 import org.ivcode.aimo.core.chatservice.SystemMessageContext
 import org.slf4j.LoggerFactory
-import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 
 /**
  * Wraps MCP prompt definitions as AIMO system message callbacks.
@@ -104,14 +104,5 @@ class McpSystemMessageCallback(
 }
 
 private fun textValue(node: JsonNode?): String? {
-    return node?.takeUnless { it.isNull }?.toString()?.stripQuotes()
+    return node?.takeUnless { it.isNull }?.takeIf { it.isString }?.stringValue()
 }
-
-private fun String.stripQuotes(): String {
-    return if (length >= 2 && startsWith('"') && endsWith('"')) {
-        substring(1, length - 1)
-    } else {
-        this
-    }
-}
-

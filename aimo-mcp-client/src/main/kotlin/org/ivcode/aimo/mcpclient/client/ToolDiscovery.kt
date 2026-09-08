@@ -67,16 +67,7 @@ private fun discoveryFailure(message: String, cause: Throwable? = null): Nothing
 }
 
 private fun textValue(node: JsonNode?): String? {
-    return node?.takeUnless { it.isNull }?.toString()?.unquote()
+    return node?.takeUnless { it.isNull }?.takeIf { it.isString }?.stringValue()
 }
 
 class DiscoveryException(message: String, cause: Throwable? = null) : Exception(message, cause)
-
-private fun String.unquote(): String {
-    return if (length >= 2 && startsWith('"') && endsWith('"')) {
-        substring(1, length - 1)
-    } else {
-        this
-    }
-}
-

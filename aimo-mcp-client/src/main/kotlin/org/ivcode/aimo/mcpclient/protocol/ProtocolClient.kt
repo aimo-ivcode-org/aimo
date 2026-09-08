@@ -270,16 +270,11 @@ private fun failRequest(message: String, cause: Throwable? = null): Nothing {
  * @return the node text or null when the node is missing or not textual.
  */
 private fun textValue(node: JsonNode?): String? {
-    return node?.takeUnless { it.isNull }?.toString()?.unquote()
-}
-
-class McpProtocolException(message: String, cause: Throwable? = null) : Exception(message, cause)
-
-private fun String.unquote(): String {
-    return if (length >= 2 && startsWith('"') && endsWith('"')) {
-        substring(1, length - 1)
-    } else {
-        this
+    return when {
+        node == null || node.isNull -> null
+        node.isString -> node.stringValue()
+        else -> node.asString()
     }
 }
 
+class McpProtocolException(message: String, cause: Throwable? = null) : Exception(message, cause)
