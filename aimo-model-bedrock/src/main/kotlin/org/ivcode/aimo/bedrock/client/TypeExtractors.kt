@@ -7,48 +7,47 @@ import software.amazon.awssdk.core.document.Document
  */
 internal object TypeExtractors {
 
-    fun extractReasoningText(source: Any?): String? {
-        if (source == null) return null
+    fun extractReasoningText(source: Any?): String? =
+        source?.let { current ->
+            val reasoning = invokeNoArg(current, "reasoningContent")
+                ?: invokeNoArg(current, "reasoning")
 
-        val reasoning = invokeNoArg(source, "reasoningContent")
-            ?: invokeNoArg(source, "reasoning")
-            ?: return null
+            reasoning?.let {
+                invokeNoArg(it, "text") as? String
+                    ?: (invokeNoArg(it, "reasoningText")?.let { nested -> invokeNoArg(nested, "text") as? String })
+            }
+        }
 
-        return invokeNoArg(reasoning, "text") as? String
-            ?: (invokeNoArg(reasoning, "reasoningText")?.let { invokeNoArg(it, "text") as? String })
-    }
+    fun extractToolUseStart(source: Any?): ToolUsePartial? =
+        source?.let { current ->
+            invokeNoArg(current, "toolUse")?.let { toolUse ->
+                ToolUsePartial(
+                    toolUseId = invokeNoArg(toolUse, "toolUseId") as? String,
+                    name = invokeNoArg(toolUse, "name") as? String,
+                    inputChunk = invokeNoArg(toolUse, "input") as? String,
+                    inputDocument = invokeNoArg(toolUse, "input") as? Document,
+                )
+            }
+        }
 
-    fun extractToolUseStart(source: Any?): ToolUsePartial? {
-        if (source == null) return null
-        val toolUse = invokeNoArg(source, "toolUse") ?: return null
-        return ToolUsePartial(
-            toolUseId = invokeNoArg(toolUse, "toolUseId") as? String,
-            name = invokeNoArg(toolUse, "name") as? String,
-            inputChunk = invokeNoArg(toolUse, "input") as? String,
-            inputDocument = invokeNoArg(toolUse, "input") as? Document,
-        )
-    }
+    fun extractToolUseDelta(source: Any?): ToolUsePartial? =
+        source?.let { current ->
+            invokeNoArg(current, "toolUse")?.let { toolUse ->
+                ToolUsePartial(
+                    toolUseId = invokeNoArg(toolUse, "toolUseId") as? String,
+                    name = invokeNoArg(toolUse, "name") as? String,
+                    inputChunk = invokeNoArg(toolUse, "input") as? String,
+                    inputDocument = invokeNoArg(toolUse, "input") as? Document,
+                )
+            }
+        }
 
-    fun extractToolUseDelta(source: Any?): ToolUsePartial? {
-        if (source == null) return null
-        val toolUse = invokeNoArg(source, "toolUse") ?: return null
-        return ToolUsePartial(
-            toolUseId = invokeNoArg(toolUse, "toolUseId") as? String,
-            name = invokeNoArg(toolUse, "name") as? String,
-            inputChunk = invokeNoArg(toolUse, "input") as? String,
-            inputDocument = invokeNoArg(toolUse, "input") as? Document,
-        )
-    }
-
-    fun invokeNoArg(target: Any, methodName: String): Any? {
-        return try {
+    fun invokeNoArg(target: Any, methodName: String): Any? =
+        runCatching {
             target.javaClass.methods
                 .firstOrNull { it.name == methodName && it.parameterCount == 0 }
                 ?.invoke(target)
-        } catch (_: Exception) {
-            null
-        }
-    }
+        }.getOrNull()
 }
 
 internal data class ToolUsePartial(
@@ -57,4 +56,3 @@ internal data class ToolUsePartial(
     val inputChunk: String? = null,
     val inputDocument: Document? = null,
 )
-

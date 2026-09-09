@@ -58,7 +58,9 @@ class ChatScopeProviderGlobalScopeProviderAggregationTest {
 
         assertTrue(
             allTools.any { it.toolDefinition.name == "mcp-server:search" },
-            "Global scope should include tools from all registered providers, not just a provider literally named 'annotated'. Found tools: ${allTools.map { it.toolDefinition.name }}"
+            "Global scope should include tools from all registered providers, " +
+                "not just a provider literally named 'annotated'. " +
+                "Found tools: ${allTools.map { it.toolDefinition.name }}"
         )
     }
 }

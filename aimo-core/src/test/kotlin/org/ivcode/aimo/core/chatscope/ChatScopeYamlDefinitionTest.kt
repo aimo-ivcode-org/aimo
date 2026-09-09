@@ -100,7 +100,11 @@ class ChatScopeYamlDefinitionTest {
         // research_tool scopes from annotation
         assertEquals(setOf("research"), researchTool!!.scopes, "Research tool should have declared scope")
         // general_tool has no explicit scope, so it inherits parent scopes
-        assertEquals(setOf("research", "admin"), generalTool!!.scopes, "General tool without scope inherits parent scopes")
+        assertEquals(
+            setOf("research", "admin"),
+            generalTool!!.scopes,
+            "General tool without scope inherits parent scopes"
+        )
     }
 
     @Test
@@ -164,36 +168,44 @@ class ChatScopeYamlDefinitionTest {
     @ChatService(scope = ["research", "admin"])
     private class FilteredToolService {
         @Tool(name = "research_search", description = "Search papers", scope = ["research"])
+        @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
         fun searchPapers(@ToolParam("Query") query: String): String = "Papers"
 
         @Tool(name = "general_help", description = "General help")
+        @Suppress("FunctionOnlyReturningConstant")
         fun getHelp(): String = "Help"
     }
 
     @ChatService(scope = ["admin", "research"])
     private class FilteredMessageService {
         @SystemMessage(name = "admin_prompt", scope = ["admin"])
+        @Suppress("FunctionOnlyReturningConstant")
         fun adminRules(): String = "Admin rules"
 
         @SystemMessage(name = "general_message")
+        @Suppress("FunctionOnlyReturningConstant")
         fun generalMessage(): String = "General message"
     }
 
     @ChatService
     private class TestToolService {
         @Tool(name = "searchPapers", description = "Search papers")
+        @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
         fun searchPapers(@ToolParam("Query") query: String): String = "Papers"
 
         @Tool(name = "analyzeData", description = "Analyze data")
+        @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
         fun analyzeData(@ToolParam("Data") data: String): String = "Analysis"
     }
 
     @ChatService
     private class TestMessageService {
         @SystemMessage(name = "admin_prompt")
+        @Suppress("FunctionOnlyReturningConstant")
         fun adminPrompt(): String = "Admin prompt"
 
         @SystemMessage(name = "research_insight")
+        @Suppress("FunctionOnlyReturningConstant")
         fun researchInsight(): String = "Research insight"
     }
 }

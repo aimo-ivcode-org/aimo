@@ -4,6 +4,7 @@ import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 
 /**
  * Configuration for the weather MCP client application.
@@ -57,11 +58,8 @@ class ApplicationConfiguration {
      * @return An in-memory DAO implementation
      */
     @Bean
+    @Primary
     fun aimoChatClientDao(): AimoChatClientDao {
         return AimoChatClientDaoMemory()
     }
 }
-
-
-
-

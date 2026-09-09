@@ -19,7 +19,8 @@ class TypeExtractorsTest {
     @DisplayName("extractReasoningText returns null when no reasoning field exists")
     fun testExtractReasoningTextNoField() {
         val obj = object {
-            fun someOtherMethod() = "value"
+            private val value = "value"
+            fun someOtherMethod() = value
         }
         assertNull(TypeExtractors.extractReasoningText(obj))
     }
@@ -54,7 +55,8 @@ class TypeExtractorsTest {
     @DisplayName("extractToolUseStart returns null when no toolUse field exists")
     fun testExtractToolUseStartNoField() {
         val obj = object {
-            fun someMethod() = "value"
+            private val value = "value"
+            fun someMethod() = value
         }
         assertNull(TypeExtractors.extractToolUseStart(obj))
     }
@@ -95,7 +97,8 @@ class TypeExtractorsTest {
     @DisplayName("invokeNoArg returns null for non-existent method")
     fun testInvokeNoArgNonExistent() {
         val obj = object {
-            fun existingMethod() = "value"
+            private val value = "value"
+            fun existingMethod() = value
         }
         assertNull(TypeExtractors.invokeNoArg(obj, "nonExistentMethod"))
     }
@@ -104,7 +107,8 @@ class TypeExtractorsTest {
     @DisplayName("invokeNoArg invokes method and returns result")
     fun testInvokeNoArgSuccess() {
         val obj = object {
-            fun getValue() = "result"
+            private val value = "result"
+            fun getValue() = value
         }
         val result = TypeExtractors.invokeNoArg(obj, "getValue")
         assertEquals("result", result)
@@ -143,4 +147,3 @@ class TypeExtractorsTest {
         fun toolUse() = toolUseValue
     }
 }
-

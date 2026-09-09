@@ -186,12 +186,7 @@ private fun AimoChatMessage.toMessage(): Message {
             id = tc.id,
             function = ToolCallFunction(
                 name = tc.name,
-                arguments = try {
-                    val json = tc.arguments?.toString() ?: "{}"
-                    mapper.readValue(json, object : TypeReference<Map<String, Any?>>() {})
-                } catch (e: Exception) {
-                    emptyMap<String, Any?>()
-                }
+                arguments = parseToolCallArguments(tc.arguments),
             )
         )
     }
@@ -219,11 +214,9 @@ private fun ToolDefinition.toTool(): Tool =
  * Jackson 3's iterator API at the Kotlin type-inference level.
  */
 private fun JsonNode.toParameters(): Parameters {
-    val raw: Map<String, Any?> = try {
+    val raw: Map<String, Any?> = runCatching {
         schemaMapper.treeToValue(this, object : TypeReference<Map<String, Any?>>() {})
-    } catch (e: Exception) {
-        emptyMap()
-    }
+    }.getOrDefault(emptyMap())
     val required = (raw["required"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
     val propertiesRaw = (raw["properties"] as? Map<*, *>) ?: emptyMap<Any, Any>()
     val properties: Map<String, Property> = propertiesRaw.entries.associate { (k, v) ->
@@ -253,6 +246,13 @@ private fun Any?.asStringKeyedMap(): Map<String, Any?>? = when (this) {
     else -> null
 }
 
+private fun parseToolCallArguments(arguments: String?): Map<String, Any?> {
+    val json = arguments ?: "{}"
+    return runCatching {
+        mapper.readValue(json, object : TypeReference<Map<String, Any?>>() {})
+    }.getOrDefault(emptyMap())
+}
+
 private fun AimoChatOptions.toOllamaOptions(): Options? {
     val hasValues = temperature != null || maxTokens != null || topP != null ||
         topK != null || frequencyPenalty != null || presencePenalty != null ||
@@ -269,7 +269,6 @@ private fun AimoChatOptions.toOllamaOptions(): Options? {
         providerOptions  = providerOptions,
     )
 }
-
 
 
 

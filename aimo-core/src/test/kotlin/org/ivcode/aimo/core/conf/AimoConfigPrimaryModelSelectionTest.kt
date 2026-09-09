@@ -72,10 +72,12 @@ class AimoConfigPrimaryModelSelectionTest {
     ): AimoChatModelConfig {
         val factories: List<AimoChatModelProviderFactory> = chatModelFactories.values.toList()
 
-        val providerPrimaries: List<AimoChatModelConfig> = factories.mapNotNull { factory: AimoChatModelProviderFactory ->
+        val providerPrimaries: List<AimoChatModelConfig> =
+            factories.mapNotNull { factory: AimoChatModelProviderFactory ->
             factory.getPrimaryName()?.let { primaryName ->
                 requireNotNull(factory.getModel(primaryName)) {
-                    "Chat model factory '${factory.provider}' reported primary model '$primaryName' but could not create it."
+                    "Chat model factory '${factory.provider}' reported primary model " +
+                        "'$primaryName' but could not create it."
                 }
             }
         }

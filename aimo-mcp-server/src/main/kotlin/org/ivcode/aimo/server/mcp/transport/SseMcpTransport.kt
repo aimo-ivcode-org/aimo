@@ -1,11 +1,9 @@
 package org.ivcode.aimo.server.mcp.transport
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.ivcode.aimo.server.mcp.handler.McpRequestHandler
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse
 import org.slf4j.LoggerFactory
-import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -24,8 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 @RestController
 @RequestMapping("/mcp/sse")
 class SseMcpTransport(
-    private val requestHandler: McpRequestHandler,
-    private val objectMapper: ObjectMapper
+    private val requestHandler: McpRequestHandler
 ) : McpTransport {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val emitters = CopyOnWriteArrayList<SseEmitter>()
@@ -63,7 +60,7 @@ class SseMcpTransport(
     @GetMapping("/connect")
     fun connect(): SseEmitter {
         logger.debug("New SSE client connected")
-        val emitter = SseEmitter(300000L)  // 5 minute timeout
+        val emitter = SseEmitter(SSE_CONNECTION_TIMEOUT_MILLIS)
 
         emitter.onCompletion {
             logger.debug("SSE emitter completed")
@@ -150,6 +147,10 @@ class SseMcpTransport(
             "transport" to "sse",
             "connected_clients" to emitters.size
         )
+    }
+
+    private companion object {
+        private const val SSE_CONNECTION_TIMEOUT_MILLIS = 300_000L
     }
 }
 

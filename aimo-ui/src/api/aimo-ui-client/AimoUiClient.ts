@@ -1,4 +1,5 @@
 import {ApiClient} from "../api-client/ApiClient";
+import { apiBaseUrl } from "../api-client/apiBaseUrl";
 
 const CONTROLLER_TITLE = "/aimo-api/title";
 
@@ -47,4 +48,4 @@ class AimoUiClientImpl extends ApiClient implements AimoUiClient {
     })
 }
 
-export const aimoUiClient: AimoUiClient = new AimoUiClientImpl('http://localhost:8080')
+export const aimoUiClient: AimoUiClient = new AimoUiClientImpl(apiBaseUrl)

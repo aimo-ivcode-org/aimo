@@ -49,11 +49,15 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         maxRequestCharacters: Long,
         scopeMetadata: Map<String, Any>,
     ): List<ChatRequestEntity> {
-        if (getConversationIfMatches(chatId, scopeMetadata) == null) return emptyList()
-        if (maxRequestCharacters <= 0) return emptyList()
+        // Early validation: check conversation, max characters, and data availability
+        if (getConversationIfMatches(chatId, scopeMetadata) == null ||
+            maxRequestCharacters <= 0 ||
+            requests[chatId] == null
+        ) {
+            return emptyList()
+        }
 
-        val chatRequests = requests[chatId] ?: return emptyList()
-        if (chatRequests.isEmpty()) return emptyList()
+        val chatRequests = requests[chatId]!!
 
         var totalCharacters = 0L
         val selected = mutableListOf<ChatRequestEntity>()
@@ -81,12 +85,15 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         scopeMetadata: Map<String, Any>,
     ): Boolean {
         val existing = getConversationIfMatches(chatId, scopeMetadata) ?: return false
-        if (metadata.isEmpty()) return true
 
-        val merged = existing.metadata.toMutableMap()
-        merged.putAll(metadata)
-        conversations[chatId] = existing.copy(metadata = merged.toMap())
-        return true
+        return if (metadata.isEmpty()) {
+            true
+        } else {
+            val merged = existing.metadata.toMutableMap()
+            merged.putAll(metadata)
+            conversations[chatId] = existing.copy(metadata = merged.toMap())
+            true
+        }
     }
 
     override fun deleteConversationMetadata(
@@ -95,20 +102,28 @@ class AimoChatClientDaoMemory: AimoChatClientDao {
         scopeMetadata: Map<String, Any>,
     ): Boolean {
         val existing = getConversationIfMatches(chatId, scopeMetadata) ?: return false
-        if (keys.isEmpty()) return true
 
-        val updated = existing.metadata.toMutableMap()
-        for (k in keys) {
-            updated.remove(k)
+        return if (keys.isEmpty()) {
+            true
+        } else {
+            val updated = existing.metadata.toMutableMap()
+            for (k in keys) {
+                updated.remove(k)
+            }
+            conversations[chatId] = existing.copy(metadata = updated.toMap())
+            true
         }
-
-        conversations[chatId] = existing.copy(metadata = updated.toMap())
-        return true
     }
 
-    private fun getConversationIfMatches(chatId: UUID, scopeMetadata: Map<String, Any>): ChatConversationEntity? {
+    private fun getConversationIfMatches(
+        chatId: UUID,
+        scopeMetadata: Map<String, Any>
+    ): ChatConversationEntity? {
         val conversation = conversations[chatId] ?: return null
-        if (!ConversationMetadataMatcher.matches(conversation.metadata, scopeMetadata)) return null
-        return conversation
+        return if (ConversationMetadataMatcher.matches(conversation.metadata, scopeMetadata)) {
+            conversation
+        } else {
+            null
+        }
     }
 }

@@ -1,4 +1,4 @@
-package org.ivcode.aimo.core.client.chat
+package org.ivcode.aimo.core.chatclient
 
 import org.ivcode.aimo.core.model.AimoChatMessage
 import org.ivcode.aimo.core.model.AimoChatMessageType

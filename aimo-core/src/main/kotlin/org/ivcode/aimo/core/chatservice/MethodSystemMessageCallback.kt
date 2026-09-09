@@ -11,7 +11,8 @@ class MethodSystemMessageCallback (
     override val scopes: Set<String> = emptySet()
 ): SystemMessageCallback {
     override fun call(context: SystemMessageContext): String? {
-        // system messages take an optional SystemMessageContext parameter, so we need to check if the method is contextual or not
+        // system messages take an optional SystemMessageContext parameter,
+        // so we need to check if the method is contextual or not
         // Ensure method is accessible before invoking. If we cannot make it accessible, throw with guidance.
         val accessible = trySetAccessible(method)
         if (!accessible) {
@@ -30,7 +31,7 @@ class MethodSystemMessageCallback (
                 method.invoke(instance) as String?
             }
         } catch (e: InaccessibleObjectException) {
-            throw IllegalAccessException("Failed to invoke method ${method.name}: ${e.message}")
+            throw IllegalAccessException("Failed to invoke method ${method.name}: ${e.message}").initCause(e)
         }
     }
 }

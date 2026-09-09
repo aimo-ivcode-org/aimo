@@ -3,6 +3,12 @@ plugins {
     kotlin("plugin.spring")
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("dev.detekt")
+}
+
+detekt {
+    config.setFrom("${rootDir}/detekt.yml")
+    ignoreFailures = true
 }
 
 dependencies {

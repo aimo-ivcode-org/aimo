@@ -20,6 +20,9 @@ import tools.jackson.databind.ObjectMapper
 @EnableScheduling
 @Import(DiscoveryScheduler::class)
 @EnableConfigurationProperties(McpProperties::class)
+/**
+ * Auto-configures MCP discovery, lifecycle management, and per-server provider registration.
+ */
 class McpClientAutoConfiguration(
     private val mcpProperties: McpProperties,
     private val aimoProperties: AimoProperties,
@@ -55,12 +58,12 @@ class McpClientAutoConfiguration(
         // Return registry of all MCP server providers
         return object : ChatServiceProviderRegistry {
             override fun getProviders(): List<ChatServiceProvider> {
-                val serverIds = mcpClientManager.getServerIds()
-                log.debug("MCP Registry.getProviders() called: found ${serverIds.size} server(s): $serverIds")
+                val serverIds = mcpClientManager.serverIds
+                log.debug("MCP Registry.getProviders() called: found {} server(s): {}", serverIds.size, serverIds)
 
                 val providers = serverIds.map { serverId ->
                     PerServerMcpChatServiceProvider(serverId, mcpClientManager).also {
-                        log.debug("Created MCP server provider: id=${it.id}, scopes=${it.scopes}")
+                        log.debug("Created MCP server provider: id={}, scopes={}", it.id, it.scopes)
                     }
                 }
                 log.debug("MCP Registry returning ${providers.size} provider(s)")
@@ -69,5 +72,8 @@ class McpClientAutoConfiguration(
         }
     }
 }
+
+
+
 
 

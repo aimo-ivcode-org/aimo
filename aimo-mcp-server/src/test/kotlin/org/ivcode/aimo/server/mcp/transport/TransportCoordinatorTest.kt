@@ -3,6 +3,7 @@ package org.ivcode.aimo.server.mcp.transport
 import org.ivcode.aimo.server.mcp.config.McpServerProperties
 import kotlin.test.Test
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 import org.springframework.beans.factory.ObjectProvider
 
 /**
@@ -11,14 +12,31 @@ import org.springframework.beans.factory.ObjectProvider
  */
 class TransportCoordinatorTest {
 
-    private class TestTransport(override val name: String) : McpTransport {
+    private class TestTransport(
+        override val name: String,
+        private val failOnInitialize: Boolean = false,
+        private val failOnShutdown: Boolean = false,
+    ) : McpTransport {
         var initialized = false
         var shutdownCalled = false
 
-        override fun initialize() { initialized = true }
-        override fun shutdown() { shutdownCalled = true }
+        override fun initialize() {
+            initialized = true
+            if (failOnInitialize) {
+                throw IllegalStateException("boom")
+            }
+        }
+
+        override fun shutdown() {
+            shutdownCalled = true
+            if (failOnShutdown) {
+                throw UnsupportedOperationException("boom")
+            }
+        }
         override fun isActive(): Boolean = initialized && !shutdownCalled
-        override fun handleRequest(request: org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest): org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse {
+        override fun handleRequest(
+            request: org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest
+        ): org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse {
             throw UnsupportedOperationException()
         }
     }
@@ -55,6 +73,28 @@ class TransportCoordinatorTest {
     }
 
     @Test
+    fun `transport initialization failures do not leak non-illegal-state exceptions`() {
+        val properties = McpServerProperties()
+        properties.transports.stdio.enabled = true
+
+        val stdio = TestTransport("stdio", failOnInitialize = true)
+
+        val coordinator = TransportCoordinator(
+            properties,
+            FixedProvider<HttpMcpTransport>(null),
+            FixedProvider<SseMcpTransport>(null),
+            FixedProvider<McpTransport>(stdio)
+        )
+
+        val exception = assertFailsWith<IllegalStateException> {
+            coordinator.initializeTransports()
+        }
+
+        assertTrue(exception.message!!.contains("No active MCP transports configured"))
+        assertTrue(stdio.initialized, "Stdio transport should have been initialized before the failure was handled")
+    }
+
+    @Test
     fun `fail fast when no transports active`() {
         val properties = McpServerProperties()
         // disable all transports
@@ -69,15 +109,33 @@ class TransportCoordinatorTest {
             FixedProvider<McpTransport>(null)
         )
 
-        var thrown = false
-        try {
+        assertFailsWith<IllegalStateException> {
             coordinator.initializeTransports()
-        } catch (e: IllegalStateException) {
-            thrown = true
         }
+    }
 
-        assertTrue(thrown, "TransportCoordinator should throw IllegalStateException when no transports are active")
+    @Test
+    fun `shutdown continues after a transport throws`() {
+        val properties = McpServerProperties()
+        val coordinator = TransportCoordinator(
+            properties,
+            FixedProvider<HttpMcpTransport>(null),
+            FixedProvider<SseMcpTransport>(null),
+            FixedProvider<McpTransport>(null)
+        )
+
+        val first = TestTransport("first", failOnShutdown = true)
+        val second = TestTransport("second")
+        val activeField = TransportCoordinator::class.java.getDeclaredField("activeTransports")
+        activeField.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val activeTransports = activeField.get(coordinator) as MutableList<McpTransport>
+        activeTransports.add(first)
+        activeTransports.add(second)
+
+        coordinator.shutdownTransports()
+
+        assertTrue(first.shutdownCalled, "First transport should have been asked to shut down")
+        assertTrue(second.shutdownCalled, "Shutdown should continue to remaining transports")
     }
 }
-
-

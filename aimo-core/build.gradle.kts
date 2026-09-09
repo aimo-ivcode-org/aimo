@@ -4,8 +4,13 @@ plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("java-library")
+    id("dev.detekt")
 }
 
+detekt {
+    config.setFrom("${rootDir}/detekt.yml")
+    ignoreFailures = true
+}
 
 dependencies {
     api("org.jetbrains.kotlin:kotlin-reflect")

@@ -21,8 +21,8 @@ import org.slf4j.LoggerFactory
  * @property displayName Human-readable name for UI display
  * @property description What this scope provides and is used for
  * @property providers List of contributing chat service providers (may be empty)
- * @property tools Static list of tool callbacks available in this scope (for backwards compatibility)
- * @property systemMessages Static list of system message callbacks available in this scope (for backwards compatibility)
+ * @property tools Static list of tool callbacks available in this scope
+ * @property systemMessages Static list of system message callbacks available in this scope
  */
 data class ChatScope(
     val id: String,

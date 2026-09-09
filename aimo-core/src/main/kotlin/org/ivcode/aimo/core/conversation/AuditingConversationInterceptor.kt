@@ -24,7 +24,11 @@ class AuditingConversationInterceptor(
 
     private val logger = auditLogger ?: LoggerFactory.getLogger("AUDIT.Conversation")
 
-    override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+    override fun interceptGet(
+        chain: ConversationInterceptor.GetChain,
+        chatId: UUID,
+        metadata: MutableMap<String, Any>
+    ): Conversation? {
         if (!enabled) {
             return chain.proceed(chatId, metadata)
         }
@@ -41,14 +45,19 @@ class AuditingConversationInterceptor(
             log("SUCCESS $auditEntry | conversationFound=${result != null}")
 
             result
-        } catch (e: Exception) {
-            // Log failure with exception details
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            // Log failure with exception details. Any exception from the chain should be audited
+            // and then rethrown to propagate to the caller.
             log("FAILURE $auditEntry | error=${e.javaClass.simpleName}: ${e.message}")
             throw e
         }
     }
 
-    override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+    override fun interceptDelete(
+        chain: ConversationInterceptor.DeleteChain,
+        chatId: UUID,
+        metadata: MutableMap<String, Any>
+    ): Boolean {
         if (!enabled) {
             return chain.proceed(chatId, metadata)
         }
@@ -65,8 +74,9 @@ class AuditingConversationInterceptor(
             log("SUCCESS $auditEntry | conversationDeleted=$result")
 
             result
-        } catch (e: Exception) {
-            // Log failure with exception details
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            // Log failure with exception details. Any exception from the chain should be audited
+            // and then rethrown to propagate to the caller.
             log("FAILURE $auditEntry | error=${e.javaClass.simpleName}: ${e.message}")
             throw e
         }

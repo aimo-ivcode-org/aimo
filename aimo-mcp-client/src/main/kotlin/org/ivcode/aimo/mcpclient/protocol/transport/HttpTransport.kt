@@ -1,13 +1,23 @@
 package org.ivcode.aimo.mcpclient.protocol.transport
 
 import org.slf4j.LoggerFactory
-import tools.jackson.databind.ObjectMapper
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+
+private const val ACCEPTED_NO_BODY_STATUS = 202
+private const val BAD_REQUEST_STATUS = 400
+private const val UNAUTHORIZED_STATUS = 401
+private const val FORBIDDEN_STATUS = 403
+private const val HTTP_ERROR_STATUS_THRESHOLD = 400
+private const val SSE_DATA_PREFIX_WITH_SPACE = "data: "
+private const val SSE_DATA_PREFIX = "data:"
+private const val SSE_PREVIEW_LENGTH = 80
+private const val MESSAGE_PREVIEW_LENGTH = 100
+private const val ERROR_BODY_PREVIEW_LENGTH = 2_000
 
 /**
  * HTTP-based MCP transport implementing the "Streamable HTTP" transport from the
@@ -27,7 +37,6 @@ class HttpTransport(
     private val url: String,
     private val authToken: String? = null,
     private val protocolVersion: String = "2025-11-25",
-    private val objectMapper: ObjectMapper = ObjectMapper(),
     private val connectTimeoutSeconds: Long = 10,
     private val messageTimeoutSeconds: Long = 60,
     private val requestTimeoutSeconds: Long = 60,  // Timeout for the full HTTP request/response
@@ -56,7 +65,7 @@ class HttpTransport(
         connected = false
         val sid = sessionId
         if (!sid.isNullOrBlank()) {
-            try {
+            runCatching {
                 val requestBuilder = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .timeout(java.time.Duration.ofSeconds(connectTimeoutSeconds))
@@ -69,95 +78,117 @@ class HttpTransport(
                 }
 
                 httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.discarding())
-            } catch (e: Exception) {
-                log.debug("Failed to terminate MCP session cleanly (non-fatal)", e)
-            }
+            }.onFailure { log.debug("Failed to terminate MCP session cleanly (non-fatal)", it) }
         }
         log.info("HTTP transport disconnected")
     }
 
     override fun send(message: String) {
-        if (!connected) {
-            throw IllegalStateException("HTTP transport not connected")
-        }
-        try {
+        check(connected) { "HTTP transport not connected" }
+
+        runCatching {
             log.debug("Sending message via HTTP POST to $url")
-            val requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(java.time.Duration.ofSeconds(requestTimeoutSeconds))  // Use request timeout instead of connect timeout
-                .header("Content-Type", "application/json")
-                .header("Accept", "application/json, text/event-stream")
-                .header("MCP-Protocol-Version", protocolVersion)
-                .POST(HttpRequest.BodyPublishers.ofString(message))
-
-            if (!authToken.isNullOrBlank()) {
-                requestBuilder.header("Authorization", "Bearer $authToken")
-            }
-            sessionId?.let { requestBuilder.header("Mcp-Session-Id", it) }
-
-            val request = requestBuilder.build()
+            val request = buildRequest(message)
             log.debug("Executing HTTP POST request to $url")
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
 
-            // Capture session id if the server assigned one (typically on initialize response)
-            response.headers().firstValue("Mcp-Session-Id").ifPresent {
-                if (sessionId == null) {
-                    log.debug("Captured MCP session id")
-                }
-                sessionId = it
-            }
-
-            if (response.statusCode() == 202) {
-                // Accepted with no body - this was a notification/response with nothing to return
-                response.body().close()
-                log.debug("Message accepted (202) with no response body")
-                return
-            }
-
-            if (response.statusCode() >= 400) {
-                val body = response.body().bufferedReader().use { it.readText() }
-log.error("HTTP POST failed with status ${response.statusCode()}: ${body.take(2000)}")
-log.debug("HTTP POST request payload (truncated): ${message.take(2000)}")
-
-                if (response.statusCode() == 401 || response.statusCode() == 403) {
-                    throw IllegalStateException("HTTP authentication failed (status ${response.statusCode()}). " +
-                        "Verify that auth token is valid and has required permissions. Response: $body")
-                } else if (response.statusCode() == 400) {
-                    throw IllegalStateException("HTTP request rejected with Bad Request (400). " +
-                        "Response: $body")
-                } else {
-                    throw IllegalStateException("HTTP POST failed: status ${response.statusCode()}, response: $body")
-                }
-            }
-
-            val contentType = (response.headers().firstValue("Content-Type").orElse("") ?: "").lowercase()
-            log.debug("Response Content-Type: $contentType, Status: ${response.statusCode()}")
-            when {
-                "text/event-stream" in contentType -> {
-                    log.debug("Response is an SSE stream; reading until stream closes")
-                    readSseResponseStream(response.body())
-                    log.debug("SSE stream reading completed")
-                }
-                "application/json" in contentType -> {
-                    val body = response.body().bufferedReader().use { it.readText() }
-                    if (body.isNotBlank()) {
-                        log.debug("Received JSON response: $body")
-                        messageQueue.offer(body)
-                    }
-                }
-                else -> {
-                    // Unknown content type; try to read as text and queue if non-empty
-                    val body = response.body().bufferedReader().use { it.readText() }
-                    if (body.isNotBlank()) {
-                        log.warn("Unexpected Content-Type '$contentType'; attempting to parse body as message")
-                        messageQueue.offer(body)
-                    }
-                }
-            }
+            captureSessionId(response)
+            handleResponse(response, message)
             log.debug("Message sent via HTTP successfully")
-        } catch (e: Exception) {
-            log.error("Failed to send message via HTTP", e)
-            throw e
+        }.onFailure {
+            log.error("Failed to send message via HTTP", it)
+        }.getOrThrow()
+    }
+
+    private fun buildRequest(message: String): HttpRequest {
+        val requestBuilder = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            // Use request timeout instead of connect timeout.
+            .timeout(java.time.Duration.ofSeconds(requestTimeoutSeconds))
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", protocolVersion)
+            .POST(HttpRequest.BodyPublishers.ofString(message))
+
+        if (!authToken.isNullOrBlank()) {
+            requestBuilder.header("Authorization", "Bearer $authToken")
+        }
+        sessionId?.let { requestBuilder.header("Mcp-Session-Id", it) }
+
+        return requestBuilder.build()
+    }
+
+    private fun captureSessionId(response: HttpResponse<java.io.InputStream>) {
+        response.headers().firstValue("Mcp-Session-Id").ifPresent {
+            if (sessionId == null) {
+                log.debug("Captured MCP session id")
+            }
+            sessionId = it
+        }
+    }
+
+    private fun handleResponse(response: HttpResponse<java.io.InputStream>, message: String) {
+        val statusCode = response.statusCode()
+        when {
+            statusCode == ACCEPTED_NO_BODY_STATUS -> {
+                response.body().close()
+                log.debug("Message accepted ($ACCEPTED_NO_BODY_STATUS) with no response body")
+            }
+
+            statusCode >= HTTP_ERROR_STATUS_THRESHOLD -> handleErrorResponse(response, message)
+
+            else -> handleSuccessResponse(response)
+        }
+    }
+
+    private fun handleErrorResponse(response: HttpResponse<java.io.InputStream>, message: String) {
+        val statusCode = response.statusCode()
+        val body = response.body().bufferedReader().use { it.readText() }
+        log.error("HTTP POST failed with status $statusCode: ${body.take(ERROR_BODY_PREVIEW_LENGTH)}")
+        log.debug("HTTP POST request payload (truncated): ${message.take(ERROR_BODY_PREVIEW_LENGTH)}")
+
+        throw when (statusCode) {
+            UNAUTHORIZED_STATUS, FORBIDDEN_STATUS -> IllegalStateException(
+                "HTTP authentication failed (status $statusCode). " +
+                    "Verify that auth token is valid and has required permissions. Response: $body"
+            )
+
+            BAD_REQUEST_STATUS -> IllegalStateException(
+                "HTTP request rejected with Bad Request ($BAD_REQUEST_STATUS). Response: $body"
+            )
+
+            else -> IllegalStateException("HTTP POST failed: status $statusCode, response: $body")
+        }
+    }
+
+    private fun handleSuccessResponse(response: HttpResponse<java.io.InputStream>) {
+        val contentType = response.headers().firstValue("Content-Type").orElse(null).orEmpty().lowercase()
+        val statusCode = response.statusCode()
+        log.debug("Response Content-Type: $contentType, Status: $statusCode")
+
+        when {
+            "text/event-stream" in contentType -> {
+                log.debug("Response is an SSE stream; reading until stream closes")
+                readSseResponseStream(response.body())
+                log.debug("SSE stream reading completed")
+            }
+
+            "application/json" in contentType -> {
+                val body = response.body().bufferedReader().use { it.readText() }
+                if (body.isNotBlank()) {
+                    log.debug("Received JSON response: ${previewText(body, ERROR_BODY_PREVIEW_LENGTH)}")
+                    messageQueue.offer(body)
+                }
+            }
+
+            else -> {
+                // Unknown content type; try to read as text and queue if non-empty.
+                val body = response.body().bufferedReader().use { it.readText() }
+                if (body.isNotBlank()) {
+                    log.warn("Unexpected Content-Type '$contentType'; attempting to parse body as message")
+                    messageQueue.offer(body)
+                }
+            }
         }
     }
 
@@ -167,59 +198,64 @@ log.debug("HTTP POST request payload (truncated): ${message.take(2000)}")
      * closes this stream once it has sent the response(s) for the originating request.
      */
     private fun readSseResponseStream(inputStream: java.io.InputStream) {
-        try {
+        var lineCount = 0
+        var messageCount = 0
+        runCatching {
             inputStream.bufferedReader().use { reader ->
-                var line: String? = null
-                var lineCount = 0
-                var messageCount = 0
-                try {
-                    while (reader.readLine().also { line = it } != null) {
-                        lineCount++
-                        val current = line ?: continue
-                        if (current.isEmpty()) continue // SSE event delimiter
+                while (true) {
+                    val current = reader.readLine() ?: break
+                    lineCount++
 
-                        val data = when {
-                            current.startsWith("data: ") -> current.substring(6)
-                            current.startsWith("data:") -> current.substring(5)
-                            current.startsWith("event:") || current.startsWith("retry:") ||
-                                current.startsWith("id:") || current.startsWith(":") -> null
-                            else -> current // raw JSON (not spec-compliant, but tolerate it)
-                        }
-
-                        if (!data.isNullOrEmpty()) {
-                            log.debug("Received SSE data (line $lineCount): ${data.take(80)}${if (data.length > 80) "..." else ""}")
-                            messageQueue.offer(data)
-                            messageCount++
-                        }
+                    extractSseData(current)?.let { data ->
+                        log.debug(
+                            "Received SSE data (line $lineCount): ${previewText(data, SSE_PREVIEW_LENGTH)}"
+                        )
+                        messageQueue.offer(data)
+                        messageCount++
                     }
-                    log.debug("SSE stream closed after reading $lineCount lines ($messageCount messages)")
-                } catch (e: Exception) {
-                    log.error("Error reading SSE stream after $lineCount lines, $messageCount messages processed", e)
-                    // Don't rethrow - we want to keep the connection alive and try the next request
                 }
             }
-        } catch (e: Exception) {
-            log.error("Error closing SSE stream reader", e)
-            // Don't rethrow - handle gracefully
+        }.onFailure {
+            log.error("Error reading SSE stream after $lineCount lines, $messageCount messages processed", it)
+            // Don't rethrow - we want to keep the connection alive and try the next request.
         }
+        log.debug("SSE stream closed after reading $lineCount lines ($messageCount messages)")
     }
 
     override fun receive(): String {
-        if (!connected) {
-            throw IllegalStateException("HTTP transport not connected")
-        }
+        check(connected) { "HTTP transport not connected" }
 
-        try {
+        return try {
             val message = messageQueue.poll(messageTimeoutSeconds, TimeUnit.SECONDS)
             if (message != null) {
-                log.debug("Received message from queue: ${message.take(100)}${if (message.length > 100) "..." else ""}")
-                return message
+                log.debug("Received message from queue: ${previewText(message, MESSAGE_PREVIEW_LENGTH)}")
+                message
+            } else {
+                // Normal case: no message arrived within timeout (expected between requests)
+                throw java.io.IOException(
+                    "Timeout waiting for message (${messageTimeoutSeconds}s) - " +
+                        "this is normal when no requests are pending"
+                )
             }
-            // Normal case: no message arrived within timeout (expected between requests)
-            throw java.io.IOException("Timeout waiting for message (${messageTimeoutSeconds}s) - this is normal when no requests are pending")
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             throw java.io.IOException("Interrupted while waiting for message", e)
         }
     }
 }
+
+private fun extractSseData(line: String): String? {
+    return when {
+        line.startsWith(SSE_DATA_PREFIX_WITH_SPACE) -> line.removePrefix(SSE_DATA_PREFIX_WITH_SPACE)
+        line.startsWith(SSE_DATA_PREFIX) -> line.removePrefix(SSE_DATA_PREFIX).trimStart()
+        line.startsWith("event:") || line.startsWith("retry:") ||
+            line.startsWith("id:") || line.startsWith(":") -> null
+
+        else -> line // raw JSON (not spec-compliant, but tolerate it)
+    }
+}
+
+private fun previewText(text: String, limit: Int): String {
+    return text.take(limit) + if (text.length > limit) "..." else ""
+}
+

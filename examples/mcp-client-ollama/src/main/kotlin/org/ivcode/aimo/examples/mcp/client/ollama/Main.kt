@@ -1,4 +1,4 @@
-package org.ivcode.aimo.examples.mcp_client_ollama
+package org.ivcode.aimo.examples.mcp.client.ollama
 
 import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.core.dao.AimoChatClientDaoFile

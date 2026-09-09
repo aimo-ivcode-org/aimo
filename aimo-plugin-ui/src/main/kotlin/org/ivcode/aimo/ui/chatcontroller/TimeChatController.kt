@@ -12,6 +12,7 @@ import java.time.temporal.ChronoUnit
 
 
 private const val HEADER_X_TIMEZONE_OFFSET = "x-timezone-offset"
+private const val SECONDS_PER_MINUTE = 60
 
 /**
  * Provides time-related tools for chat.
@@ -45,7 +46,7 @@ class TimeChatController {
     }
 
     fun toZoneId(timezoneOffset: Int): ZoneId? {
-        val zoneOffset = ZoneOffset.ofTotalSeconds(-1 * timezoneOffset * 60)
+        val zoneOffset = ZoneOffset.ofTotalSeconds(-timezoneOffset * SECONDS_PER_MINUTE)
         return ZoneId.ofOffset("UTC", zoneOffset)
     }
 }

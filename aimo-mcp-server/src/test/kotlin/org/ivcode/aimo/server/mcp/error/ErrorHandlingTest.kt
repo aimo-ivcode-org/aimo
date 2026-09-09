@@ -2,7 +2,8 @@ package org.ivcode.aimo.server.mcp.error
 
 import org.ivcode.aimo.server.mcp.protocol.McpErrorCode
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class ErrorHandlingTest {
 

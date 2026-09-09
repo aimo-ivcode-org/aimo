@@ -38,7 +38,8 @@ class ChatController (
                 chatClientService.chat(chatId, request, mapOf(
                     PROPERTY_NAME_REQUEST_METADATA to requestMetadata
                 ), output)
-            } catch (ex: Exception) {
+            } catch (@Suppress("TooGenericExceptionCaught") ex: Exception) {
+                // Streamed responses need to fail safely at the boundary instead of escaping the lambda.
                 log.error("Error while streaming chat for chatId=$chatId", ex)
             }
         }
