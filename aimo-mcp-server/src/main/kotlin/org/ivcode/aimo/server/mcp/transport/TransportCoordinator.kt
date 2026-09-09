@@ -53,14 +53,16 @@ class TransportCoordinator(
             val stdioTransport = stdioTransportProvider.getIfAvailable()
             if (stdioTransport != null) {
                 logger.info("Enabling Stdio transport")
-                try {
-                    stdioTransport.initialize()
-                    activeTransports.add(stdioTransport)
-                } catch (exception: IllegalStateException) {
-                    logger.error("Error initializing Stdio transport", exception)
-                }
+            try {
+                stdioTransport.initialize()
+                activeTransports.add(stdioTransport)
+            } catch (@Suppress("TooGenericExceptionCaught") exception: Exception) {
+                // Suppress the generic-catch detekt rule here because this is a transport boundary:
+                // we log the failure and keep startup behavior consistent instead of aborting on one transport.
+                logger.error("Error initializing Stdio transport", exception)
+            }
             } else {
-                logger.warn("Stdio transport is enabled in configuration but no stdio transport bean is available")
+            logger.warn("Stdio transport is enabled in configuration but no stdio transport bean is available")
             }
         }
 
@@ -83,7 +85,9 @@ class TransportCoordinator(
         activeTransports.forEach { transport ->
             try {
                 transport.shutdown()
-            } catch (exception: IllegalStateException) {
+            } catch (@Suppress("TooGenericExceptionCaught") exception: Exception) {
+                // Suppress the generic-catch detekt rule here because one transport failing to shut down
+                // should not prevent the remaining transports from being cleaned up and logged.
                 logger.error("Error shutting down {} transport", transport.name, exception)
             }
         }
@@ -104,4 +108,3 @@ class TransportCoordinator(
         return activeTransports.any { it.name == transportName && it.isActive() }
     }
 }
-

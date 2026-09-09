@@ -3,7 +3,6 @@ package org.ivcode.aimo.bedrock.client
 import org.slf4j.Logger
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeClient
 import software.amazon.awssdk.services.bedrockruntime.BedrockRuntimeAsyncClient
-import software.amazon.awssdk.core.exception.SdkException
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseRequest as BedrockConverseRequest
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse as BedrockConverseResponse
 import software.amazon.awssdk.services.bedrockruntime.model.ConverseStreamRequest as BedrockConverseStreamRequest
@@ -30,9 +29,10 @@ internal class RequestExecutor(
         return try {
             val response = client.converse(bedrockRequest)
             transformConverseResponse(response)
-        } catch (e: SdkException) {
-            log.error("Bedrock converse failed modelId={}: {}", modelId, e.message, e)
-            throw IllegalStateException("Bedrock chat request failed: ${e.message}", e)
+        } catch (@Suppress("TooGenericExceptionCaught") exception: Exception) {
+            // Suppress the generic-catch detekt rule here because the Bedrock client boundary
+            // must convert any transport or mapping failure into one consistent wrapped exception.
+            wrapFailure("Bedrock chat request failed", "Bedrock converse failed", exception)
         }
     }
 
@@ -95,9 +95,13 @@ internal class RequestExecutor(
                 )
             }
             transformed
-        } catch (e: SdkException) {
-            log.error("Bedrock stream failed modelId={}: {}", modelId, e.message, e)
-            throw IllegalStateException("Bedrock stream request failed: ${e.message}", e)
+        } catch (@Suppress("TooGenericExceptionCaught") exception: Exception) {
+            // Suppress the generic-catch detekt rule here because stream setup, waiting, and
+            // final response transformation all need to fail through the same Bedrock boundary.
+            if (exception is InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
+            wrapFailure("Bedrock stream request failed", "Bedrock stream failed", exception)
         }
     }
 
@@ -177,5 +181,14 @@ internal class RequestExecutor(
             )
         }
         return transformed
+    }
+
+    private fun wrapFailure(
+        messagePrefix: String,
+        logMessage: String,
+        exception: Exception,
+    ): Nothing {
+        log.error("{} modelId={}: {}", logMessage, modelId, exception.message, exception)
+        throw IllegalStateException("$messagePrefix: ${exception.message}", exception)
     }
 }

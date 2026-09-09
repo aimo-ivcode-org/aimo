@@ -39,7 +39,10 @@ class ControllerHelpersTest {
             ?: throw AssertionError("add tool not found")
 
         val schema = addTool.toolDefinition.inputSchema
-        assertEquals("object", schema.get("type").toString().trim('"'))
+        assertEquals(
+            "object",
+            objectMapper.treeToValue(schema.get("type"), String::class.java)
+        )
 
         val properties = schema.get("properties")
         assertTrue(properties.has("a"), "Schema should have 'a' parameter")
@@ -81,8 +84,14 @@ class ControllerHelpersTest {
 
         // multiply has signature:
         // multiply(x: Double @ToolParam("First operand"), y: Double @ToolParam("Second operand"))
-        assertEquals("First operand", properties.get("x").get("description").toString().trim('"'))
-        assertEquals("Second operand", properties.get("y").get("description").toString().trim('"'))
+        assertEquals(
+            "First operand",
+            objectMapper.treeToValue(properties.get("x").get("description"), String::class.java)
+        )
+        assertEquals(
+            "Second operand",
+            objectMapper.treeToValue(properties.get("y").get("description"), String::class.java)
+        )
     }
 
     @Test
