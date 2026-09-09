@@ -32,7 +32,9 @@ tasks.register<Exec>("build-resources") {
     dependsOn("npmInstall")
     workingDir = projectDir
     
-    inputs.files("package.json", "src")
+    inputs.files("package.json", "package-lock.json", "vite.config.js", "index.html")
+    inputs.dir("src")
+    inputs.dir("public")
     outputs.dir("dist")
 
     val isWindows = System.getProperty("os.name").lowercase().contains("windows")

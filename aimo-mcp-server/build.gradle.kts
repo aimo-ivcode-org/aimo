@@ -8,6 +8,7 @@ plugins {
 }
 
 detekt {
+    config.setFrom("${rootDir}/detekt.yml")
     ignoreFailures = true
 }
 
@@ -45,5 +46,4 @@ tasks.named("bootJar") {
 tasks.named("jar") {
     enabled = true
 }
-
 
