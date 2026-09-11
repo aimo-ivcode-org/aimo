@@ -15,4 +15,3 @@ class BedrockConfig {
         properties: BedrockModelsProperties,
     ): AimoChatModelProviderFactory = BedrockChatModelFactory(properties.bedrock)
 }
-

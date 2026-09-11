@@ -92,12 +92,12 @@ internal class AimoChatClientImpl (
     // Prompt budgeter selected based on model configuration
     // Responsible for filtering history to fit the model's context window
     private val promptBudgeter: PromptBudgeter = when (model.context.budgeterType) {
-        AimoPromptBudgeterType.CONTEXT_WINDOW -> ContextWindowPromptBudgeter(
+        AimoPromptBudgeterType.CONTEXT_WINDOW -> ContextWindowPromptBudgeter (
             maxInputTokens = model.context.size,
             excludeThinking = model.context.excludeThinking,
         )
 
-        AimoPromptBudgeterType.NO_OP -> NoOpPromptBudgeter(
+        AimoPromptBudgeterType.NO_OP -> NoOpPromptBudgeter (
             excludeThinking = model.context.excludeThinking,
         )
     }
