@@ -1,18 +1,12 @@
 package org.ivcode.aimo.server.mcp.handler
 
-import com.fasterxml.jackson.databind.ObjectMapper
-import org.ivcode.aimo.server.mcp.annotation.McpContext
-import org.ivcode.aimo.server.mcp.annotation.McpParam
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcError
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse
 import org.ivcode.aimo.server.mcp.protocol.McpErrorCode
 import org.ivcode.aimo.server.mcp.registry.McpServiceRegistry
 import org.slf4j.LoggerFactory
-import kotlin.reflect.KParameter
-import kotlin.reflect.full.instanceParameter
-import kotlin.reflect.jvm.isAccessible
-import kotlin.reflect.jvm.kotlinFunction
+import java.lang.reflect.Method
 
 /**
  * Handles tool/call requests - invokes @McpTool methods with parameter binding.
@@ -30,101 +24,210 @@ class ToolCallHandler(
      * - name: tool name (or "beanName:toolName")
      * - arguments: map of tool parameters
      */
-    fun handle(request: JsonRpcRequest): JsonRpcResponse {
-        return try {
-            val params = request.params ?: return error(
-                request.id,
-                McpErrorCode.INVALID_PARAMS,
-                "Missing 'params' in request"
+    fun handle(request: JsonRpcRequest): JsonRpcResponse =
+        try {
+            when (val parsedRequest = parseRequest(request)) {
+                is ToolRequestParseResult.Error -> parsedRequest.response
+                is ToolRequestParseResult.Success -> executeToolCall(request.id, parsedRequest)
+            }
+        } catch (exception: IllegalArgumentException) {
+            logger.error("Error handling tool call", exception)
+            error(request.id, McpErrorCode.INTERNAL_ERROR, "Internal error: ${exception.message}")
+        } catch (exception: IllegalStateException) {
+            logger.error("Error handling tool call", exception)
+            error(request.id, McpErrorCode.INTERNAL_ERROR, "Internal error: ${exception.message}")
+        }
+
+    /**
+     * Parse the request envelope into the fields required for tool invocation.
+     *
+     * @param request incoming JSON-RPC request.
+     * @return either a parsed request or an error response to return to the client.
+     */
+    private fun parseRequest(request: JsonRpcRequest): ToolRequestParseResult {
+        // Validate the JSON-RPC params object before attempting any lookup work.
+        val params = request.params
+        val toolName = params?.get("name")?.toString()
+        val response = when {
+            params == null -> ToolRequestParseResult.Error(
+                error(request.id, McpErrorCode.INVALID_PARAMS, "Missing 'params' in request")
             )
 
-            val toolName = params["name"]?.toString() ?: return error(
-                request.id,
-                McpErrorCode.INVALID_PARAMS,
-                "Missing 'name' parameter"
+            toolName == null -> ToolRequestParseResult.Error(
+                error(request.id, McpErrorCode.INVALID_PARAMS, "Missing 'name' parameter")
             )
 
-            val arguments = (params["arguments"] as? Map<*, *>)?.mapKeys { it.key.toString() }
-                ?: emptyMap<String, Any?>()
+            else -> {
+                val arguments = (params["arguments"] as? Map<*, *>)
+                    ?.mapKeys { (key, _) -> key.toString() }
+                    ?: emptyMap()
+                ToolRequestParseResult.Success(toolName = toolName, arguments = arguments)
+            }
+        }
 
-            // Look up tool
-            val toolRegistry = serviceRegistry.getTool(toolName) ?: return error(
-                request.id,
+        return response
+    }
+
+    /**
+     * Execute a resolved tool call.
+     *
+     * @param requestId JSON-RPC request identifier.
+     * @param parsedRequest validated tool request data.
+     * @return JSON-RPC response containing either the tool result or a protocol error.
+     */
+    private fun executeToolCall(
+        requestId: Any?,
+        parsedRequest: ToolRequestParseResult.Success
+    ): JsonRpcResponse {
+        // Resolve the tool metadata before binding or invoking anything.
+        val toolRegistry = serviceRegistry.getTool(parsedRequest.toolName)
+        val response = if (toolRegistry == null) {
+            error(
+                requestId,
                 McpErrorCode.TOOL_NOT_FOUND,
-                "Tool '$toolName' not found"
+                "Tool '${parsedRequest.toolName}' not found"
             )
+        } else {
+            logger.debug("Invoking tool: {}", parsedRequest.toolName)
 
-            logger.debug("Invoking tool: {}", toolName)
+            // Bind incoming arguments to the reflected method signature.
+            when (val bindingResult = bindToolParameters(requestId, parsedRequest, toolRegistry.method)) {
+                is ToolBindingResult.Error -> bindingResult.response
+                is ToolBindingResult.Success -> {
+                    // Invoke the tool and convert the result into MCP response content.
+                    invokeTool(
+                        requestId,
+                        parsedRequest.toolName,
+                        toolRegistry.bean,
+                        toolRegistry.method,
+                        bindingResult.bindingResult
+                    )
+                }
+            }
+        }
 
-            // Bind parameters
-            val bindingResult = try {
+        return response
+    }
+
+    /**
+     * Bind tool arguments to the reflected method parameters.
+     *
+     * @param requestId JSON-RPC request identifier.
+     * @param parsedRequest validated tool request data.
+     * @param method tool method to bind.
+     * @return either the bound parameters or a ready INVALID_PARAMS response.
+     */
+    private fun bindToolParameters(
+        requestId: Any?,
+        parsedRequest: ToolRequestParseResult.Success,
+        method: Method
+    ): ToolBindingResult {
+        return try {
+            ToolBindingResult.Success(
                 parameterBinder.bindParameters(
-                    method = toolRegistry.method,
-                    arguments = arguments,
-                    context = mapOf(
-                        "toolName" to toolName,
-                        "requestId" to request.id?.toString()
+                    method = method,
+                    arguments = parsedRequest.arguments,
+                    context = buildToolContext(parsedRequest.toolName, requestId)
+                )
+            )
+        } catch (exception: ParameterBindingException) {
+            logger.warn(
+                "Parameter binding failed for tool '{}': {}",
+                parsedRequest.toolName,
+                exception.message
+            )
+            ToolBindingResult.Error(
+                error(
+                    requestId,
+                    McpErrorCode.INVALID_PARAMS,
+                    exception.message ?: "Invalid parameter"
+                )
+            )
+        }
+    }
+
+    /**
+     * Invoke the target tool method.
+     *
+     * @param requestId JSON-RPC request identifier.
+     * @param toolName tool name used for logging and error reporting.
+     * @param target bean instance that owns the method.
+     * @param method reflected method to invoke.
+     * @param bindingResult bound argument values.
+     * @return JSON-RPC response for the tool invocation.
+     */
+    private fun invokeTool(
+        requestId: Any?,
+        toolName: String,
+        target: Any,
+        method: Method,
+        bindingResult: ParameterBinder.BindingResult
+    ): JsonRpcResponse {
+        return try {
+            val result = MethodInvocationSupport.invoke(target, method, bindingResult)
+            logger.debug("Tool invocation succeeded: {}", toolName)
+            buildSuccessResponse(requestId, result)
+        } catch (exception: ReflectiveOperationException) {
+            executionError(requestId, toolName, exception)
+        } catch (exception: IllegalArgumentException) {
+            executionError(requestId, toolName, exception)
+        }
+    }
+
+    /**
+     * Build the request context passed to @McpContext parameters.
+     *
+     * @param toolName resolved tool name.
+     * @param requestId JSON-RPC request identifier.
+     * @return context map visible to the invoked tool.
+     */
+    private fun buildToolContext(toolName: String, requestId: Any?): Map<String, Any?> {
+        return mapOf(
+            "toolName" to toolName,
+            "requestId" to requestId?.toString()
+        )
+    }
+
+    /**
+     * Build a successful tool response payload.
+     *
+     * @param requestId JSON-RPC request identifier.
+     * @param result tool result object.
+     * @return JSON-RPC response containing MCP text content.
+     */
+    private fun buildSuccessResponse(requestId: Any?, result: Any?): JsonRpcResponse {
+        return JsonRpcResponse(
+            id = requestId,
+            result = mapOf(
+                "content" to listOf(
+                    mapOf(
+                        "type" to "text",
+                        "text" to result.toString()
                     )
                 )
-            } catch (e: ParameterBindingException) {
-                logger.warn("Parameter binding failed for tool '{}': {}", toolName, e.message)
-                return error(
-                    request.id,
-                    McpErrorCode.INVALID_PARAMS,
-                    e.message ?: "Invalid parameter"
-                )
-            }
-
-            // Invoke tool. Prefer Kotlin callBy when available so we can respect Kotlin default parameters
-            val result = try {
-                val kotlinFn = toolRegistry.method.kotlinFunction
-                if (kotlinFn != null) {
-                    // Build callBy map of KParameter -> value. Include instance parameter.
-                    val callByMap = mutableMapOf<KParameter, Any?>()
-                    kotlinFn.instanceParameter?.let { callByMap[it] = toolRegistry.bean }
-
-                    for (kp in kotlinFn.parameters) {
-                        if (kp == kotlinFn.instanceParameter) continue
-
-                        val name = kp.name
-                        if (name != null && bindingResult.provided.contains(name)) {
-                            callByMap[kp] = bindingResult.values[name]
-                        } else {
-                            // If the Java parameter has @McpContext, inject context even if not provided
-                            val javaParam = toolRegistry.method.parameters.firstOrNull { it.name == name }
-                            if (javaParam != null && javaParam.getAnnotation(McpContext::class.java) != null) {
-                                callByMap[kp] = bindingResult.context
-                            }
-                        }
-                    }
-
-                    kotlinFn.isAccessible = true
-                    kotlinFn.callBy(callByMap)
-                } else {
-                    // Fallback to Java reflection: build args in declaration order
-                    val javaArgs = toolRegistry.method.parameters.map { p -> bindingResult.values[p.name] }
-                    toolRegistry.method.invoke(toolRegistry.bean, *javaArgs.toTypedArray())
-                }
-            } catch (e: Exception) {
-                logger.error("Tool invocation failed: {}", toolName, e)
-                return error(
-                    request.id,
-                    McpErrorCode.TOOL_EXECUTION_FAILED,
-                    "Tool execution failed: ${e.cause?.message ?: e.message}"
-                )
-            }
-
-            logger.debug("Tool invocation succeeded: {}", toolName)
-
-            // Return result
-            JsonRpcResponse(
-                id = request.id,
-                result = mapOf("content" to listOf(mapOf("type" to "text", "text" to result.toString())))
             )
-        } catch (e: Exception) {
-            logger.error("Error handling tool call", e)
-            error(request.id, McpErrorCode.INTERNAL_ERROR, "Internal error: ${e.message}")
-        }
+        )
+    }
+
+    /**
+     * Convert an invocation failure into an MCP tool error response.
+     *
+     * @param requestId JSON-RPC request identifier.
+     * @param toolName tool name used for logging.
+     * @param exception invocation failure.
+     * @return JSON-RPC error response.
+     */
+    private fun executionError(
+        requestId: Any?,
+        toolName: String,
+        exception: Exception
+    ): JsonRpcResponse {
+        logger.error("Tool invocation failed: {}", toolName, exception)
+        return error(
+            requestId,
+            McpErrorCode.TOOL_EXECUTION_FAILED,
+            "Tool execution failed: ${exception.cause?.message ?: exception.message}"
+        )
     }
 
     private fun error(id: Any?, code: Int, message: String): JsonRpcResponse {
@@ -135,228 +238,39 @@ class ToolCallHandler(
     }
 }
 
-/**
- * Exception thrown when parameter binding fails.
- */
-class ParameterBindingException(
-    val parameterName: String,
-    val expectedType: Class<*>,
-    val providedValue: Any?,
-    message: String
-) : Exception(message)
-
-/**
- * Binds request parameters to method arguments.
- */
-class ParameterBinder(
-    private val objectMapper: ObjectMapper
-) {
-    private val logger = LoggerFactory.getLogger(javaClass)
-
-    data class BindingResult(
-        val values: Map<String, Any?>,
-        val provided: Set<String>,
-        val context: Map<String, Any?>
-    )
+private sealed interface ToolRequestParseResult {
+    /**
+     * Parsed tool request payload.
+     *
+     * @property toolName resolved tool name from the request.
+     * @property arguments request arguments keyed by parameter name.
+     */
+    data class Success(
+        val toolName: String,
+        val arguments: Map<String, Any?>
+    ) : ToolRequestParseResult
 
     /**
-     * Bind parameters from request to method arguments.
-     * @throws ParameterBindingException if parameter conversion fails
+     * Error response produced while parsing the tool request.
+     *
+     * @property response JSON-RPC response to return immediately.
      */
-    fun bindParameters(
-        method: java.lang.reflect.Method,
-        arguments: Map<String, Any?>,
-        context: Map<String, Any?>
-    ): BindingResult {
-        val values = mutableMapOf<String, Any?>()
-        val provided = mutableSetOf<String>()
+    data class Error(val response: JsonRpcResponse) : ToolRequestParseResult
+}
 
-        // Precompute Kotlin parameter names (excluding instance param) for robust fallback
-        val kotlinParamNames: List<String?> = method.kotlinFunction
-            ?.parameters
-            ?.filter { it != method.kotlinFunction!!.instanceParameter }
-            ?.map { it.name }
-            ?: emptyList()
+private sealed interface ToolBindingResult {
+    /**
+     * Successful tool argument binding.
+     *
+     * @property bindingResult resolved arguments for invocation.
+     */
+    data class Success(val bindingResult: ParameterBinder.BindingResult) : ToolBindingResult
 
-        var nonInstanceIndex = 0
-        for ((idx, param) in method.parameters.withIndex()) {
-            // Resolve parameter name. Prefer the Java parameter name, but fall back to Kotlin
-            // metadata when the Java name is missing or synthetic (e.g., "arg0"). Use a
-            // position-based fallback against Kotlin parameter names to avoid relying solely
-            // on Java -parameters being present.
-            val javaName = param.name
-            val name: String? = if (javaName == null || javaName.matches(Regex("arg\\d+"))) {
-                // Use the next Kotlin parameter name if available
-                val kname = kotlinParamNames.getOrNull(nonInstanceIndex)
-                nonInstanceIndex++
-                kname ?: javaName
-            } else {
-                nonInstanceIndex++
-                javaName
-            }
-
-            if (name == null || name.matches(Regex("arg\\d+"))) {
-                throw ParameterBindingException(
-                    parameterName = "<unknown>",
-                    expectedType = param.type,
-                    providedValue = null,
-                    message = "Unable to bind parameter with no name"
-                )
-            }
-
-            // Check if this is a context parameter
-            if (param.getAnnotation(McpContext::class.java) != null) {
-                values[name] = context
-                provided.add(name)
-                continue
-            }
-
-            // Get value from arguments
-            val value = arguments[name]
-
-            // Check if parameter is optional (not required and not in arguments)
-            val paramAnnotation = param.getAnnotation(McpParam::class.java)
-            val isOptional = paramAnnotation != null && !paramAnnotation.required
-            val isProvided = arguments.containsKey(name)
-
-            if (!isOptional && !isProvided) {
-                throw ParameterBindingException(
-                    parameterName = name,
-                    expectedType = param.type,
-                    providedValue = null,
-                    message = "Missing required parameter '$name'"
-                )
-            }
-
-            // Type conversion for provided non-null values
-            val convertedValue: Any? = when {
-                value != null && param.type.isAssignableFrom(value.javaClass) -> value
-                value != null && param.type == String::class.java -> value.toString()
-                value != null && (param.type == Int::class.java || param.type == Integer::class.java) -> {
-                    when (value) {
-                        is Number -> value.toInt()
-                        is String -> {
-                            value.toIntOrNull() ?: throw ParameterBindingException(
-                                parameterName = name,
-                                expectedType = param.type,
-                                providedValue = value,
-                                message = "Parameter '$name' expects an integer but got invalid value: '$value'"
-                            )
-                        }
-                        else -> throw ParameterBindingException(
-                            parameterName = name,
-                            expectedType = param.type,
-                            providedValue = value,
-                            message = "Parameter '$name' expects an integer but got ${value.javaClass.simpleName}: $value"
-                        )
-                    }
-                }
-                value != null && param.type == Long::class.java -> {
-                    when (value) {
-                        is Number -> value.toLong()
-                        is String -> {
-                            value.toLongOrNull() ?: throw ParameterBindingException(
-                                parameterName = name,
-                                expectedType = param.type,
-                                providedValue = value,
-                                message = "Parameter '$name' expects a long but got invalid value: '$value'"
-                            )
-                        }
-                        else -> throw ParameterBindingException(
-                            parameterName = name,
-                            expectedType = param.type,
-                            providedValue = value,
-                            message = "Parameter '$name' expects a long but got ${value.javaClass.simpleName}: $value"
-                        )
-                    }
-                }
-                value != null && (param.type == java.lang.Double::class.java || param.type == java.lang.Double.TYPE
-                        || param.type == java.lang.Float::class.java || param.type == java.lang.Float.TYPE) -> {
-                    when (value) {
-                        is Number -> {
-                            // Preserve the requested numeric precision: Float vs Double
-                            if (param.type == java.lang.Float::class.java || param.type == java.lang.Float.TYPE) {
-                                value.toFloat()
-                            } else {
-                                value.toDouble()
-                            }
-                        }
-                        is String -> {
-                            if (param.type == java.lang.Float::class.java || param.type == java.lang.Float.TYPE) {
-                                value.toFloatOrNull() ?: throw ParameterBindingException(
-                                    parameterName = name,
-                                    expectedType = param.type,
-                                    providedValue = value,
-                                    message = "Parameter '$name' expects a decimal number (float) but got invalid value: '$value'"
-                                )
-                            } else {
-                                value.toDoubleOrNull() ?: throw ParameterBindingException(
-                                    parameterName = name,
-                                    expectedType = param.type,
-                                    providedValue = value,
-                                    message = "Parameter '$name' expects a decimal number (double) but got invalid value: '$value'"
-                                )
-                            }
-                        }
-                        else -> throw ParameterBindingException(
-                            parameterName = name,
-                            expectedType = param.type,
-                            providedValue = value,
-                            message = "Parameter '$name' expects a decimal number but got ${value.javaClass.simpleName}: $value"
-                        )
-                    }
-                }
-                value != null && (param.type == java.lang.Boolean::class.java || param.type == java.lang.Boolean.TYPE) -> {
-                    when (value) {
-                        is Boolean -> value
-                        is String -> {
-                            val v = value.trim()
-                            when {
-                                v.equals("true", ignoreCase = true) -> true
-                                v.equals("false", ignoreCase = true) -> false
-                                v.equals("yes", ignoreCase = true) -> true
-                                v.equals("no", ignoreCase = true) -> false
-                                v == "1" -> true
-                                v == "0" -> false
-                                v.equals("on", ignoreCase = true) -> true
-                                v.equals("off", ignoreCase = true) -> false
-                                else -> throw ParameterBindingException(
-                                    parameterName = name,
-                                    expectedType = param.type,
-                                    providedValue = value,
-                                    message = "Parameter '$name' expects a boolean (true/false or yes/no/1/0/on/off) but got: '$value'"
-                                )
-                            }
-                        }
-                        else -> throw ParameterBindingException(
-                            parameterName = name,
-                            expectedType = param.type,
-                            providedValue = value,
-                            message = "Parameter '$name' expects a boolean but got ${value.javaClass.simpleName}: $value"
-                        )
-                    }
-                }
-                value != null -> {
-                    // Try to convert using ObjectMapper
-                    try {
-                        objectMapper.convertValue(value, param.type)
-                    } catch (e: Exception) {
-                        throw ParameterBindingException(
-                            parameterName = name,
-                            expectedType = param.type,
-                            providedValue = value,
-                            message = "Could not convert parameter '$name' to type ${param.type.simpleName}: ${e.message}"
-                        )
-                    }
-                }
-                else -> null
-            }
-
-            values[name] = convertedValue
-            if (isProvided) provided.add(name)
-        }
-
-        return BindingResult(values = values, provided = provided, context = context)
-    }
+    /**
+     * Error response produced while binding tool arguments.
+     *
+     * @property response JSON-RPC response to return immediately.
+     */
+    data class Error(val response: JsonRpcResponse) : ToolBindingResult
 }
 

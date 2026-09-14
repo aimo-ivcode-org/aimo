@@ -13,7 +13,8 @@ import tools.jackson.databind.JsonNode
  * Each `call` method represents a **single provider invocation** and returns usage for that call only:
  * - [AimoChatResponse.usage] reflects tokens consumed in **this specific engine call**
  * - Multi-turn exchanges (tool calls and retries) are **not** orchestrated inside the engine
- * - Instead, orchestration happens at the core layer ([AimoChatClientImpl]) which loops and calls the engine multiple times
+ * - Instead, orchestration happens at the core layer ([AimoChatClientImpl]), which loops and
+ *   calls the engine multiple times
  * - Request-level usage aggregation (summing across tool calls and retries) happens in the core, not the engine
  * - Engine implementations have no knowledge of higher-level tool-call loops; they only handle single-turn model calls
  */

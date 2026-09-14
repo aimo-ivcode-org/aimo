@@ -7,7 +7,8 @@ import org.ivcode.aimo.server.mcp.handler.PromptGetHandler
 import org.ivcode.aimo.server.mcp.handler.ParameterBinder
 import org.ivcode.aimo.server.mcp.registry.McpServiceRegistry
 import org.ivcode.aimo.server.mcp.schema.McpSchemaGenerator
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.context.support.StaticApplicationContext
 import java.io.ByteArrayInputStream
@@ -43,9 +44,9 @@ class StdioMcpTransportTest {
 
             val parameterBinder = ParameterBinder(objectMapper)
             val toolCallHandler = ToolCallHandler(serviceRegistry, parameterBinder)
-            val promptGetHandler = PromptGetHandler(serviceRegistry, parameterBinder, objectMapper)
+            val promptGetHandler = PromptGetHandler(serviceRegistry, parameterBinder)
 
-            val requestHandler = McpRequestHandler(serviceRegistry, toolCallHandler, promptGetHandler, objectMapper)
+            val requestHandler = McpRequestHandler(serviceRegistry, toolCallHandler, promptGetHandler)
 
             val transport = StdioMcpTransport(requestHandler, objectMapper)
 
@@ -70,7 +71,10 @@ class StdioMcpTransportTest {
             System.out.flush()
 
             val outStr = baos.toString(Charsets.UTF_8.name())
-            assertTrue(outStr.contains("POST_STOP_CHECK"), "System.out should remain open and usable after transport.stop()")
+            assertTrue(
+                outStr.contains("POST_STOP_CHECK"),
+                "System.out should remain open and usable after transport.stop()"
+            )
         } finally {
             // Restore original streams
             System.setIn(originalIn)

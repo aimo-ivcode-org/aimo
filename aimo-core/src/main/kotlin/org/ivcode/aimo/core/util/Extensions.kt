@@ -14,5 +14,8 @@ fun Map<String, Any>.getChatId(): UUID? = this[CONTEXT_KEY__CHAT_ID] as? UUID
 fun SystemMessageContext.getRequestId(): UUID? = this.context[CONTEXT_KEY__REQUEST_ID] as? UUID
 fun Map<String, Any>.getRequestId(): UUID? = this[CONTEXT_KEY__REQUEST_ID] as? UUID
 
-fun SystemMessageContext.getConversationClient(): Conversation? = this.context[CONTEXT_KEY__CONVERSATION] as? Conversation
-fun Map<String, Any>.getConversationClient(): Conversation? = this[CONTEXT_KEY__CONVERSATION] as? Conversation
+fun SystemMessageContext.getConversationClient(): Conversation? =
+    this.context[CONTEXT_KEY__CONVERSATION] as? Conversation
+
+fun Map<String, Any>.getConversationClient(): Conversation? =
+    this[CONTEXT_KEY__CONVERSATION] as? Conversation

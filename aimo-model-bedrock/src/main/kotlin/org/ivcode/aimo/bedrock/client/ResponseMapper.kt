@@ -5,6 +5,10 @@ import software.amazon.awssdk.services.bedrockruntime.model.ConverseResponse as 
 import software.amazon.awssdk.services.bedrockruntime.model.Message as BedrockMessage
 import software.amazon.awssdk.services.bedrockruntime.model.ContentBlock as BedrockContentBlock
 import software.amazon.awssdk.services.bedrockruntime.model.ToolResultContentBlock as BedrockToolResultContentBlock
+import software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock as BedrockSystemContentBlock
+import software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration as BedrockToolConfiguration
+import software.amazon.awssdk.services.bedrockruntime.model.Tool as BedrockTool
+import software.amazon.awssdk.services.bedrockruntime.model.InferenceConfiguration as BedrockInferenceConfiguration
 import software.amazon.awssdk.services.bedrockruntime.model.ConversationRole
 
 /**
@@ -59,98 +63,10 @@ internal object ResponseMapper {
     }
 
     fun toBedrockFields(request: ConverseRequest): BedrockRequestFields {
-        val bedrockMessages = request.messages.map { msg ->
-            BedrockMessage.builder()
-                .role(stringToBedrockRole(msg.role))
-                .content(msg.content.map { cb ->
-                    when {
-                        cb.text != null -> BedrockContentBlock.builder()
-                            .text(cb.text)
-                            .build()
-                        cb.toolUse != null -> BedrockContentBlock.builder()
-                            .toolUse(software.amazon.awssdk.services.bedrockruntime.model.ToolUseBlock.builder()
-                                .toolUseId(cb.toolUse.toolUseId)
-                                .name(cb.toolUse.name)
-                                .input(DocumentConverter.anyToDocument(cb.toolUse.input))
-                                .build())
-                            .build()
-                        cb.toolResult != null -> BedrockContentBlock.builder()
-                            .toolResult(software.amazon.awssdk.services.bedrockruntime.model.ToolResultBlock.builder()
-                                .toolUseId(cb.toolResult.toolUseId)
-                                .content(cb.toolResult.content.map { tc ->
-                                    BedrockToolResultContentBlock.builder()
-                                        .text(tc.text.orEmpty())
-                                        .build()
-                                })
-                                .build())
-                            .build()
-                        else -> throw IllegalStateException("Unknown content block type")
-                    }
-                })
-                .build()
-        }
-
-        val bedrockSystemPrompt = request.system?.map { sys ->
-            software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock.builder()
-                .text(sys.text)
-                .build()
-        }?.let { systemBlocks ->
-            if (request.cachePointAfterSystem && systemBlocks.isNotEmpty()) {
-                val cachePoint = software.amazon.awssdk.services.bedrockruntime.model.SystemContentBlock.builder()
-                    .cachePoint(
-                        software.amazon.awssdk.services.bedrockruntime.model.CachePointBlock.builder()
-                            .type(software.amazon.awssdk.services.bedrockruntime.model.CachePointType.DEFAULT)
-                            .build()
-                    )
-                    .build()
-                systemBlocks + cachePoint
-            } else {
-                systemBlocks
-            }
-        }
-
-        val bedrockInferenceConfig = request.inferenceConfig?.let { inf ->
-            software.amazon.awssdk.services.bedrockruntime.model.InferenceConfiguration.builder().apply {
-                inf.maxTokens?.let { maxTokens(it) }
-                inf.temperature?.let { temperature(it.toFloat()) }
-                inf.topP?.let { topP(it.toFloat()) }
-                inf.stopSequences?.let { stopSequences(it) }
-            }.build()
-        }
-
-        val bedrockToolConfig = request.toolConfig?.let { tc ->
-            val mappedTools = tc.tools.map { tool ->
-                    software.amazon.awssdk.services.bedrockruntime.model.Tool.builder()
-                        .toolSpec(
-                            software.amazon.awssdk.services.bedrockruntime.model.ToolSpecification.builder().apply {
-                                name(tool.toolSpec.name)
-                                tool.toolSpec.description?.let { description(it) }
-                                inputSchema(
-                                    software.amazon.awssdk.services.bedrockruntime.model.ToolInputSchema.builder()
-                                        .json(DocumentConverter.anyToDocument(tool.toolSpec.inputSchema.json))
-                                        .build()
-                                )
-                            }.build()
-                        )
-                        .build()
-                }
-
-            val toolsWithCachePoint = if (request.cachePointAfterTools && mappedTools.isNotEmpty()) {
-                mappedTools + software.amazon.awssdk.services.bedrockruntime.model.Tool.builder()
-                    .cachePoint(
-                        software.amazon.awssdk.services.bedrockruntime.model.CachePointBlock.builder()
-                            .type(software.amazon.awssdk.services.bedrockruntime.model.CachePointType.DEFAULT)
-                            .build()
-                    )
-                    .build()
-            } else {
-                mappedTools
-            }
-
-            software.amazon.awssdk.services.bedrockruntime.model.ToolConfiguration.builder()
-                .tools(toolsWithCachePoint)
-                .build()
-        }
+        val bedrockMessages: List<BedrockMessage> = request.messages.map { msg -> mapMessage(msg) }
+        val bedrockSystemPrompt = request.system?.let { mapSystemBlocks(it, request.cachePointAfterSystem) }
+        val bedrockInferenceConfig = request.inferenceConfig?.let(::mapInferenceConfig)
+        val bedrockToolConfig = request.toolConfig?.let { mapToolConfiguration(it, request.cachePointAfterTools) }
 
         return BedrockRequestFields(
             messages = bedrockMessages,
@@ -163,6 +79,124 @@ internal object ResponseMapper {
             ),
         )
     }
+
+    private val mapMessage: (ConverseMessage) -> BedrockMessage = { msg ->
+        BedrockMessage.builder()
+            .role(stringToBedrockRole(msg.role))
+            .content(msg.content.map { mapContentBlock(it) })
+            .build()
+    }
+
+    private val mapContentBlock: (ContentBlock) -> BedrockContentBlock = { cb ->
+        when {
+            cb.text != null -> BedrockContentBlock.builder()
+                .text(cb.text)
+                .build()
+
+            cb.toolUse != null -> BedrockContentBlock.builder()
+                .toolUse(
+                    software.amazon.awssdk.services.bedrockruntime.model.ToolUseBlock.builder()
+                        .toolUseId(cb.toolUse.toolUseId)
+                        .name(cb.toolUse.name)
+                        .input(DocumentConverter.anyToDocument(cb.toolUse.input))
+                        .build(),
+                )
+                .build()
+
+            cb.toolResult != null -> BedrockContentBlock.builder()
+                .toolResult(
+                    software.amazon.awssdk.services.bedrockruntime.model.ToolResultBlock.builder()
+                        .toolUseId(cb.toolResult.toolUseId)
+                        .content(
+                            cb.toolResult.content.map { tc ->
+                                BedrockToolResultContentBlock.builder()
+                                    .text(tc.text.orEmpty())
+                                    .build()
+                            },
+                        )
+                        .build(),
+                )
+                .build()
+
+            else -> throw IllegalStateException("Unknown content block type")
+        }
+    }
+
+    private val mapSystemBlocks: (List<SystemContentBlock>, Boolean) -> List<BedrockSystemContentBlock> =
+        { systemBlocks, cachePointAfterSystem ->
+            val mappedBlocks = systemBlocks.map { mapSystemBlock(it) }
+            if (cachePointAfterSystem && mappedBlocks.isNotEmpty()) {
+                mappedBlocks + buildSystemCachePoint()
+            } else {
+                mappedBlocks
+            }
+        }
+
+    private fun mapSystemBlock(
+        systemBlock: SystemContentBlock,
+    ): BedrockSystemContentBlock =
+        BedrockSystemContentBlock.builder()
+            .text(systemBlock.text)
+            .build()
+
+    private fun buildSystemCachePoint(): BedrockSystemContentBlock =
+        BedrockSystemContentBlock.builder()
+            .cachePoint(
+                software.amazon.awssdk.services.bedrockruntime.model.CachePointBlock.builder()
+                    .type(software.amazon.awssdk.services.bedrockruntime.model.CachePointType.DEFAULT)
+                    .build(),
+            )
+            .build()
+
+    private fun mapInferenceConfig(
+        inferenceConfig: InferenceConfiguration,
+    ): BedrockInferenceConfiguration =
+        BedrockInferenceConfiguration.builder().apply {
+            inferenceConfig.maxTokens?.let { maxTokens(it) }
+            inferenceConfig.temperature?.let { temperature(it.toFloat()) }
+            inferenceConfig.topP?.let { topP(it.toFloat()) }
+            inferenceConfig.stopSequences?.let { stopSequences(it) }
+        }.build()
+
+    private fun mapToolConfiguration(
+        toolConfig: ToolConfiguration,
+        cachePointAfterTools: Boolean,
+    ): BedrockToolConfiguration {
+        val mappedTools = toolConfig.tools.map { mapTool(it) }
+        val toolsWithCachePoint = if (cachePointAfterTools && mappedTools.isNotEmpty()) {
+            mappedTools + buildToolCachePoint()
+        } else {
+            mappedTools
+        }
+
+        return BedrockToolConfiguration.builder()
+            .tools(toolsWithCachePoint)
+            .build()
+    }
+
+    private fun mapTool(tool: Tool): BedrockTool =
+        BedrockTool.builder()
+            .toolSpec(
+                software.amazon.awssdk.services.bedrockruntime.model.ToolSpecification.builder().apply {
+                    name(tool.toolSpec.name)
+                    tool.toolSpec.description?.let { description(it) }
+                    inputSchema(
+                        software.amazon.awssdk.services.bedrockruntime.model.ToolInputSchema.builder()
+                            .json(DocumentConverter.anyToDocument(tool.toolSpec.inputSchema.json))
+                            .build(),
+                    )
+                }.build(),
+            )
+            .build()
+
+    private fun buildToolCachePoint(): BedrockTool =
+        BedrockTool.builder()
+            .cachePoint(
+                software.amazon.awssdk.services.bedrockruntime.model.CachePointBlock.builder()
+                    .type(software.amazon.awssdk.services.bedrockruntime.model.CachePointType.DEFAULT)
+                    .build(),
+            )
+            .build()
 
     private fun mergeAdditionalModelRequestFields(
         existing: Map<String, Any?>?,

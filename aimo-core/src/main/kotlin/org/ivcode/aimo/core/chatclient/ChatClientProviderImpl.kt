@@ -55,18 +55,24 @@ internal class ChatClientProviderImpl(
           return object : AimoChatClient {
               override val chatId = coreClient.chatId
 
-              override fun chat(request: org.ivcode.aimo.core.model.AimoChatRequest): org.ivcode.aimo.core.model.AimoChatResponse {
-                  return nonStreamingChain(request)
-              }
+              override fun chat(
+                   request: org.ivcode.aimo.core.model.AimoChatRequest
+               ): org.ivcode.aimo.core.model.AimoChatResponse {
+                   return nonStreamingChain(request)
+               }
 
-              override fun chatStream(request: org.ivcode.aimo.core.model.AimoChatRequest, callback: (org.ivcode.aimo.core.model.AimoChatResponse) -> Unit): org.ivcode.aimo.core.model.AimoChatResponse {
-                  val base: (org.ivcode.aimo.core.model.AimoChatRequest) -> org.ivcode.aimo.core.model.AimoChatResponse = { req ->
-                      coreClient.chatStream(req, callback)
-                  }
-                  val chain = composeChatInterceptors(effectiveInterceptors, base)
-                  return chain(request)
-              }
-          }
+               override fun chatStream(
+                   request: org.ivcode.aimo.core.model.AimoChatRequest,
+                   callback: (org.ivcode.aimo.core.model.AimoChatResponse) -> Unit
+               ): org.ivcode.aimo.core.model.AimoChatResponse {
+                   val base: (org.ivcode.aimo.core.model.AimoChatRequest) ->
+                       org.ivcode.aimo.core.model.AimoChatResponse = { req ->
+                       coreClient.chatStream(req, callback)
+                   }
+                   val chain = composeChatInterceptors(effectiveInterceptors, base)
+                   return chain(request)
+               }
+           }
     }
 
     override fun getDefaultInterceptors(): List<ChatClientInterceptor> {

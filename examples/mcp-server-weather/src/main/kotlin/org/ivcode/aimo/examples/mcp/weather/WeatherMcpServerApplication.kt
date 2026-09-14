@@ -14,7 +14,8 @@ import org.springframework.boot.runApplication
  * - Get weather:
  *   curl -X POST http://localhost:9090/mcp/ \
  *     -H "Content-Type: application/json" \
- *     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get-weather","arguments":{"city":"Seattle"}}}'
+ *     -d '{"jsonrpc":"2.0","id":1,"method":"tools/call",'
+ *        '"params":{"name":"get-weather","arguments":{"city":"Seattle"}}}'
  *
  * - List tools:
  *   curl -X POST http://localhost:9090/mcp/ \
@@ -28,4 +29,3 @@ class WeatherMcpServerApplication
 fun main(args: Array<String>) {
     runApplication<WeatherMcpServerApplication>(*args)
 }
-

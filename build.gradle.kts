@@ -146,11 +146,9 @@ subprojects {
 
 	pluginManager.withPlugin("org.jetbrains.dokka") {
 		extensions.configure<org.jetbrains.dokka.gradle.DokkaExtension> {
-			dokkaSourceSets.configureEach {
-				val modulePath = project.projectDir
-					.relativeTo(rootDir)
-					.invariantSeparatorsPath
+			val modulePath = projectDir.relativeTo(rootDir).invariantSeparatorsPath
 
+			dokkaSourceSets.configureEach {
 				sourceLink {
 					// local source directory
 					localDirectory.set(file("src/main/kotlin"))

@@ -12,9 +12,6 @@ import org.ivcode.aimo.bedrock.client.BedrockChatClient
 import org.ivcode.aimo.bedrock.client.ContentBlock
 import org.ivcode.aimo.bedrock.client.ConverseMessage
 import org.ivcode.aimo.bedrock.client.ConverseRequest
-import org.ivcode.aimo.bedrock.client.InferenceConfiguration
-import org.ivcode.aimo.bedrock.client.InputSchema
-import org.ivcode.aimo.bedrock.client.SystemContentBlock
 import org.ivcode.aimo.bedrock.client.Tool
 import org.ivcode.aimo.bedrock.client.ToolConfiguration
 import org.ivcode.aimo.bedrock.client.ToolSpec
@@ -26,12 +23,15 @@ import org.ivcode.aimo.core.model.AimoPromptCacheUsage
 import org.ivcode.aimo.core.model.AimoToolCall
 import org.ivcode.aimo.core.model.AimoUsage
 import org.ivcode.aimo.core.model.ToolDefinition
-import tools.jackson.databind.JsonNode
 import tools.jackson.core.type.TypeReference
+import tools.jackson.databind.JsonNode
 import tools.jackson.module.kotlin.jacksonObjectMapper
+import java.io.IOException
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.UUID
+
+private val schemaMapper = jacksonObjectMapper()
 
 /**
  * [AimoChatModelProviderFactory] backed by AWS Bedrock API.
@@ -196,77 +196,6 @@ class BedrockChatModelFactory(
     }
 }
 
-// =============================================================================
-// Option-map → typed-options conversions (file-private)
-// =============================================================================
-
-/**
- * Converts a raw Bedrock options map to the provider-agnostic [AimoChatOptions].
- *
- * Keys that have no standard counterpart are collected into [AimoChatOptions.providerOptions].
- */
-private fun Map<String, Any>.toAimoChatOptions(): AimoChatOptions {
-    var model: String? = null
-    var temperature: Double? = null
-    var maxTokens: Int? = null
-    var topP: Double? = null
-    var topK: Int? = null
-    var frequencyPenalty: Double? = null
-    var presencePenalty: Double? = null
-    var stopSequences = emptyList<String>()
-    val providerOptions = mutableMapOf<String, Any>()
-
-    forEach { (key, value) ->
-        when (key.lowercase().replace("-", "").replace("_", "")) {
-            "model" -> model = value.toString()
-            "temperature" -> temperature = value.asDouble()
-            "maxtokens" -> maxTokens = value.asInt()
-            "topp" -> topP = value.asDouble()
-            "topk" -> topK = value.asInt()
-            "frequencypenalty" -> frequencyPenalty = value.asDouble()
-            "presencepenalty" -> presencePenalty = value.asDouble()
-            "stop" -> stopSequences = value.asStringList()
-            else -> providerOptions[key] = value
-        }
-    }
-
-    return AimoChatOptions(
-        model = model,
-        temperature = temperature,
-        maxTokens = maxTokens,
-        topP = topP,
-        topK = topK,
-        frequencyPenalty = frequencyPenalty,
-        presencePenalty = presencePenalty,
-        stopSequences = stopSequences,
-        providerOptions = providerOptions,
-    )
-}
-
-// Small type-coercion helpers
-private fun Any.asInt(): Int = when (this) {
-    is Number -> toInt()
-    else -> toString().toInt()
-}
-
-private fun Any.asDouble(): Double = when (this) {
-    is Number -> toDouble()
-    else -> toString().toDouble()
-}
-
-private fun Any.asStringList(): List<String> = when (this) {
-    is List<*> -> this
-        .mapNotNull { item -> item?.toString()?.trim()?.takeIf { it.isNotEmpty() } }
-    else -> toString()
-        .split(",")
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-}
-
-// =============================================================================
-// BedrockChatEngineImpl
-// =============================================================================
-
 /**
  * [AimoChatEngine] implementation that delegates to [BedrockChatClient].
  */
@@ -314,7 +243,7 @@ internal class BedrockChatEngineImpl(
             .mapNotNull { msg ->
                 msg.content
                     ?.takeIf { it.isNotBlank() }
-                    ?.let { SystemContentBlock(text = it) }
+                    ?.let { org.ivcode.aimo.bedrock.client.SystemContentBlock(text = it) }
             }
             .toList()
 
@@ -415,35 +344,23 @@ internal class BedrockChatEngineImpl(
         )
     }
 
-    private fun buildUsage(usage: org.ivcode.aimo.bedrock.client.Usage?): AimoUsage? {
-        // Return null if no usage data is available (SDK didn't provide it)
-        if (usage == null) {
-            return null
-        }
-        // Return null if all usage fields are null or zero
-        if (usage.inputTokens == null && usage.outputTokens == null &&
-            usage.cacheReadInputTokens == 0 && usage.cacheWriteInputTokens == 0) {
-            return null
-        }
+    private fun buildUsage(usage: org.ivcode.aimo.bedrock.client.Usage?): AimoUsage? =
+        usage?.takeIf { it.hasMeaningfulValues() }?.let { resolvedUsage ->
+            val cacheRead = resolvedUsage.cacheReadInputTokens
+            val cacheWrite = resolvedUsage.cacheWriteInputTokens
 
-        val cacheRead = usage.cacheReadInputTokens
-        val cacheWrite = usage.cacheWriteInputTokens
-        return AimoUsage(
-            inputTokens = usage.inputTokens,
-            outputTokens = usage.outputTokens,
-            promptCache = if (cacheRead > 0 || cacheWrite > 0) {
-                AimoPromptCacheUsage(
-                    cacheReadInputTokens = cacheRead,
-                    cacheWriteInputTokens = cacheWrite,
-                )
-            } else null,
-        )
-    }
+            AimoUsage(
+                inputTokens = resolvedUsage.inputTokens,
+                outputTokens = resolvedUsage.outputTokens,
+                promptCache = if (cacheRead > 0 || cacheWrite > 0) {
+                    AimoPromptCacheUsage(
+                        cacheReadInputTokens = cacheRead,
+                        cacheWriteInputTokens = cacheWrite,
+                    )
+                } else null,
+            )
+        }
 }
-
-// =============================================================================
-// Extension helpers (file-private)
-// =============================================================================
 
 private fun AimoChatMessage.toConverseMessageOrNull(): ConverseMessage? {
     val role = when (type) {
@@ -455,116 +372,69 @@ private fun AimoChatMessage.toConverseMessageOrNull(): ConverseMessage? {
         AimoChatMessageType.TOOL -> "user"
     }
 
-    val blocks = mutableListOf<ContentBlock>()
+    val blocks = when (type) {
+        AimoChatMessageType.TOOL -> toolResultBlocks()
+        AimoChatMessageType.ASSISTANT -> assistantBlocks()
+        else -> userTextBlocks()
+    }
 
-    when (type) {
-        AimoChatMessageType.TOOL -> {
-            // Tool results must be mapped to ToolResultBlock to complete the tool-calling loop
-            val toolUseId = toolCallId ?: return null
-            val resultContent = content?.takeIf { it.isNotBlank() }
-                ?.let { listOf(ContentBlock(text = it)) }
-                ?: emptyList()
-            blocks += ContentBlock(
+    return if (blocks.isEmpty()) null else ConverseMessage(role = role, content = blocks)
+}
+
+private fun AimoChatMessage.toolResultBlocks(): List<ContentBlock> =
+    toolCallId?.takeIf { it.isNotBlank() }?.let { toolUseId ->
+        val resultContent = content?.takeIf { it.isNotBlank() }
+            ?.let { listOf(ContentBlock(text = it)) }
+            ?: emptyList()
+
+        listOf(
+            ContentBlock(
                 toolResult = org.ivcode.aimo.bedrock.client.ToolResult(
                     toolUseId = toolUseId,
                     content = resultContent,
-                )
-            )
-        }
-        AimoChatMessageType.ASSISTANT -> {
-            val text = content?.takeIf { it.isNotBlank() }
-            if (text != null) {
-                blocks += ContentBlock(text = text)
-            }
-            toolCalls.orEmpty().forEach { call ->
-                blocks += ContentBlock(
-                    toolUse = ToolUse(
-                        toolUseId = call.id,
-                        name = call.name,
-                        input = call.arguments.toJsonMap(),
-                    )
-                )
-            }
-        }
-        else -> {
-            val text = content?.takeIf { it.isNotBlank() }
-            if (text != null) {
-                blocks += ContentBlock(text = text)
-            }
-        }
+                ),
+            ),
+        )
+    } ?: emptyList()
+
+private fun AimoChatMessage.assistantBlocks(): List<ContentBlock> {
+    val blocks = mutableListOf<ContentBlock>()
+    content?.takeIf { it.isNotBlank() }?.let { blocks += ContentBlock(text = it) }
+    toolCalls.orEmpty().forEach { call ->
+        blocks += ContentBlock(
+            toolUse = ToolUse(
+                toolUseId = call.id,
+                name = call.name,
+                input = call.arguments.toJsonMap(),
+            ),
+        )
     }
-
-    if (blocks.isEmpty()) return null
-
-    return ConverseMessage(role = role, content = blocks)
+    return blocks
 }
 
-private fun String.toJsonMap(): Map<String, Any?> {
-    return try {
+private fun AimoChatMessage.userTextBlocks(): List<ContentBlock> =
+    content?.takeIf { it.isNotBlank() }
+        ?.let { listOf(ContentBlock(text = it)) }
+        ?: emptyList()
+
+private fun String.toJsonMap(): Map<String, Any?> =
+    try {
         schemaMapper.readValue(this, object : TypeReference<Map<String, Any?>>() {})
-    } catch (_: Exception) {
+    } catch (_: IOException) {
         mapOf("raw" to this)
     }
-}
 
 private fun ToolDefinition.toTool(): Tool {
     return Tool(
         toolSpec = ToolSpec(
             name = name,
             description = description,
-            inputSchema = InputSchema(json = inputSchema.treeToMap()),
+            inputSchema = org.ivcode.aimo.bedrock.client.InputSchema(json = inputSchema.treeToMap()),
         )
     )
 }
 
-private val schemaMapper = jacksonObjectMapper()
-
-private fun JsonNode.treeToMap(): Map<String, Any?> {
-    return try {
+private fun JsonNode.treeToMap(): Map<String, Any?> =
+    runCatching {
         schemaMapper.treeToValue(this, object : TypeReference<Map<String, Any?>>() {})
-    } catch (e: Exception) {
-        emptyMap()
-    }
-}
-
-private fun AimoChatOptions.toInferenceConfiguration(): InferenceConfiguration? {
-    val hasValues = temperature != null || maxTokens != null || topP != null ||
-        topK != null || stopSequences.isNotEmpty()
-    if (!hasValues) return null
-    return InferenceConfiguration(
-        maxTokens = maxTokens,
-        temperature = temperature,
-        topP = topP,
-        topK = topK,
-        stopSequences = stopSequences.ifEmpty { null },
-    )
-}
-
-private fun AimoChatOptions.additionalModelRequestFields(): Map<String, Any?>? {
-    fun Any?.asStringKeyedMap(): Map<String, Any?>? = when (this) {
-        is Map<*, *> -> this.entries.associate { it.key.toString() to it.value }
-        else -> null
-    }
-
-    val direct = providerOptions["additionalModelRequestFields"].asStringKeyedMap()
-    val kebab = providerOptions["additional-model-request-fields"].asStringKeyedMap()
-    val snake = providerOptions["additional_model_request_fields"].asStringKeyedMap()
-
-    val merged = LinkedHashMap<String, Any?>()
-    if (!direct.isNullOrEmpty()) merged.putAll(direct)
-    else if (!kebab.isNullOrEmpty()) merged.putAll(kebab)
-    else if (!snake.isNullOrEmpty()) merged.putAll(snake)
-
-    if (frequencyPenalty != null && merged.keys.none { it.normalizedOptionKey() == "frequencypenalty" }) {
-        merged["frequency_penalty"] = frequencyPenalty
-    }
-    if (presencePenalty != null && merged.keys.none { it.normalizedOptionKey() == "presencepenalty" }) {
-        merged["presence_penalty"] = presencePenalty
-    }
-
-    return merged.takeIf { it.isNotEmpty() }
-}
-
-private fun String.normalizedOptionKey(): String =
-    lowercase().replace("-", "").replace("_", "")
-
+    }.getOrElse { emptyMap() }

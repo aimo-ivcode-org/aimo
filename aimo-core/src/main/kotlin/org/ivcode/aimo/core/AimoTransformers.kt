@@ -32,6 +32,8 @@ internal fun ChatMessageEntity.toAimoChatMessage() = AimoChatMessage(
     done = true,
 )
 
+
+
 private fun String.toAimoChatMessageType(): AimoChatMessageType = when(this) {
     "SYSTEM" -> AimoChatMessageType.SYSTEM
     "USER" -> AimoChatMessageType.USER

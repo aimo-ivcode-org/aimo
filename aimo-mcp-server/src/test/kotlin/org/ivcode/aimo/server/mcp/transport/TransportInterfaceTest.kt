@@ -2,7 +2,9 @@ package org.ivcode.aimo.server.mcp.transport
 
 import org.ivcode.aimo.server.mcp.protocol.McpErrorCode
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertFalse
 
 class TransportInterfaceTest {
 

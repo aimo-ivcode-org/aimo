@@ -51,3 +51,6 @@ data/
 ### Open-Spec ###
 .github/skills/openspec*
 .github/prompts/opsx*
+
+### Gh Skills ###
+.agents/

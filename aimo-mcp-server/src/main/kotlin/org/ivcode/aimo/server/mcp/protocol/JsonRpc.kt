@@ -10,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 abstract class JsonRpcMessage {
-    @JsonProperty("jsonrpc")
+    @field:JsonProperty("jsonrpc")
     val jsonRpc: String = "2.0"
 }
 
@@ -19,13 +19,13 @@ abstract class JsonRpcMessage {
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class JsonRpcRequest(
-    @JsonProperty("id")
+    @field:JsonProperty("id")
     val id: Any? = null,
 
-    @JsonProperty("method")
+    @field:JsonProperty("method")
     val method: String,
 
-    @JsonProperty("params")
+    @field:JsonProperty("params")
     val params: Map<String, Any?>? = null
  ) : JsonRpcMessage() {
     private val additionalProperties = mutableMapOf<String, Any?>()
@@ -44,13 +44,13 @@ data class JsonRpcRequest(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class JsonRpcResponse(
-    @JsonProperty("id")
+    @field:JsonProperty("id")
     val id: Any? = null,
 
-    @JsonProperty("result")
+    @field:JsonProperty("result")
     val result: Any? = null,
 
-    @JsonProperty("error")
+    @field:JsonProperty("error")
     val error: JsonRpcError? = null
 ) : JsonRpcMessage()
 
@@ -59,13 +59,13 @@ data class JsonRpcResponse(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class JsonRpcError(
-    @JsonProperty("code")
+    @field:JsonProperty("code")
     val code: Int,
 
-    @JsonProperty("message")
+    @field:JsonProperty("message")
     val message: String,
 
-    @JsonProperty("data")
+    @field:JsonProperty("data")
     val data: Any? = null
 )
 
@@ -91,13 +91,13 @@ object McpErrorCode {
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class InitializeRequest(
-    @JsonProperty("protocolVersion")
+    @field:JsonProperty("protocolVersion")
     val protocolVersion: String,
 
-    @JsonProperty("capabilities")
+    @field:JsonProperty("capabilities")
     val capabilities: Map<String, Any?>,
 
-    @JsonProperty("clientInfo")
+    @field:JsonProperty("clientInfo")
     val clientInfo: ClientInfo
 )
 
@@ -106,10 +106,10 @@ data class InitializeRequest(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ClientInfo(
-    @JsonProperty("name")
+    @field:JsonProperty("name")
     val name: String,
 
-    @JsonProperty("version")
+    @field:JsonProperty("version")
     val version: String
 )
 
@@ -118,13 +118,13 @@ data class ClientInfo(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class InitializeResponse(
-    @JsonProperty("protocolVersion")
+    @field:JsonProperty("protocolVersion")
     val protocolVersion: String,
 
-    @JsonProperty("capabilities")
+    @field:JsonProperty("capabilities")
     val capabilities: ServerCapabilities,
 
-    @JsonProperty("serverInfo")
+    @field:JsonProperty("serverInfo")
     val serverInfo: ServerInfo
 )
 
@@ -133,34 +133,34 @@ data class InitializeResponse(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ServerCapabilities(
-    @JsonProperty("tools")
+    @field:JsonProperty("tools")
     val tools: ToolCapability? = null,
 
-    @JsonProperty("prompts")
+    @field:JsonProperty("prompts")
     val prompts: PromptCapability? = null,
 
-    @JsonProperty("resources")
+    @field:JsonProperty("resources")
     val resources: ResourceCapability? = null
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ToolCapability(
-    @JsonProperty("listChanged")
+    @field:JsonProperty("listChanged")
     val listChanged: Boolean? = null
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class PromptCapability(
-    @JsonProperty("listChanged")
+    @field:JsonProperty("listChanged")
     val listChanged: Boolean? = null
 )
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ResourceCapability(
-    @JsonProperty("subscribe")
+    @field:JsonProperty("subscribe")
     val subscribe: Boolean? = null,
 
-    @JsonProperty("listChanged")
+    @field:JsonProperty("listChanged")
     val listChanged: Boolean? = null
 )
 
@@ -169,10 +169,10 @@ data class ResourceCapability(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ServerInfo(
-    @JsonProperty("name")
+    @field:JsonProperty("name")
     val name: String,
 
-    @JsonProperty("version")
+    @field:JsonProperty("version")
     val version: String
 )
 
@@ -181,13 +181,13 @@ data class ServerInfo(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ToolDefinition(
-    @JsonProperty("name")
+    @field:JsonProperty("name")
     val name: String,
 
-    @JsonProperty("description")
+    @field:JsonProperty("description")
     val description: String? = null,
 
-    @JsonProperty("inputSchema")
+    @field:JsonProperty("inputSchema")
     val inputSchema: ToolInputSchema? = null
 )
 
@@ -196,13 +196,13 @@ data class ToolDefinition(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ToolInputSchema(
-    @JsonProperty("type")
+    @field:JsonProperty("type")
     val type: String = "object",
 
-    @JsonProperty("properties")
+    @field:JsonProperty("properties")
     val properties: Map<String, PropertySchema>,
 
-    @JsonProperty("required")
+    @field:JsonProperty("required")
     val required: List<String>? = null
 )
 
@@ -211,16 +211,16 @@ data class ToolInputSchema(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class PropertySchema(
-    @JsonProperty("type")
+    @field:JsonProperty("type")
     val type: String,
 
-    @JsonProperty("description")
+    @field:JsonProperty("description")
     val description: String? = null,
 
-    @JsonProperty("items")
+    @field:JsonProperty("items")
     val items: PropertySchema? = null,
 
-    @JsonProperty("enum")
+    @field:JsonProperty("enum")
     val enum: List<Any>? = null
 )
 
@@ -229,13 +229,13 @@ data class PropertySchema(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class PromptDefinition(
-    @JsonProperty("name")
+    @field:JsonProperty("name")
     val name: String,
 
-    @JsonProperty("description")
+    @field:JsonProperty("description")
     val description: String? = null,
 
-    @JsonProperty("arguments")
+    @field:JsonProperty("arguments")
     val arguments: List<PromptArgument>? = null
 )
 
@@ -244,13 +244,13 @@ data class PromptDefinition(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class PromptArgument(
-    @JsonProperty("name")
+    @field:JsonProperty("name")
     val name: String,
 
-    @JsonProperty("description")
+    @field:JsonProperty("description")
     val description: String? = null,
 
-    @JsonProperty("required")
+    @field:JsonProperty("required")
     val required: Boolean = false
 )
 
@@ -259,16 +259,15 @@ data class PromptArgument(
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 data class ResourceDefinition(
-    @JsonProperty("uri")
+    @field:JsonProperty("uri")
     val uri: String,
 
-    @JsonProperty("name")
+    @field:JsonProperty("name")
     val name: String? = null,
 
-    @JsonProperty("description")
+    @field:JsonProperty("description")
     val description: String? = null,
 
-    @JsonProperty("mimeType")
+    @field:JsonProperty("mimeType")
     val mimeType: String? = null
 )
-

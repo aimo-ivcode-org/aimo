@@ -1,11 +1,13 @@
 package org.ivcode.aimo.server.mcp.transport
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.core.JsonProcessingException
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcRequest
 import org.ivcode.aimo.server.mcp.protocol.JsonRpcResponse
 import org.slf4j.LoggerFactory
 import org.springframework.context.Lifecycle
 import java.io.BufferedReader
+import java.io.IOException
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import kotlin.concurrent.thread
@@ -72,9 +74,9 @@ class StdioMcpTransport(
                         handleStdioLine(line)
                     }
                 }
-            } catch (e: Exception) {
+            } catch (exception: IOException) {
                 if (isRunning) {
-                    logger.error("Error reading from stdin", e)
+                    logger.error("Error reading from stdin", exception)
                 }
             } finally {
                 logger.debug("Stdio reader thread exiting")
@@ -93,32 +95,21 @@ class StdioMcpTransport(
         logger.info("Stopping stdio MCP transport listener")
         isRunning = false
 
-        try {
-            // Do not close System.in / System.out wrappers: closing them can break
-            // the host application's global IO. Instead, flush the output writer
-            // and rely on thread interruption to stop the reader loop.
-            try {
-                writer.flush()
-            } catch (_: Exception) {
-                // ignore flush errors
-            }
-        } catch (e: Exception) {
-            logger.debug("Error closing stdio streams", e)
-        }
+        // Do not close System.in / System.out wrappers: closing them can break
+        // the host application's global IO. Instead, flush the output writer
+        // and rely on thread interruption to stop the reader loop.
+        writer.flush()
 
         // Interrupt and join the reader thread if it's a different thread than the caller.
         val rt = readerThread
         if (rt != null && rt != Thread.currentThread()) {
-            try {
-                rt.interrupt()
-            } catch (_: Exception) {
-                // ignore
-            }
+            rt.interrupt()
 
             try {
-                rt.join(5000)
-            } catch (_: Exception) {
-                logger.debug("Reader thread did not terminate within timeout")
+                rt.join(READER_THREAD_JOIN_TIMEOUT_MILLIS)
+            } catch (exception: InterruptedException) {
+                Thread.currentThread().interrupt()
+                logger.debug("Reader thread join interrupted", exception)
             }
         }
     }
@@ -147,13 +138,13 @@ class StdioMcpTransport(
             writer.flush()
 
             logger.debug("Sent stdio response: id={}", response.id)
-        } catch (e: Exception) {
-            logger.error("Error processing stdio line: {}", line, e)
+        } catch (exception: JsonProcessingException) {
+            logger.error("Error processing stdio line: {}", line, exception)
             try {
                 val error = mapOf(
                     "jsonrpc" to "2.0",
                     "error" to mapOf(
-                        "code" to -32700,
+                        "code" to JSON_RPC_PARSE_ERROR,
                         "message" to "Parse error"
                     ),
                     "id" to null
@@ -161,10 +152,19 @@ class StdioMcpTransport(
                 val errorJson = objectMapper.writeValueAsString(error)
                 writer.println(errorJson)
                 writer.flush()
-            } catch (writeError: Exception) {
-                logger.error("Error sending error response", writeError)
+            } catch (writeException: JsonProcessingException) {
+                logger.error("Error sending error response", writeException)
+            } catch (writeException: IllegalArgumentException) {
+                logger.error("Error sending error response", writeException)
             }
+        } catch (exception: IllegalArgumentException) {
+            logger.error("Error processing stdio line: {}", line, exception)
         }
+    }
+
+    private companion object {
+        private const val READER_THREAD_JOIN_TIMEOUT_MILLIS = 5_000L
+        private const val JSON_RPC_PARSE_ERROR = -32700
     }
 }
 

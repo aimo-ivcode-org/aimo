@@ -3,11 +3,17 @@ package org.ivcode.aimo.core.chatclient
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.conversation.Conversation
-import org.ivcode.aimo.core.model.*
+import org.ivcode.aimo.core.model.AimoChatEngine
+import org.ivcode.aimo.core.model.AimoChatMessage
+import org.ivcode.aimo.core.model.AimoChatMessageType
+import org.ivcode.aimo.core.model.AimoChatModelConfig
+import org.ivcode.aimo.core.model.AimoChatOptions
+import org.ivcode.aimo.core.model.AimoChatRequest
+import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoPrompt
 import java.time.Instant
 import java.util.UUID
 
@@ -32,8 +38,12 @@ class ChatClientProviderImplIntegrationTest {
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-            override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
-            override fun getGlobalScope(): ChatScope = scope
+            override fun getScope(id: String, context: Map<String, Any>): ChatScope? {
+                return if (id == scope.id) scope else null
+            }
+            override fun getGlobalScope(): ChatScope {
+                return scope
+            }
         }
 
         // Minimal conversation implementation
@@ -41,10 +51,10 @@ class ChatClientProviderImplIntegrationTest {
         val conversation = object : Conversation {
             override val chatId: UUID = convId
             override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = null
-            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {}
+            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) = Unit
             override fun getChatMetadata(): Map<String, Any> = emptyMap()
             override fun getChatProperty(property: String): Any? = null
-            override fun writeChatProperty(property: String, value: Any) {}
+            override fun writeChatProperty(property: String, value: Any) = Unit
             override fun deleteChatProperty(property: String): Boolean = false
         }
 
@@ -79,7 +89,10 @@ class ChatClientProviderImplIntegrationTest {
 
         val modelConfig = AimoChatModelConfig(name = "test", chatEngine = engine, isPrimary = true)
 
-        val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+        val providerFactory = ChatClientProviderImpl(
+            chatScopeProvider = scopeProvider,
+            defaultInterceptors = emptyList()
+        )
 
         // Create client with our test interceptor
         val client = providerFactory.createClient(
@@ -129,14 +142,25 @@ class ChatClientProviderImplIntegrationTest {
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-            override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
-            override fun getGlobalScope(): ChatScope = scope
+            override fun getScope(id: String, context: Map<String, Any>): ChatScope? {
+                return if (id == scope.id) scope else null
+            }
+            override fun getGlobalScope(): ChatScope {
+                return scope
+            }
         }
 
         val convId = UUID.randomUUID()
         val conversation = createTestConversation(convId)
-        val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
-        val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+        val modelConfig = AimoChatModelConfig(
+            name = "test",
+            chatEngine = createTestEngine(convId),
+            isPrimary = true
+        )
+        val providerFactory = ChatClientProviderImpl(
+            chatScopeProvider = scopeProvider,
+            defaultInterceptors = emptyList()
+        )
 
         val client = providerFactory.createClient(
             model = modelConfig,
@@ -183,14 +207,25 @@ class ChatClientProviderImplIntegrationTest {
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-            override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
-            override fun getGlobalScope(): ChatScope = scope
+            override fun getScope(id: String, context: Map<String, Any>): ChatScope? {
+                return if (id == scope.id) scope else null
+            }
+            override fun getGlobalScope(): ChatScope {
+                return scope
+            }
         }
 
         val convId = UUID.randomUUID()
         val conversation = createTestConversation(convId)
-        val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
-        val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+        val modelConfig = AimoChatModelConfig(
+            name = "test",
+            chatEngine = createTestEngine(convId),
+            isPrimary = true
+        )
+        val providerFactory = ChatClientProviderImpl(
+            chatScopeProvider = scopeProvider,
+            defaultInterceptors = emptyList()
+        )
 
         val client = providerFactory.createClient(
             model = modelConfig,
@@ -221,14 +256,25 @@ class ChatClientProviderImplIntegrationTest {
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-            override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
-            override fun getGlobalScope(): ChatScope = scope
+            override fun getScope(id: String, context: Map<String, Any>): ChatScope? {
+                return if (id == scope.id) scope else null
+            }
+            override fun getGlobalScope(): ChatScope {
+                return scope
+            }
         }
 
         val convId = UUID.randomUUID()
         val conversation = createTestConversation(convId)
-        val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
-        val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+        val modelConfig = AimoChatModelConfig(
+            name = "test",
+            chatEngine = createTestEngine(convId),
+            isPrimary = true
+        )
+        val providerFactory = ChatClientProviderImpl(
+            chatScopeProvider = scopeProvider,
+            defaultInterceptors = emptyList()
+        )
 
         val client = providerFactory.createClient(
             model = modelConfig,
@@ -292,14 +338,22 @@ class ChatClientProviderImplIntegrationTest {
         val scope = ChatScope(id = "global", displayName = "global", description = "global")
         val scopeProvider = object : ChatScopeProvider {
             override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-            override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
+            override fun getScope(id: String, context: Map<String, Any>): ChatScope? =
+                if (id == scope.id) scope else null
             override fun getGlobalScope(): ChatScope = scope
         }
 
         val convId = UUID.randomUUID()
         val conversation = createTestConversation(convId)
-        val modelConfig = AimoChatModelConfig(name = "test", chatEngine = streamingEngine, isPrimary = true)
-        val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+        val modelConfig = AimoChatModelConfig(
+            name = "test",
+            chatEngine = streamingEngine,
+            isPrimary = true
+        )
+        val providerFactory = ChatClientProviderImpl(
+            chatScopeProvider = scopeProvider,
+            defaultInterceptors = emptyList()
+        )
 
         val client = providerFactory.createClient(
             model = modelConfig,
@@ -310,7 +364,7 @@ class ChatClientProviderImplIntegrationTest {
 
         val response = client.chatStream(
             AimoChatRequest(prompt = "test", context = emptyMap())
-        ) { chunk ->
+        ) { _ ->
             callbackInvocations.add("chunk-received")
         }
 
@@ -351,14 +405,19 @@ class ChatClientProviderImplIntegrationTest {
          val scope = ChatScope(id = "global", displayName = "global", description = "global")
          val scopeProvider = object : ChatScopeProvider {
              override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-             override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
+             override fun getScope(id: String, context: Map<String, Any>): ChatScope? =
+                 if (id == scope.id) scope else null
              override fun getGlobalScope(): ChatScope = scope
          }
 
          val convId = UUID.randomUUID()
          val conversation = createTestConversation(convId)
-         val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
-         
+         val modelConfig = AimoChatModelConfig(
+             name = "test",
+             chatEngine = createTestEngine(convId),
+             isPrimary = true
+         )
+
          // Create provider with default interceptor
          val providerFactory = ChatClientProviderImpl(
              chatScopeProvider = scopeProvider,
@@ -400,14 +459,22 @@ class ChatClientProviderImplIntegrationTest {
          val scope = ChatScope(id = "global", displayName = "global", description = "global")
          val scopeProvider = object : ChatScopeProvider {
              override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-             override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
+             override fun getScope(id: String, context: Map<String, Any>): ChatScope? =
+                 if (id == scope.id) scope else null
              override fun getGlobalScope(): ChatScope = scope
          }
 
          val convId = UUID.randomUUID()
          val conversation = createTestConversation(convId)
-         val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
-         val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+         val modelConfig = AimoChatModelConfig(
+             name = "test",
+             chatEngine = createTestEngine(convId),
+             isPrimary = true
+         )
+         val providerFactory = ChatClientProviderImpl(
+             chatScopeProvider = scopeProvider,
+             defaultInterceptors = emptyList()
+         )
 
          // Create request with custom context values
          val customContextValue = "test-metadata"
@@ -424,7 +491,11 @@ class ChatClientProviderImplIntegrationTest {
          client.chat(AimoChatRequest(prompt = "hello", context = requestContext))
 
          // Verify interceptor received the context value via request.context
-         assertEquals(customContextValue, capturedContextValue, "Interceptor should be able to access custom context values from request")
+         assertEquals(
+             customContextValue,
+             capturedContextValue,
+             "Interceptor should be able to access custom context values from request"
+         )
      }
 
      @Test
@@ -458,14 +529,20 @@ class ChatClientProviderImplIntegrationTest {
          val scope = ChatScope(id = "global", displayName = "global", description = "global")
          val scopeProvider = object : ChatScopeProvider {
              override fun getScopes(context: Map<String, Any>): List<ChatScope> = listOf(scope)
-             override fun getScope(id: String, context: Map<String, Any>): ChatScope? = if (id == scope.id) scope else null
+             override fun getScope(
+                 id: String,
+                 context: Map<String, Any>
+             ): ChatScope? = if (id == scope.id) scope else null
              override fun getGlobalScope(): ChatScope = scope
          }
 
          val convId = UUID.randomUUID()
          val conversation = createTestConversation(convId)
          val modelConfig = AimoChatModelConfig(name = "test", chatEngine = createTestEngine(convId), isPrimary = true)
-         val providerFactory = ChatClientProviderImpl(chatScopeProvider = scopeProvider, defaultInterceptors = emptyList())
+         val providerFactory = ChatClientProviderImpl(
+             chatScopeProvider = scopeProvider,
+             defaultInterceptors = emptyList()
+         )
 
          val client = providerFactory.createClient(
              model = modelConfig,
@@ -484,10 +561,10 @@ class ChatClientProviderImplIntegrationTest {
         return object : Conversation {
             override val chatId: UUID = convId
             override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = null
-            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {}
+            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) = Unit
             override fun getChatMetadata(): Map<String, Any> = emptyMap()
             override fun getChatProperty(property: String): Any? = null
-            override fun writeChatProperty(property: String, value: Any) {}
+            override fun writeChatProperty(property: String, value: Any) = Unit
             override fun deleteChatProperty(property: String): Boolean = false
         }
     }

@@ -8,21 +8,12 @@ import org.ivcode.aimo.server.mcp.handler.PromptGetHandler
 import org.ivcode.aimo.server.mcp.handler.ToolCallHandler
 import org.ivcode.aimo.server.mcp.registry.McpServiceRegistry
 import org.ivcode.aimo.server.mcp.schema.McpSchemaGenerator
-import org.ivcode.aimo.server.mcp.transport.HttpMcpTransport
-import org.ivcode.aimo.server.mcp.transport.SseMcpTransport
-import org.ivcode.aimo.server.mcp.transport.TransportCoordinator
 import org.ivcode.aimo.server.mcp.validation.ParameterValidator
-import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.beans.factory.ObjectProvider
-import org.ivcode.aimo.server.mcp.transport.StdioMcpTransport
-import org.springframework.context.event.ContextRefreshedEvent
-import org.springframework.context.event.EventListener
 
 /**
  * Spring Boot auto-configuration for MCP server framework.
@@ -36,7 +27,6 @@ import org.springframework.context.event.EventListener
 @Configuration
 @EnableConfigurationProperties(McpServerProperties::class)
 class McpServerAutoConfiguration {
-    private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
      * Configure ObjectMapper for JSON serialization.
@@ -115,10 +105,9 @@ class McpServerAutoConfiguration {
     @ConditionalOnMissingBean(PromptGetHandler::class)
     fun promptGetHandler(
         serviceRegistry: McpServiceRegistry,
-        parameterBinder: ParameterBinder,
-        objectMapper: ObjectMapper
+        parameterBinder: ParameterBinder
     ): PromptGetHandler {
-        return PromptGetHandler(serviceRegistry, parameterBinder, objectMapper)
+        return PromptGetHandler(serviceRegistry, parameterBinder)
     }
 
     /**
@@ -129,107 +118,9 @@ class McpServerAutoConfiguration {
     fun mcpRequestHandler(
         serviceRegistry: McpServiceRegistry,
         toolCallHandler: ToolCallHandler,
-        promptGetHandler: PromptGetHandler,
-        objectMapper: ObjectMapper
+        promptGetHandler: PromptGetHandler
     ): McpRequestHandler {
-        return McpRequestHandler(serviceRegistry, toolCallHandler, promptGetHandler, objectMapper)
-    }
-
-    /**
-     * Register HTTP transport bean.
-     */
-    @Bean
-    @ConditionalOnMissingBean(HttpMcpTransport::class)
-    @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.http", name = ["enabled"], havingValue = "true", matchIfMissing = true)
-    fun httpMcpTransport(
-        requestHandler: McpRequestHandler,
-        objectMapper: ObjectMapper
-    ): HttpMcpTransport {
-        return HttpMcpTransport(requestHandler, objectMapper)
-    }
-
-    /**
-     * Register SSE transport bean.
-     */
-    @Bean
-    @ConditionalOnMissingBean(SseMcpTransport::class)
-    @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.sse", name = ["enabled"], havingValue = "true", matchIfMissing = false)
-    fun sseMcpTransport(
-        requestHandler: McpRequestHandler,
-        objectMapper: ObjectMapper
-    ): SseMcpTransport {
-        return SseMcpTransport(requestHandler, objectMapper)
-    }
-
-    /**
-     * Register stdio transport as a bean when enabled. Stdio transport is implemented as a Lifecycle
-     * and must be created explicitly from auto-configuration to avoid accidental creation via
-     * component scanning (which may not happen when only @EnableMcpServer is used).
-     */
-    @Bean
-    @ConditionalOnMissingBean(StdioMcpTransport::class)
-    @ConditionalOnProperty(prefix = "aimo.mcp-server.transports.stdio", name = ["enabled"], havingValue = "true", matchIfMissing = false)
-    fun stdioMcpTransport(requestHandler: McpRequestHandler, objectMapper: ObjectMapper): StdioMcpTransport {
-        return StdioMcpTransport(requestHandler, objectMapper)
-    }
-
-    /**
-     * Register transport coordinator bean.
-     */
-    @Bean
-    @ConditionalOnMissingBean(TransportCoordinator::class)
-    fun transportCoordinator(
-        properties: McpServerProperties,
-        httpTransportProvider: ObjectProvider<HttpMcpTransport>,
-        sseTransportProvider: ObjectProvider<SseMcpTransport>,
-        stdioTransportProvider: ObjectProvider<org.ivcode.aimo.server.mcp.transport.McpTransport>
-    ): TransportCoordinator {
-        return TransportCoordinator(properties, httpTransportProvider, sseTransportProvider, stdioTransportProvider)
-    }
-
-    /**
-     * Event listener for Spring context initialization.
-     *
-     * Discovers services and initializes transports when the context is ready.
-     */
-    @EventListener(ContextRefreshedEvent::class)
-    fun onContextRefreshed(event: ContextRefreshedEvent) {
-        val serviceRegistry = event.applicationContext.getBean(McpServiceRegistry::class.java)
-        val coordinator = event.applicationContext.getBean(TransportCoordinator::class.java)
-        val properties = event.applicationContext.getBean(McpServerProperties::class.java)
-
-
-        logger.info("Initializing MCP server framework (v{})", properties.version)
-
-        try {
-            // Discover services
-            serviceRegistry.discoverServices()
-
-            // Warn if any methods expose synthetic Java parameter names (arg0/arg1)
-            val synthetic = serviceRegistry.detectSyntheticParameterNames()
-            if (synthetic.isNotEmpty()) {
-                logger.warn("Detected ${synthetic.size} parameter(s) with synthetic Java names. This may break schema generation or runtime parameter binding.")
-                synthetic.take(10).forEach { logger.warn(it) }
-                if (synthetic.size > 10) {
-                    logger.warn("...and ${synthetic.size - 10} more")
-                }
-                logger.warn("Recommend compiling Kotlin/JVM code with -java-parameters or annotating parameters with @McpParam to provide stable names.")
-            }
-
-            // Check if discovery found any services
-            if (properties.discovery.failIfEmpty && serviceRegistry.getServices().isEmpty()) {
-                logger.error("No MCP services found and failIfEmpty is true")
-                throw IllegalStateException("No MCP services found")
-            }
-
-            // Initialize transports
-            coordinator.initializeTransports()
-
-            logger.info("MCP server initialized successfully")
-        } catch (e: Exception) {
-            logger.error("Error initializing MCP server", e)
-            throw e
-        }
+        return McpRequestHandler(serviceRegistry, toolCallHandler, promptGetHandler)
     }
 }
 
@@ -240,6 +131,10 @@ class McpServerAutoConfiguration {
  */
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.RUNTIME)
-@org.springframework.context.annotation.Import(McpServerAutoConfiguration::class)
+@org.springframework.context.annotation.Import(
+    McpServerAutoConfiguration::class,
+    McpTransportConfiguration::class,
+    McpServerStartupListener::class
+)
 annotation class EnableMcpServer
 

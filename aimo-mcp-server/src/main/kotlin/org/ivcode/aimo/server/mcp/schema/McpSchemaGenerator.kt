@@ -29,7 +29,7 @@ class McpSchemaGenerator {
         } else {
             method.name
         }
-        val description = toolAnnotation?.description ?: getMethodDescription(method)
+        val description = toolAnnotation?.description?.takeIf { it.isNotBlank() }
 
         // Extract parameters, excluding @McpContext
         val parameters = method.parameters.filter { !hasAnnotation(it, McpContext::class) }.toTypedArray()
@@ -59,7 +59,7 @@ class McpSchemaGenerator {
         } else {
             method.name
         }
-        val description = promptAnnotation?.description ?: getMethodDescription(method)
+        val description = promptAnnotation?.description?.takeIf { it.isNotBlank() }
 
         // Extract arguments (excluding context)
         val arguments = method.parameters
@@ -117,23 +117,14 @@ class McpSchemaGenerator {
     private fun getPropertyType(type: Class<*>): String {
         return when {
             type == String::class.java -> "string"
-            type == Int::class.java || type == Integer::class.java -> "integer"
-            type == Long::class.java -> "integer"
-            type == Double::class.java || type == Float::class.java -> "number"
-            type == Boolean::class.java || type == java.lang.Boolean::class.java -> "boolean"
+            type in INTEGER_TYPES -> "integer"
+            type in NUMBER_TYPES -> "number"
+            type in BOOLEAN_TYPES -> "boolean"
             type.isArray -> "array"
-            type == List::class.java || type == Collection::class.java || type == Iterable::class.java -> "array"
+            type in ARRAY_LIKE_TYPES -> "array"
             type == Map::class.java -> "object"
             else -> "string"
         }
-    }
-
-    /**
-     * Get description from JavaDoc or annotation.
-     */
-    private fun getMethodDescription(method: Method): String? {
-        // TODO: Parse JavaDoc comments from method
-        return null
     }
 
     /**
@@ -175,6 +166,26 @@ class McpSchemaGenerator {
         }
 
         return errors
+    }
+
+    private companion object {
+        private val INTEGER_TYPES = setOf(
+            Int::class.javaObjectType,
+            Int::class.javaPrimitiveType!!,
+            Long::class.javaObjectType,
+            Long::class.javaPrimitiveType!!
+        )
+        private val NUMBER_TYPES = setOf(
+            Double::class.javaObjectType,
+            Double::class.javaPrimitiveType!!,
+            Float::class.javaObjectType,
+            Float::class.javaPrimitiveType!!
+        )
+        private val BOOLEAN_TYPES = setOf(
+            Boolean::class.javaObjectType,
+            Boolean::class.javaPrimitiveType!!
+        )
+        private val ARRAY_LIKE_TYPES = setOf(List::class.java, Collection::class.java, Iterable::class.java)
     }
 }
 

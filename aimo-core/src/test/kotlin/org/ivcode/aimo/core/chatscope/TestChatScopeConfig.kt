@@ -153,7 +153,8 @@ class TestChatScopeConfig {
             })
 
             // 3. Add messages explicitly referenced in config (systemMessageRefs)
-            // system-message-refs act as an override: explicitly include these messages regardless of their scope restrictions
+            // system-message-refs act as an override: explicitly include these messages
+            // regardless of their scope restrictions
             systemMessagesForScope.addAll(allSystemMessages.filter { msg ->
                 config.systemMessageRefs.contains(msg.name)
             })

@@ -2,7 +2,10 @@ package org.ivcode.aimo.server.mcp.validation
 
 import org.ivcode.aimo.server.mcp.protocol.McpErrorCode
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertNull
 import java.lang.reflect.Method
 
 class RequestValidationTest {

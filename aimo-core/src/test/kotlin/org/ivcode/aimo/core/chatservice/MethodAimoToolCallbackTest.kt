@@ -123,7 +123,9 @@ class MethodAimoToolCallbackTest {
         }
 
         assertEquals(
-            "Method notATool on org.ivcode.aimo.core.chatservice.MethodAimoToolCallbackTest\$TestToolController must be annotated with @Tool",
+            "Method notATool on " +
+                "org.ivcode.aimo.core.chatservice.MethodAimoToolCallbackTest\$TestToolController " +
+                "must be annotated with @Tool",
             error.message,
         )
     }

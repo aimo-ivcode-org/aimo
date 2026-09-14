@@ -159,12 +159,20 @@ class ConversationFactoryTest {
          val capturedGetMetadata = mutableListOf<Map<String, Any>>()
 
         val testInterceptor = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 capturedGetMetadata.add(metadata.toMap())
                 return chain.proceed(chatId, metadata)
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 return chain.proceed(chatId, metadata)
             }
         }
@@ -185,13 +193,21 @@ class ConversationFactoryTest {
     fun `factory with interceptor can modify metadata before DAO call`() {
         val dao = AimoChatClientDaoMemory()
         val metadataEnricher = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 // Add required scope key that enables access
                 metadata["userId"] = "user1"
                 return chain.proceed(chatId, metadata)
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 metadata["userId"] = "user1"
                 return chain.proceed(chatId, metadata)
             }
@@ -217,14 +233,22 @@ class ConversationFactoryTest {
         val callOrder = mutableListOf<String>()
 
         val interceptor1 = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 callOrder.add("interceptor1_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor1_after")
                 return result
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 callOrder.add("interceptor1_delete_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor1_delete_after")
@@ -233,14 +257,22 @@ class ConversationFactoryTest {
         }
 
         val interceptor2 = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 callOrder.add("interceptor2_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor2_after")
                 return result
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 callOrder.add("interceptor2_delete_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor2_delete_after")
@@ -269,11 +301,19 @@ class ConversationFactoryTest {
         val callOrder = mutableListOf<String>()
 
         val interceptor1 = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 return chain.proceed(chatId, metadata)
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 callOrder.add("interceptor1_delete_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor1_delete_after")
@@ -282,11 +322,19 @@ class ConversationFactoryTest {
         }
 
         val interceptor2 = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 return chain.proceed(chatId, metadata)
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 callOrder.add("interceptor2_delete_before")
                 val result = chain.proceed(chatId, metadata)
                 callOrder.add("interceptor2_delete_after")
@@ -307,7 +355,12 @@ class ConversationFactoryTest {
         // Interceptors should be called in order for delete
         assertTrue(deleted, "Delete should succeed")
         assertEquals(
-            listOf("interceptor1_delete_before", "interceptor2_delete_before", "interceptor2_delete_after", "interceptor1_delete_after"),
+            listOf(
+                "interceptor1_delete_before",
+                "interceptor2_delete_before",
+                "interceptor2_delete_after",
+                "interceptor1_delete_after",
+            ),
             callOrder
         )
     }
@@ -411,11 +464,19 @@ class ConversationFactoryTest {
         val capturedDeleteMetadata = mutableListOf<Map<String, Any>>()
 
         val testInterceptor = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 return chain.proceed(chatId, metadata)
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 capturedDeleteMetadata.add(metadata.toMap())
                 return chain.proceed(chatId, metadata)
             }
@@ -439,11 +500,19 @@ class ConversationFactoryTest {
         val dao = AimoChatClientDaoMemory()
 
         val blockingInterceptor = object : ConversationInterceptor {
-            override fun interceptGet(chain: ConversationInterceptor.GetChain, chatId: UUID, metadata: MutableMap<String, Any>): Conversation? {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
                 return chain.proceed(chatId, metadata)
             }
 
-            override fun interceptDelete(chain: ConversationInterceptor.DeleteChain, chatId: UUID, metadata: MutableMap<String, Any>): Boolean {
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean {
                 // Block delete
                 return false
             }

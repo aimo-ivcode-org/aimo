@@ -7,6 +7,7 @@ import {
 } from "./AimoClientModel";
 import { normalizeChatResponse, normalizeHistoryRequest } from "./AimoClientNormalizers";
 import {ApiClient} from "../api-client/ApiClient";
+import { apiBaseUrl } from "../api-client/apiBaseUrl";
 import {ResponseBuilder} from "./ResponseBuilder";
 
 const CONTROLLER_CHAT = "/aimo-api/chat"
@@ -116,4 +117,4 @@ class AimoClientImpl extends ApiClient implements AimoClient {
 
 }
 
-export const aimoClient: AimoClient = new AimoClientImpl('http://localhost:8080')
+export const aimoClient: AimoClient = new AimoClientImpl(apiBaseUrl)
