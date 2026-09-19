@@ -6,7 +6,7 @@ The core framework for multi-turn AI conversations with tool use, system message
 
 Aimo Core provides:
 - **Chat Client**: Multi-turn LLM chat with tool calling
-- **Conversation Storage**: Durable history with DAO-based persistence and interceptor support
+- **Conversation Storage**: Durable history with direct Conversation implementations and interceptor support
 - **Chat Services**: Annotation-driven tool and system message discovery
 - **Chat Scopes**: Role-based filtering of available tools and system messages
 - **Model Adapters**: Pluggable LLM model providers (Ollama, Bedrock, etc.)
@@ -32,7 +32,7 @@ val response = client.chat(
 
 **Flow:**
 1. Merge request metadata with conversation context
-2. Fetch conversation history from DAO (respecting scope metadata)
+2. Fetch conversation history from ConversationFactory (respecting scope metadata)
 3. Prompt budget calculation
 4. LLM call → receive completion
 5. Handle tool calls (if any)
@@ -80,7 +80,7 @@ class MyService {
 
 ### Conversation & History Storage
 
-`Conversation` represents a single chat's persistent history:
+`Conversation` is the primary abstraction for a single chat's persistent history:
 
 ```kotlin
 val conversation = conversationFactory.getConversation(
@@ -94,11 +94,16 @@ conversation.getChatProperty("title")
 conversation.writeChatProperty("title", "My Chat")
 ```
 
-**Storage:**
-- Backed by `AimoChatClientDao` (file or in-memory implementations)
-- Scope metadata filters access (e.g., tenant-based isolation)
+**Implementations:**
+- `MemoryConversation`: In-memory storage (development, testing, stateless deployments)
+- `FileConversation`: File-backed JSON storage (local persistence)
+- Future: SQL/NoSQL implementations (PostgreSQL, MongoDB, etc.)
+
+**Key features:**
+- Scope metadata enforced for access control (e.g., tenant-based isolation)
 - Durable metadata stored with conversation
-- All reads/writes pass scope metadata for DAO filtering
+- Request-grouped history for stateful replay and proper ordering
+- Optional character budget for bounded-history retrieval
 
 ### Conversation Interceptors
 
@@ -171,30 +176,40 @@ builder
 // or defaults to "global" scope
 ```
 
-## Data Access Object (DAO)
+## ConversationFactory
 
-The `AimoChatClientDao` interface abstracts storage:
+The factory manages the full lifecycle of conversations:
 
 ```kotlin
-interface AimoChatClientDao {
-    fun getChatConversation(chatId: UUID, scopeMetadata: Map<String, Any>): ChatConversationEntity?
-    fun addChatRequest(request: ChatRequestEntity, scopeMetadata: Map<String, Any>): Boolean
-    fun getChatRequests(chatId: UUID, scopeMetadata: Map<String, Any>): List<ChatRequestEntity>
-    fun upsertConversationMetadata(chatId: UUID, metadata: Map<String, Any>, scopeMetadata: Map<String, Any>): Boolean
-    // ... more methods
-}
+val factory = MemoryConversationFactory()  // or FileConversationFactory(dataDir)
+
+// Create a new conversation
+val conversation = factory.createConversation(
+    metadata = mapOf("tenant" to "acme", "userId" to "user123")
+)
+
+// Get existing conversation
+val existing = factory.getConversation(chatId, metadata)
+
+// List conversations by scope
+val userChats = factory.getConversations(metadata = mapOf("userId" to "user123"))
+
+// Delete a conversation
+factory.deleteConversation(chatId, metadata)
 ```
 
-**Implementations:**
-- `AimoChatClientDaoMemory`: In-memory storage
-- `AimoChatClientDaoFile`: File-based JSON storage
-- Custom implementations for databases (SQL, NoSQL, etc.)
+**Operations:**
+- `createConversation()`: Create and register a new conversation
+- `getConversation()`: Retrieve existing conversation with scope validation
+- `getConversations()`: List conversations matching scope metadata
+- `deleteConversation()`: Remove a conversation from storage
 
-**Scope Metadata Matching:**
-- Empty `scopeMetadata` matches all conversations
-- Otherwise, **all entries** in `scopeMetadata` must match stored metadata (AND logic)
-- File and Memory DAOs use `ConversationMetadataMatcher` for post-query filtering
-- Database implementations should push filtering into SQL WHERE clauses
+**Interceptor support:**
+```kotlin
+val factory = MemoryConversationFactory()
+    .withInterceptor(AuditingInterceptor())
+    .withInterceptor(EncryptionInterceptor())
+```
 
 ## Context Management
 
@@ -207,16 +222,13 @@ Well-known context keys throughout the system:
 
 ## Building a Chat Client
 
-The typical flow requires two factories:
+The typical flow requires creating a conversation and a chat client:
 
 ```kotlin
 // 1. Create a conversation (for history storage)
-val dao = AimoChatClientDaoMemory()
-val conversationFactory = ConversationFactoryImpl(dao)
+val conversationFactory = MemoryConversationFactory()  // or FileConversationFactory(dataDir)
 val metadata = mapOf("tenant" to "acme", "userId" to "user123")
-val entity = dao.createChatConversation(metadata)
-val conversation = conversationFactory.getConversation(entity.chatId, metadata)
-    ?: error("Conversation not found")
+val conversation = conversationFactory.createConversation(metadata)
 
 // 2. Build and use the chat client
 // (ChatClientBuilderFactory is typically injected or configured in Spring)
@@ -236,7 +248,7 @@ val response = chatClient.chat(
 ```
 
 **Key points:**
-- `ConversationFactory` creates/loads conversations from storage (DAO)
+- `ConversationFactory` creates/loads conversations from storage (Memory, File, or custom)
 - `ChatClientBuilderFactory` is configured at application startup with models, tools, and scopes
 - `builder(conversation)` creates a builder with the conversation already bound
 - Optional customization: model selection, scope selection, interceptors

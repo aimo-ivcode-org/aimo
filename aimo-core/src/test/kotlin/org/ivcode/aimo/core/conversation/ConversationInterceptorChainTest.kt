@@ -67,7 +67,7 @@ class ConversationInterceptorChainTest {
         val callLog = mutableListOf<String>()
         val chatId = UUID.randomUUID()
 
-        val modifyingInterceptor = object : ConversationInterceptor {
+        val modifyingInterceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -88,7 +88,7 @@ class ConversationInterceptorChainTest {
             }
         }
 
-        val readingInterceptor = object : ConversationInterceptor {
+        val readingInterceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -96,14 +96,6 @@ class ConversationInterceptorChainTest {
             ): Conversation? {
                 val value = metadata["modified"]
                 callLog.add("read:$value")
-                return chain.proceed(chatId, metadata)
-            }
-
-            override fun interceptDelete(
-                chain: ConversationInterceptor.DeleteChain,
-                chatId: UUID,
-                metadata: MutableMap<String, Any>
-            ): Boolean {
                 return chain.proceed(chatId, metadata)
             }
         }
@@ -128,7 +120,7 @@ class ConversationInterceptorChainTest {
         var capturedMetadata: MutableMap<String, Any>? = null
         val chatId = UUID.randomUUID()
 
-        val capturingInterceptor = object : ConversationInterceptor {
+        val capturingInterceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -163,7 +155,7 @@ class ConversationInterceptorChainTest {
         var capturedChatId: UUID? = null
         val chatId = UUID.randomUUID()
 
-        val capturingInterceptor = object : ConversationInterceptor {
+        val capturingInterceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -213,7 +205,7 @@ class ConversationInterceptorChainTest {
         var capturedMetadata: MutableMap<String, Any>? = null
         val chatId = UUID.randomUUID()
 
-        val capturingInterceptor = object : ConversationInterceptor {
+        val capturingInterceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -249,7 +241,7 @@ class ConversationInterceptorChainTest {
         val callLog = mutableListOf<String>()
         val chatId = UUID.randomUUID()
 
-        val shortCircuitInterceptor = object : ConversationInterceptor {
+        val shortCircuitInterceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -307,7 +299,7 @@ class ConversationInterceptorChainTest {
     @Test
     fun `interceptors can return nullable results`() {
         val chatId = UUID.randomUUID()
-        val interceptor = object : ConversationInterceptor {
+        val interceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -337,7 +329,7 @@ class ConversationInterceptorChainTest {
         var capturedChatIds = mutableListOf<UUID>()
         val originalChatId = UUID.randomUUID()
 
-        val trackingInterceptor = object : ConversationInterceptor {
+        val trackingInterceptor = object : NoOpInterceptor() {
             override fun interceptGet(
                 chain: ConversationInterceptor.GetChain,
                 chatId: UUID,
@@ -404,7 +396,7 @@ class ConversationInterceptorChainTest {
          val callLog = mutableListOf<String>()
          val chatId = UUID.randomUUID()
 
-         val interceptor = object : ConversationInterceptor {
+         val interceptor = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -440,7 +432,7 @@ class ConversationInterceptorChainTest {
          val callLog = mutableListOf<String>()
          val chatId = UUID.randomUUID()
 
-         val interceptor1 = object : ConversationInterceptor {
+         val interceptor1 = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -459,7 +451,7 @@ class ConversationInterceptorChainTest {
              }
          }
 
-         val interceptor2 = object : ConversationInterceptor {
+         val interceptor2 = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -478,7 +470,7 @@ class ConversationInterceptorChainTest {
              }
          }
 
-         val interceptor3 = object : ConversationInterceptor {
+         val interceptor3 = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -516,7 +508,7 @@ class ConversationInterceptorChainTest {
          val callLog = mutableListOf<String>()
          val chatId = UUID.randomUUID()
 
-         val modifyingInterceptor = object : ConversationInterceptor {
+         val modifyingInterceptor = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -536,7 +528,7 @@ class ConversationInterceptorChainTest {
              }
          }
 
-         val readingInterceptor = object : ConversationInterceptor {
+         val readingInterceptor = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -579,7 +571,7 @@ class ConversationInterceptorChainTest {
          val callLog = mutableListOf<String>()
          val chatId = UUID.randomUUID()
 
-         val shortCircuitInterceptor = object : ConversationInterceptor {
+         val shortCircuitInterceptor = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -599,7 +591,7 @@ class ConversationInterceptorChainTest {
              }
          }
 
-         val neverCalledInterceptor = object : ConversationInterceptor {
+         val neverCalledInterceptor = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -653,7 +645,7 @@ class ConversationInterceptorChainTest {
          var capturedChatIds = mutableListOf<UUID>()
          val originalChatId = UUID.randomUUID()
 
-         val trackingInterceptor = object : ConversationInterceptor {
+         val trackingInterceptor = object : NoOpInterceptor() {
              override fun interceptGet(
                  chain: ConversationInterceptor.GetChain,
                  chatId: UUID,
@@ -712,10 +704,46 @@ class ConversationInterceptorChainTest {
          }
      }
 
-    private class LoggingInterceptor(
+     /**
+      * Base class providing default no-op implementations for all ConversationInterceptor methods.
+      * Tests can override only the methods they care about.
+      */
+     private abstract class NoOpInterceptor : ConversationInterceptor {
+         override fun interceptCreate(
+             chain: ConversationInterceptor.CreateChain,
+             metadata: MutableMap<String, Any>
+         ): Conversation = chain.proceed(metadata)
+
+         override fun interceptGet(
+             chain: ConversationInterceptor.GetChain,
+             chatId: UUID,
+             metadata: MutableMap<String, Any>
+         ): Conversation? = chain.proceed(chatId, metadata)
+
+         override fun interceptList(
+             chain: ConversationInterceptor.ListChain,
+             metadata: MutableMap<String, Any>
+         ): List<Conversation> = chain.proceed(metadata)
+
+         override fun interceptDelete(
+             chain: ConversationInterceptor.DeleteChain,
+             chatId: UUID,
+             metadata: MutableMap<String, Any>
+         ): Boolean = chain.proceed(chatId, metadata)
+     }
+
+       private class LoggingInterceptor(
         private val name: String,
         private val callLog: MutableList<String>
     ) : ConversationInterceptor {
+        override fun interceptCreate(
+            chain: ConversationInterceptor.CreateChain,
+            metadata: MutableMap<String, Any>
+        ): Conversation {
+            callLog.add(name)
+            return chain.proceed(metadata)
+        }
+
         override fun interceptGet(
             chain: ConversationInterceptor.GetChain,
             chatId: UUID,
@@ -723,6 +751,14 @@ class ConversationInterceptorChainTest {
         ): Conversation? {
             callLog.add(name)
             return chain.proceed(chatId, metadata)
+        }
+
+        override fun interceptList(
+            chain: ConversationInterceptor.ListChain,
+            metadata: MutableMap<String, Any>
+        ): List<Conversation> {
+            callLog.add(name)
+            return chain.proceed(metadata)
         }
 
         override fun interceptDelete(

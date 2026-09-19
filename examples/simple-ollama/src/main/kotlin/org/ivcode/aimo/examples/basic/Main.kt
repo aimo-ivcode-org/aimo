@@ -1,12 +1,13 @@
 package org.ivcode.aimo.examples.basic
 
-import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.dao.AimoChatClientDaoFile
+import org.ivcode.aimo.core.conversation.ConversationFactory
+import org.ivcode.aimo.core.conversation.FileConversationFactory
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import tools.jackson.databind.ObjectMapper
 import java.io.File
 
@@ -21,11 +22,12 @@ fun main(args: Array<String>) {
 class SimpleOllamaConfig {
 
     @Bean
-    fun createAimoDao(
+    @Primary
+    fun appConversationFactory(
         @Value("\${aimo.data-dir:./data}") dataDirPath: String,
         objectMapper: ObjectMapper
-    ): AimoChatClientDao {
+    ): ConversationFactory {
         val dataDir = File(dataDirPath)
-        return AimoChatClientDaoFile(dataDir, objectMapper)
+        return FileConversationFactory(dataDir, objectMapper)
     }
 }
