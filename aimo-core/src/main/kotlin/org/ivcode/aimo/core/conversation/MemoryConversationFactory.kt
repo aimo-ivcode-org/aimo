@@ -12,12 +12,12 @@ import java.util.UUID
  * Supports interceptors for auditing, caching, and other cross-cutting concerns.
  */
 class MemoryConversationFactory(
-    private val interceptors: List<ConversationInterceptor> = emptyList()
+    private val interceptors: List<ConversationInterceptor> = emptyList(),
+    private val conversations: MutableMap<UUID, Conversation> = mutableMapOf()
 ) : ConversationFactory {
-    private val conversations = mutableMapOf<UUID, MemoryConversation>()
 
     override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
-        return MemoryConversationFactory(interceptors + interceptor)
+        return MemoryConversationFactory(interceptors + interceptor, conversations)
     }
 
     override fun createConversation(metadata: Map<String, Any>): Conversation {
@@ -34,16 +34,20 @@ class MemoryConversationFactory(
         }
         
         // Persist metadata if provided
-        if (metadata.isNotEmpty()) {
-            conversation.writeChatProperties(metadata)
+        if (mutableMetadata.isNotEmpty()) {
+            conversation.writeChatProperties(mutableMetadata)
         }
         
-        conversations[chatId] = conversation as MemoryConversation
+        conversations[chatId] = conversation
         return conversation
     }
 
     override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
         val conversation = conversations[chatId] ?: return null
+        
+        // Validate scope match against stored metadata
+        val storedMetadata = conversation.getChatMetadata()
+        if (!matchesScope(storedMetadata, metadata)) return null
         
         return if (interceptors.isEmpty()) {
             conversation
@@ -57,18 +61,28 @@ class MemoryConversationFactory(
     }
 
     override fun getConversations(metadata: Map<String, Any>): List<Conversation> {
+        val filtered = conversations.values.filter { conversation ->
+            matchesScope(conversation.getChatMetadata(), metadata)
+        }
+        
         return if (interceptors.isEmpty()) {
-            conversations.values.toList()
+            filtered
         } else {
             val mutableMetadata = metadata.toMutableMap()
             val chain = buildListChain(interceptors, 0) {
-                conversations.values.toList()
+                filtered
             }
             chain.proceed(mutableMetadata)
         }
     }
 
     override fun deleteConversation(chatId: UUID, metadata: Map<String, Any>): Boolean {
+        val conversation = conversations[chatId] ?: return false
+        
+        // Validate scope match before deleting
+        val storedMetadata = conversation.getChatMetadata()
+        if (!matchesScope(storedMetadata, metadata)) return false
+        
         val mutableMetadata = metadata.toMutableMap()
         
         return if (interceptors.isEmpty()) {
@@ -78,6 +92,13 @@ class MemoryConversationFactory(
                 conversations.remove(chatId) != null
             }
             chain.proceed(chatId, mutableMetadata)
+        }
+    }
+
+    private fun matchesScope(storedMetadata: Map<String, Any>, requestedMetadata: Map<String, Any>): Boolean {
+        // All keys in requestedMetadata must exist in storedMetadata with matching values
+        return requestedMetadata.all { (key, value) ->
+            storedMetadata[key] == value
         }
     }
 

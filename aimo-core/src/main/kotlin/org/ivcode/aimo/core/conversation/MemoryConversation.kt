@@ -36,8 +36,9 @@ class MemoryConversation(
     
     private val requestGroups = mutableListOf<RequestGroup>()
     private val metadata = mutableMapOf<String, Any>()
+    private val lock = Object()
 
-    override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
+    override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = synchronized(lock) {
         if (requestGroups.isEmpty()) return emptyList()
         
         return if (maxCacheCharacters == null) {
@@ -51,7 +52,7 @@ class MemoryConversation(
             for (group in requestGroups.asReversed()) {
                 for (msg in group.messages.asReversed()) {
                     val msgSize = (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
-                    if (charCount + msgSize > maxCacheCharacters && result.isNotEmpty()) {
+                    if (charCount + msgSize > maxCacheCharacters) {
                         return result.asReversed()
                     }
                     result.add(msg)
@@ -65,15 +66,17 @@ class MemoryConversation(
     override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
         if (messages.isEmpty()) return
         
-        // Group messages by request
-        requestGroups.add(RequestGroup(
-            requestId = requestId,
-            messages = messages.toMutableList(),
-            createdAt = Instant.now()
-        ))
+        synchronized(lock) {
+            // Group messages by request
+            requestGroups.add(RequestGroup(
+                requestId = requestId,
+                messages = messages.toMutableList(),
+                createdAt = Instant.now()
+            ))
+        }
     }
 
-    override fun getHistory(maxCacheCharacters: Long?): List<AimoHistoryRequest> {
+    override fun getHistory(maxCacheCharacters: Long?): List<AimoHistoryRequest> = synchronized(lock) {
         if (requestGroups.isEmpty()) return emptyList()
         
         return if (maxCacheCharacters == null) {
@@ -96,7 +99,7 @@ class MemoryConversation(
                     (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
                 }
                 
-                if (charCount + groupSize > maxCacheCharacters && result.isNotEmpty()) {
+                if (charCount + groupSize > maxCacheCharacters) {
                     return result.asReversed()
                 }
                 
@@ -112,23 +115,33 @@ class MemoryConversation(
         }
     }
 
-    override fun getChatMetadata(): Map<String, Any> = metadata.toMap()
-
-    override fun getChatProperty(property: String): Any? = metadata[property]
-
-    override fun writeChatProperty(property: String, value: Any) {
-        metadata[property] = value
+    override fun getChatMetadata(): Map<String, Any> = synchronized(lock) {
+        metadata.toMap()
     }
 
-    override fun deleteChatProperty(property: String): Boolean {
-        return metadata.remove(property) != null
+    override fun getChatProperty(property: String): Any? = synchronized(lock) {
+        metadata[property]
+    }
+
+    override fun writeChatProperty(property: String, value: Any) {
+        synchronized(lock) {
+            metadata[property] = value
+        }
+    }
+
+    override fun deleteChatProperty(property: String): Boolean = synchronized(lock) {
+        metadata.remove(property) != null
     }
 
     override fun writeChatProperties(properties: Map<String, Any>) {
-        metadata.putAll(properties)
+        synchronized(lock) {
+            metadata.putAll(properties)
+        }
     }
 
     override fun deleteChatProperties(keys: List<String>) {
-        keys.forEach { metadata.remove(it) }
+        synchronized(lock) {
+            keys.forEach { metadata.remove(it) }
+        }
     }
 }

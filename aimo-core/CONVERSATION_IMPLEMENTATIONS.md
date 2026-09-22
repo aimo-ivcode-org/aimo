@@ -60,24 +60,32 @@ val conversation = factory.createConversation(
 **File Structure:**
 ```
 data/conversations/
-├── 550e8400-e29b-41d4-a716-446655440000.json
-├── 6ba7b810-9dad-11d1-80b4-00c04fd430c8.json
+├── 550e8400-e29b-41d4-a716-446655440000/
+│   ├── metadata.json
+│   └── messages.json
+├── 6ba7b810-9dad-11d1-80b4-00c04fd430c8/
+│   ├── metadata.json
+│   └── messages.json
 └── ...
 ```
 
-Each file contains:
+**metadata.json** contains chat properties:
 ```json
 {
-  "chatId": "550e8400-e29b-41d4-a716-446655440000",
-  "metadata": {"userId": "user123", "tenant": "acme"},
-  "requests": [
-    {
-      "requestId": "...",
-      "createdAt": "2026-09-14T22:30:00Z",
-      "messages": [...]
-    }
-  ]
+  "userId": "user123",
+  "tenant": "acme"
 }
+```
+
+**messages.json** contains request groups:
+```json
+[
+  {
+    "requestId": "...",
+    "createdAt": "2026-09-14T22:30:00Z",
+    "messages": [...]
+  }
+]
 ```
 
 ## Adding Custom Implementations

@@ -1,6 +1,7 @@
 package org.ivcode.aimo.core.conversation
 
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.jsonMapper
 import org.ivcode.aimo.core.model.AimoChatMessage
 import org.ivcode.aimo.core.model.AimoHistoryRequest
 import java.io.File
@@ -26,7 +27,7 @@ import java.util.UUID
 class FileConversation(
     override val chatId: UUID,
     private val storageDir: File,
-    private val objectMapper: ObjectMapper = ObjectMapper(),
+    private val objectMapper: ObjectMapper = jsonMapper(),
     private val scopeMetadata: Map<String, Any> = emptyMap()
 ) : Conversation {
     
@@ -43,7 +44,7 @@ class FileConversation(
     // Lock for thread-safe file operations
     private val lock = Object()
 
-    private fun loadRequestGroups(): List<RequestGroup> = synchronized(lock) {
+    private fun loadRequestGroupsUnsafe(): List<RequestGroup> {
         if (!messagesFile.exists()) return emptyList()
         return try {
             objectMapper.readValue(messagesFile, Array<RequestGroup>::class.java).toList()
@@ -52,11 +53,11 @@ class FileConversation(
         }
     }
 
-    private fun saveRequestGroups(groups: List<RequestGroup>) = synchronized(lock) {
+    private fun saveRequestGroupsUnsafe(groups: List<RequestGroup>) {
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(messagesFile, groups)
     }
 
-    private fun loadMetadata(): Map<String, Any> = synchronized(lock) {
+    private fun loadMetadataUnsafe(): Map<String, Any> {
         if (!metadataFile.exists()) return emptyMap()
         return try {
             @Suppress("UNCHECKED_CAST")
@@ -66,8 +67,24 @@ class FileConversation(
         }
     }
 
-    private fun saveMetadata(metadata: Map<String, Any>) = synchronized(lock) {
+    private fun saveMetadataUnsafe(metadata: Map<String, Any>) {
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(metadataFile, metadata)
+    }
+
+    private fun loadRequestGroups(): List<RequestGroup> = synchronized(lock) {
+        return loadRequestGroupsUnsafe()
+    }
+
+    private fun saveRequestGroups(groups: List<RequestGroup>) = synchronized(lock) {
+        saveRequestGroupsUnsafe(groups)
+    }
+
+    private fun loadMetadata(): Map<String, Any> = synchronized(lock) {
+        return loadMetadataUnsafe()
+    }
+
+    private fun saveMetadata(metadata: Map<String, Any>) = synchronized(lock) {
+        saveMetadataUnsafe(metadata)
     }
 
     override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? {
@@ -83,7 +100,7 @@ class FileConversation(
             for (group in groups.asReversed()) {
                 for (msg in group.messages.asReversed()) {
                     val msgSize = (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
-                    if (charCount + msgSize > maxCacheCharacters && result.isNotEmpty()) {
+                    if (charCount + msgSize > maxCacheCharacters) {
                         return result.asReversed()
                     }
                     result.add(msg)
@@ -97,13 +114,15 @@ class FileConversation(
     override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
         if (messages.isEmpty()) return
         
-        val groups = loadRequestGroups().toMutableList()
-        groups.add(RequestGroup(
-            requestId = requestId,
-            messages = messages,
-            createdAt = Instant.now()
-        ))
-        saveRequestGroups(groups)
+        synchronized(lock) {
+            val groups = loadRequestGroupsUnsafe().toMutableList()
+            groups.add(RequestGroup(
+                requestId = requestId,
+                messages = messages,
+                createdAt = Instant.now()
+            ))
+            saveRequestGroupsUnsafe(groups)
+        }
     }
 
     override fun getHistory(maxCacheCharacters: Long?): List<AimoHistoryRequest> {
@@ -128,7 +147,7 @@ class FileConversation(
                     (msg.content?.length ?: 0) + (msg.thinking?.length ?: 0)
                 }
                 
-                if (charCount + groupSize > maxCacheCharacters && result.isNotEmpty()) {
+                if (charCount + groupSize > maxCacheCharacters) {
                     return result.asReversed()
                 }
                 
@@ -149,28 +168,36 @@ class FileConversation(
     override fun getChatProperty(property: String): Any? = loadMetadata()[property]
 
     override fun writeChatProperty(property: String, value: Any) {
-        val metadata = loadMetadata().toMutableMap()
-        metadata[property] = value
-        saveMetadata(metadata)
+        synchronized(lock) {
+            val metadata = loadMetadataUnsafe().toMutableMap()
+            metadata[property] = value
+            saveMetadataUnsafe(metadata)
+        }
     }
 
     override fun deleteChatProperty(property: String): Boolean {
-        val metadata = loadMetadata().toMutableMap()
-        val existed = metadata.containsKey(property)
-        metadata.remove(property)
-        if (existed) saveMetadata(metadata)
-        return existed
+        synchronized(lock) {
+            val metadata = loadMetadataUnsafe().toMutableMap()
+            val existed = metadata.containsKey(property)
+            metadata.remove(property)
+            if (existed) saveMetadataUnsafe(metadata)
+            return existed
+        }
     }
 
     override fun writeChatProperties(properties: Map<String, Any>) {
-        val metadata = loadMetadata().toMutableMap()
-        metadata.putAll(properties)
-        saveMetadata(metadata)
+        synchronized(lock) {
+            val metadata = loadMetadataUnsafe().toMutableMap()
+            metadata.putAll(properties)
+            saveMetadataUnsafe(metadata)
+        }
     }
 
     override fun deleteChatProperties(keys: List<String>) {
-        val metadata = loadMetadata().toMutableMap()
-        keys.forEach { metadata.remove(it) }
-        saveMetadata(metadata)
+        synchronized(lock) {
+            val metadata = loadMetadataUnsafe().toMutableMap()
+            keys.forEach { metadata.remove(it) }
+            saveMetadataUnsafe(metadata)
+        }
     }
 }

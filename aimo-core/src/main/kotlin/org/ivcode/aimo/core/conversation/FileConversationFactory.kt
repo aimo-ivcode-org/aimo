@@ -1,6 +1,7 @@
 package org.ivcode.aimo.core.conversation
 
 import tools.jackson.databind.ObjectMapper
+import tools.jackson.module.kotlin.jsonMapper
 import java.io.File
 import java.util.UUID
 
@@ -23,7 +24,7 @@ import java.util.UUID
  */
 class FileConversationFactory(
     private val storageDir: File,
-    private val objectMapper: ObjectMapper = ObjectMapper(),
+    private val objectMapper: ObjectMapper = jsonMapper(),
     private val interceptors: List<ConversationInterceptor> = emptyList()
 ) : ConversationFactory {
     init {
@@ -48,8 +49,8 @@ class FileConversationFactory(
         }
         
         // Persist metadata if provided
-        if (metadata.isNotEmpty()) {
-            conversation.writeChatProperties(metadata)
+        if (mutableMetadata.isNotEmpty()) {
+            conversation.writeChatProperties(mutableMetadata)
         }
         
         return conversation
@@ -59,7 +60,11 @@ class FileConversationFactory(
         val conversationDir = File(storageDir, chatId.toString())
         if (!conversationDir.exists()) return null
         
-        val conversation = FileConversation(chatId, storageDir, objectMapper)
+        // Load the stored metadata and validate scope match
+        val storedMetadata = loadStoredMetadata(conversationDir)
+        if (!matchesScope(storedMetadata, metadata)) return null
+        
+        val conversation = FileConversation(chatId, storageDir, objectMapper, storedMetadata)
         
         return if (interceptors.isEmpty()) {
             conversation
@@ -82,7 +87,10 @@ class FileConversationFactory(
                 val chatIdStr = dir.name
                 try {
                     val chatId = UUID.fromString(chatIdStr)
-                    conversations.add(FileConversation(chatId, storageDir, objectMapper))
+                    val storedMetadata = loadStoredMetadata(dir)
+                    if (matchesScope(storedMetadata, metadata)) {
+                        conversations.add(FileConversation(chatId, storageDir, objectMapper, storedMetadata))
+                    }
                 } catch (e: IllegalArgumentException) {
                     // Skip directories that are not valid UUIDs
                 }
@@ -113,6 +121,24 @@ class FileConversationFactory(
                 conversationDir.deleteRecursively()
             }
             chain.proceed(chatId, mutableMetadata)
+        }
+    }
+
+    private fun loadStoredMetadata(conversationDir: File): Map<String, Any> {
+        val metadataFile = File(conversationDir, "metadata.json")
+        if (!metadataFile.exists()) return emptyMap()
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            objectMapper.readValue(metadataFile, Map::class.java) as Map<String, Any>
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    private fun matchesScope(storedMetadata: Map<String, Any>, requestedMetadata: Map<String, Any>): Boolean {
+        // All keys in requestedMetadata must exist in storedMetadata with matching values
+        return requestedMetadata.all { (key, value) ->
+            storedMetadata[key] == value
         }
     }
 
