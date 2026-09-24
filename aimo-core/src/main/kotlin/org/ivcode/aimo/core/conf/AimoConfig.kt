@@ -186,21 +186,6 @@ class AimoConfig {
         )
        }
 
-    /**
-     * Creates the conversation factory used to resolve conversation instances.
-     *
-     * Creates a MemoryConversationFactory for in-memory conversation storage. Example
-     * applications can override this bean to use FileConversationFactory or other
-     * implementations as needed. The factory returned by this bean can be further
-     * configured with interceptors (auditing, caching, etc.) by the application.
-     *
-     * @return A conversation factory for managing conversations.
-     */
-    @Bean
-    fun createConversationFactory(): ConversationFactory {
-        return MemoryConversationFactory()
-    }
-
 
     /**
      * Creates the chat model factory used to select provider-specific model implementations.
