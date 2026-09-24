@@ -325,7 +325,7 @@ internal class AimoChatClientImpl (
     ): List<AimoChatMessage> {
         val persistedTaskMessages = taskMessages.filterNot { it.isEmptyPayload() }
         val allMessages = listOf(promptMessage) + persistedTaskMessages
-        conversation.addMessages(responseId, allMessages, maxCacheCharacters = promptBudgeter.maxContextSize)
+        conversation.addMessages(responseId, allMessages)
         return persistedTaskMessages
     }
 

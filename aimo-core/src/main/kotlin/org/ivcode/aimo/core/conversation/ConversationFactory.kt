@@ -8,16 +8,16 @@ import java.util.UUID
  * The ConversationFactory manages the full lifecycle of conversations:
  * - **Creation**: `createConversation()` creates and registers a new conversation
  * - **Access**: `getConversation()` retrieves an existing conversation
- * - **Listing**: `getConversations()` lists conversations matching optional scope metadata
+ * - **Listing**: `getConversations()` lists conversations matching optional interceptor metadata
  * - **Deletion**: `deleteConversation()` removes a conversation
  *
- * Metadata passed to all methods is used for scope-based access control and filtering.
- * Interceptors can enrich metadata or implement cross-cutting concerns (auditing, caching,
- * encryption, etc.) for all four lifecycle operations.
+ * Interceptor metadata passed to all methods flows through the interceptor chain, allowing
+ * interceptors to enrich, validate, or deny operations based on access control, tenant context,
+ * or other cross-cutting concerns (auditing, caching, encryption, etc.).
  *
  * Implementations are responsible for:
  * - Managing underlying storage (in-memory, filesystem, database, etc.)
- * - Enforcing scope metadata constraints
+ * - Enforcing access control based on interceptor metadata
  * - Composing interceptors into the conversation's access chain
  * - Atomic operations for all lifecycle methods
  */
@@ -34,52 +34,51 @@ interface ConversationFactory {
      * Create a new conversation.
      *
      * Creates and registers a fresh conversation in the underlying storage with optional
-     * initial metadata. All subsequent factory operations (get, list, delete) will see
-     * this newly created conversation.
+     * initial interceptor metadata. Interceptors can enrich or validate this metadata.
      *
-     * @param metadata optional initial metadata for the conversation; may be enriched or
-     *                 validated by interceptors
+     * @param metadata optional initial interceptor metadata for the conversation; may be
+     *                 enriched or validated by interceptors
      * @return a new Conversation instance
-     * @throws IllegalStateException if creation fails or scope metadata is invalid
+     * @throws IllegalStateException if creation fails
      */
     fun createConversation(metadata: Map<String, Any> = emptyMap()): Conversation
 
     /**
-     * Get a conversation by chat ID with optional scope metadata.
+     * Get a conversation by chat ID with optional interceptor metadata.
      *
-     * Scope metadata is used for access control and filtering. Interceptors may validate
-     * or enrich the metadata before returning the conversation.
+     * The metadata flows through the interceptor chain for validation and enrichment
+     * before the conversation is returned.
      *
      * @param chatId The chat identifier
-     * @param metadata optional scope metadata for access control (e.g., tenant, user scope);
-     *                 interceptors may add or validate entries
-     * @return The conversation instance, or null if not found or access denied by scope/interceptors
+     * @param metadata optional interceptor metadata for access control and filtering;
+     *                 interceptors may validate or enrich this metadata
+     * @return The conversation instance, or null if not found or access denied by interceptors
      */
     fun getConversation(chatId: UUID, metadata: Map<String, Any> = emptyMap()): Conversation?
 
     /**
-     * List conversations matching optional scope metadata.
+     * List conversations matching optional interceptor metadata.
      *
-     * Returns all conversations that match the provided scope metadata. Useful for listing
-     * user chats, tenant chats, or other scoped conversation collections.
+     * Returns all conversations filtered through the interceptor chain based on the
+     * provided metadata.
      *
-     * @param metadata optional scope metadata for filtering (e.g., tenant, user scope);
-     *                 only conversations matching this scope are returned
-     * @return list of Conversation instances matching the scope, or empty list if none found
+     * @param metadata optional interceptor metadata for filtering; only conversations
+     *                 matching this metadata are returned (after interceptor processing)
+     * @return list of Conversation instances, or empty list if none found
      */
     fun getConversations(metadata: Map<String, Any> = emptyMap()): List<Conversation>
 
     /**
-     * Delete a conversation by chat ID with optional scope metadata.
+     * Delete a conversation by chat ID with optional interceptor metadata.
      *
-     * Scope metadata is used for access control. Interceptors may validate the delete
-     * operation before the conversation is removed from storage.
+     * The metadata flows through the interceptor chain, which may validate or deny
+     * the delete operation.
      *
      * @param chatId The chat identifier
-     * @param metadata optional scope metadata for access control (e.g., tenant, user scope);
-     *                 interceptors may add entries or deny the operation
+     * @param metadata optional interceptor metadata for access control; interceptors may
+     *                 validate this metadata or deny the operation
      * @return true if the conversation was successfully deleted, false if not found or
-     *         access denied by scope/interceptors
+     *         access denied by interceptors
      */
     fun deleteConversation(chatId: UUID, metadata: Map<String, Any> = emptyMap()): Boolean
 }

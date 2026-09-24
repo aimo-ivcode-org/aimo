@@ -1,22 +1,33 @@
 package org.ivcode.aimo.core.conversation
 
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * In-memory implementation of ConversationFactory.
  *
- * Creates and manages MemoryConversation instances, storing them in an in-memory map.
+ * Creates and manages MemoryConversation instances, storing them in an internal thread-safe map.
  * All data is lost when the application terminates. Suitable for development, testing,
  * and single-session scenarios.
  *
  * Supports interceptors for auditing, caching, and other cross-cutting concerns.
+ *
+ * Thread-safe: concurrent access is protected by an internal ConcurrentHashMap.
  */
 class MemoryConversationFactory(
     private val interceptors: List<ConversationInterceptor> = emptyList(),
-    private val conversations: MutableMap<UUID, Conversation> = mutableMapOf()
+    sharedConversations: Map<UUID, Conversation>? = null
 ) : ConversationFactory {
+    // Internal thread-safe storage - always a ConcurrentHashMap, never exposed
+    private val conversations: ConcurrentHashMap<UUID, Conversation> = 
+        if (sharedConversations != null) {
+            ConcurrentHashMap(sharedConversations)
+        } else {
+            ConcurrentHashMap()
+        }
 
     override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
+        // Share the same backing store so existing conversations remain accessible
         return MemoryConversationFactory(interceptors + interceptor, conversations)
     }
 
@@ -33,7 +44,7 @@ class MemoryConversationFactory(
             chain.proceed(mutableMetadata) as Conversation
         }
         
-        // Persist metadata if provided
+        // Persist metadata after interceptor chain (captures any enrichment)
         if (mutableMetadata.isNotEmpty()) {
             conversation.writeChatProperties(mutableMetadata)
         }
@@ -43,32 +54,37 @@ class MemoryConversationFactory(
     }
 
     override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
+        val mutableMetadata = metadata.toMutableMap()
+        
         val conversation = conversations[chatId] ?: return null
         
-        // Validate scope match against stored metadata
-        val storedMetadata = conversation.getChatMetadata()
-        if (!matchesScope(storedMetadata, metadata)) return null
-        
-        return if (interceptors.isEmpty()) {
+        // Run interceptor chain first to allow enrichment of metadata
+        val result = if (interceptors.isEmpty()) {
             conversation
         } else {
-            val mutableMetadata = metadata.toMutableMap()
             val chain = buildGetChain(interceptors, 0) { _ ->
                 conversation
             }
             chain.proceed(chatId, mutableMetadata)
         }
+        
+        // After interceptors complete, validate scope match with enriched metadata
+        val storedMetadata = conversation.getChatMetadata()
+        if (!matchesScope(storedMetadata, mutableMetadata)) return null
+        
+        return result
     }
 
     override fun getConversations(metadata: Map<String, Any>): List<Conversation> {
+        val mutableMetadata = metadata.toMutableMap()
+        
         val filtered = conversations.values.filter { conversation ->
-            matchesScope(conversation.getChatMetadata(), metadata)
+            matchesScope(conversation.getChatMetadata(), mutableMetadata)
         }
         
         return if (interceptors.isEmpty()) {
             filtered
         } else {
-            val mutableMetadata = metadata.toMutableMap()
             val chain = buildListChain(interceptors, 0) {
                 filtered
             }
@@ -77,13 +93,13 @@ class MemoryConversationFactory(
     }
 
     override fun deleteConversation(chatId: UUID, metadata: Map<String, Any>): Boolean {
+        val mutableMetadata = metadata.toMutableMap()
+        
         val conversation = conversations[chatId] ?: return false
         
-        // Validate scope match before deleting
+        // Load stored metadata and validate scope match BEFORE running delete chain
         val storedMetadata = conversation.getChatMetadata()
-        if (!matchesScope(storedMetadata, metadata)) return false
-        
-        val mutableMetadata = metadata.toMutableMap()
+        if (!matchesScope(storedMetadata, mutableMetadata)) return false
         
         return if (interceptors.isEmpty()) {
             conversations.remove(chatId) != null

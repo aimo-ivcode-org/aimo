@@ -49,7 +49,10 @@ interface Conversation {
     /**
      * Append chat messages to this conversation's history.
      *
-     * Implementations should persist the messages to the conversation backing store.
+     * Implementations should persist the messages to the conversation backing store without
+     * any budget validation or trimming. All provided messages are appended to the conversation
+     * log. Budget management and history trimming are handled at higher layers (e.g., by the
+     * prompt budgeter).
      *
      * The provided requestId is used as the durable request identifier for persistence. This allows
      * callers (especially chat clients) to maintain correlation between the response ID returned to
@@ -58,10 +61,9 @@ interface Conversation {
      *
      * @param requestId The unique request identifier to use for history persistence
      * @param messages messages to append, in the order they should appear in the conversation
-     * @param maxCacheCharacters optional character-budget hint for bounded-history persistence
      * @throws IllegalStateException if the messages cannot be persisted
      */
-    fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long? = null)
+    fun addMessages(requestId: UUID, messages: List<AimoChatMessage>)
 
     /**
      * Return persisted chat metadata.

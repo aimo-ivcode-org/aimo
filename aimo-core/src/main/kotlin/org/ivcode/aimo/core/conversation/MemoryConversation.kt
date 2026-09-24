@@ -19,12 +19,9 @@ import java.util.UUID
  * within the same application session.
  *
  * @param chatId the unique identifier for the chat
- * @param scopeMetadata optional metadata used to validate access; if provided, all
- *                      read operations must match this scope
  */
 class MemoryConversation(
-    override val chatId: UUID,
-    private val scopeMetadata: Map<String, Any> = emptyMap()
+    override val chatId: UUID
 ) : Conversation {
     
     // Request grouping: maintain insertion order and per-request message grouping
@@ -63,7 +60,7 @@ class MemoryConversation(
         }
     }
 
-    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
+    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>) {
         if (messages.isEmpty()) return
         
         synchronized(lock) {

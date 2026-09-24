@@ -60,21 +60,24 @@ class FileConversationFactory(
         val conversationDir = File(storageDir, chatId.toString())
         if (!conversationDir.exists()) return null
         
-        // Load the stored metadata and validate scope match
-        val storedMetadata = loadStoredMetadata(conversationDir)
-        if (!matchesScope(storedMetadata, metadata)) return null
+        val mutableMetadata = metadata.toMutableMap()
+        val conversation = FileConversation(chatId, storageDir, objectMapper)
         
-        val conversation = FileConversation(chatId, storageDir, objectMapper, storedMetadata)
-        
-        return if (interceptors.isEmpty()) {
+        // Run interceptor chain first to allow enrichment of metadata
+        val result = if (interceptors.isEmpty()) {
             conversation
         } else {
-            val mutableMetadata = metadata.toMutableMap()
             val chain = buildGetChain(interceptors, 0) { _ ->
                 conversation
             }
             chain.proceed(chatId, mutableMetadata)
         }
+        
+        // After interceptors complete, validate scope match with enriched metadata
+        val storedMetadata = loadStoredMetadata(conversationDir)
+        if (!matchesScope(storedMetadata, mutableMetadata)) return null
+        
+        return result
     }
 
     override fun getConversations(metadata: Map<String, Any>): List<Conversation> {
@@ -89,7 +92,7 @@ class FileConversationFactory(
                     val chatId = UUID.fromString(chatIdStr)
                     val storedMetadata = loadStoredMetadata(dir)
                     if (matchesScope(storedMetadata, metadata)) {
-                        conversations.add(FileConversation(chatId, storageDir, objectMapper, storedMetadata))
+                        conversations.add(FileConversation(chatId, storageDir, objectMapper))
                     }
                 } catch (e: IllegalArgumentException) {
                     // Skip directories that are not valid UUIDs
@@ -111,6 +114,10 @@ class FileConversationFactory(
     override fun deleteConversation(chatId: UUID, metadata: Map<String, Any>): Boolean {
         val conversationDir = File(storageDir, chatId.toString())
         if (!conversationDir.exists()) return false
+        
+        // Load stored metadata and validate scope match BEFORE running delete
+        val storedMetadata = loadStoredMetadata(conversationDir)
+        if (!matchesScope(storedMetadata, metadata)) return false
         
         val mutableMetadata = metadata.toMutableMap()
         

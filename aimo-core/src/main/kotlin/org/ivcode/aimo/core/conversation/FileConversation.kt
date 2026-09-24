@@ -17,18 +17,16 @@ import java.util.UUID
  * - `metadata.json`: Object containing chat metadata properties
  *
  * Suitable for single-process deployments and testing scenarios requiring persistence.
+ * Metadata is loaded from the persisted file on every read operation to ensure consistency.
  *
  * @param chatId the unique identifier for the chat
  * @param storageDir the root directory where conversation data is stored (one subdirectory per chatId)
  * @param objectMapper the Jackson ObjectMapper to use for JSON serialization (defaults to standard configuration)
- * @param scopeMetadata optional metadata used to validate access; if provided, all
- *                      read operations must match this scope
  */
 class FileConversation(
     override val chatId: UUID,
     private val storageDir: File,
-    private val objectMapper: ObjectMapper = jsonMapper(),
-    private val scopeMetadata: Map<String, Any> = emptyMap()
+    private val objectMapper: ObjectMapper = jsonMapper()
 ) : Conversation {
     
     private data class RequestGroup(
@@ -111,7 +109,7 @@ class FileConversation(
         }
     }
 
-    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) {
+    override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>) {
         if (messages.isEmpty()) return
         
         synchronized(lock) {
