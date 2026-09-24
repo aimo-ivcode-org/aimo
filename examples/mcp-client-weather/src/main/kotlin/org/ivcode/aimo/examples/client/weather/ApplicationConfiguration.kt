@@ -4,7 +4,6 @@ import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.core.conversation.MemoryConversationFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Primary
 
 /**
  * Configuration for the weather MCP client application.
@@ -58,7 +57,6 @@ class ApplicationConfiguration {
      * @return An in-memory ConversationFactory implementation
      */
     @Bean
-    @Primary
     fun conversationFactory(): ConversationFactory {
         return MemoryConversationFactory()
     }

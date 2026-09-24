@@ -7,7 +7,6 @@ import org.springframework.boot.runApplication
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Primary
 import tools.jackson.databind.ObjectMapper
 import java.io.File
 
@@ -22,7 +21,6 @@ fun main(args: Array<String>) {
 class SimpleOllamaConfig {
 
     @Bean
-    @Primary
     fun appConversationFactory(
         @Value("\${aimo.data-dir:./data}") dataDirPath: String,
         objectMapper: ObjectMapper
