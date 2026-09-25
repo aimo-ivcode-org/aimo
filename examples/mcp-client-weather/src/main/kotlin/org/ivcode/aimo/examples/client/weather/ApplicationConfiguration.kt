@@ -1,23 +1,22 @@
 package org.ivcode.aimo.examples.client.weather
 
-import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
+import org.ivcode.aimo.core.conversation.ConversationFactory
+import org.ivcode.aimo.core.conversation.MemoryConversationFactory
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.context.annotation.Primary
 
 /**
  * Configuration for the weather MCP client application.
  *
  * This class provides Spring beans required for the AIMO framework to operate,
- * specifically the conversation storage DAO.
+ * specifically the conversation storage factory.
  *
  * ## Architecture
  *
  * The AIMO framework requires:
  * - An LLM provider (Ollama in this case, configured in application.yml)
  * - An MCP client to discover remote tools (weather server in this case)
- * - A DAO for conversation storage (provided here)
+ * - A ConversationFactory for conversation storage (provided here)
  * - A chat server to accept user requests (aimo-server)
  * - A web UI to interact with the chat (aimo-plugin-ui)
  *
@@ -28,38 +27,37 @@ import org.springframework.context.annotation.Primary
  * - Stateless deployments
  * - Quick prototyping
  *
- * For production, replace AimoChatClientDaoMemory with:
- * - AimoChatClientDaoFile - file-based storage
+ * For production, replace MemoryConversationFactory with:
+ * - FileConversationFactory - file-based storage
  * - Custom database implementation (PostgreSQL, MongoDB, etc.)
  *
  * ## Example: File-based Storage
  *
  * ```kotlin
  * @Bean
- * fun aimoChatClientDao(): AimoChatClientDao {
- *     return AimoChatClientDaoFile(File("./data/conversations"))
+ * fun conversationFactory(): ConversationFactory {
+ *     return FileConversationFactory(File("./data/conversations"))
  * }
  * ```
  *
- * @see org.ivcode.aimo.core.dao.AimoChatClientDao
- * @see org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
- * @see org.ivcode.aimo.core.dao.AimoChatClientDaoFile
+ * @see org.ivcode.aimo.core.conversation.ConversationFactory
+ * @see org.ivcode.aimo.core.conversation.MemoryConversationFactory
+ * @see org.ivcode.aimo.core.conversation.FileConversationFactory
  */
 @Configuration
 class ApplicationConfiguration {
 
     /**
-     * Provide in-memory DAO for conversation storage.
+     * Provide in-memory ConversationFactory for conversation storage.
      *
      * This bean is required by the AIMO core framework to store and retrieve
      * conversation history. Using in-memory storage means conversations are
      * lost when the application restarts.
      *
-     * @return An in-memory DAO implementation
+     * @return An in-memory ConversationFactory implementation
      */
     @Bean
-    @Primary
-    fun aimoChatClientDao(): AimoChatClientDao {
-        return AimoChatClientDaoMemory()
+    fun conversationFactory(): ConversationFactory {
+        return MemoryConversationFactory()
     }
 }

@@ -1,7 +1,6 @@
 package org.ivcode.aimo.ui.controller
 
 import org.ivcode.aimo.core.conversation.ConversationFactory
-import org.ivcode.aimo.core.dao.AimoChatClientDao
 import org.ivcode.aimo.server.consts.API_CONTROLLER_CONTEXT
 import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.ui.chatcontroller.TitleChatController
@@ -20,7 +19,6 @@ import java.util.UUID
 @RequestMapping("/$API_CONTROLLER_CONTEXT/title")
 class TitleController constructor(
     private val conversationFactory: ConversationFactory,
-    private val conversationStore: AimoChatClientDao,
     private val titleChatController: TitleChatController,
 ) {
 
@@ -35,8 +33,8 @@ class TitleController constructor(
 
     @GetMapping("/")
     fun getTitles(): List<ConversationTitle> {
-        return conversationStore.getChatConversations().mapNotNull { entity ->
-            titleChatController.getTitle(entity.chatId, entity.metadata)
+        return conversationFactory.getConversations().mapNotNull { conversation ->
+            titleChatController.getTitle(conversation.chatId, conversation.getChatMetadata())
         }
     }
 

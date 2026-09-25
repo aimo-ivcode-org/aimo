@@ -24,6 +24,31 @@ class AuditingConversationInterceptor(
 
     private val logger = auditLogger ?: LoggerFactory.getLogger("AUDIT.Conversation")
 
+    override fun interceptCreate(
+        chain: ConversationInterceptor.CreateChain,
+        metadata: MutableMap<String, Any>
+    ): Conversation {
+        if (!enabled) {
+            return chain.proceed(metadata)
+        }
+
+        val timestamp = Instant.now()
+        val auditEntry = buildCreateAuditEntry(timestamp, metadata)
+
+        log("BEFORE $auditEntry")
+
+        return try {
+            val result = chain.proceed(metadata)
+
+            log("SUCCESS $auditEntry | conversationId=${result.chatId}")
+
+            result
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            log("FAILURE $auditEntry | error=${e.javaClass.simpleName}: ${e.message}")
+            throw e
+        }
+    }
+
     override fun interceptGet(
         chain: ConversationInterceptor.GetChain,
         chatId: UUID,
@@ -41,13 +66,35 @@ class AuditingConversationInterceptor(
         return try {
             val result = chain.proceed(chatId, metadata)
 
-            // Log successful completion
             log("SUCCESS $auditEntry | conversationFound=${result != null}")
 
             result
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            // Log failure with exception details. Any exception from the chain should be audited
-            // and then rethrown to propagate to the caller.
+            log("FAILURE $auditEntry | error=${e.javaClass.simpleName}: ${e.message}")
+            throw e
+        }
+    }
+
+    override fun interceptList(
+        chain: ConversationInterceptor.ListChain,
+        metadata: MutableMap<String, Any>
+    ): List<Conversation> {
+        if (!enabled) {
+            return chain.proceed(metadata)
+        }
+
+        val timestamp = Instant.now()
+        val auditEntry = buildListAuditEntry(timestamp, metadata)
+
+        log("BEFORE $auditEntry")
+
+        return try {
+            val result = chain.proceed(metadata)
+
+            log("SUCCESS $auditEntry | conversationsFound=${result.size}")
+
+            result
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
             log("FAILURE $auditEntry | error=${e.javaClass.simpleName}: ${e.message}")
             throw e
         }
@@ -70,16 +117,35 @@ class AuditingConversationInterceptor(
         return try {
             val result = chain.proceed(chatId, metadata)
 
-            // Log successful completion
             log("SUCCESS $auditEntry | conversationDeleted=$result")
 
             result
         } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-            // Log failure with exception details. Any exception from the chain should be audited
-            // and then rethrown to propagate to the caller.
             log("FAILURE $auditEntry | error=${e.javaClass.simpleName}: ${e.message}")
             throw e
         }
+    }
+
+    private fun buildCreateAuditEntry(
+        timestamp: Instant,
+        metadata: Map<String, Any>
+    ): String {
+        val sb = StringBuilder()
+        sb.append("operation=CREATE")
+        sb.append(" | timestamp=$timestamp")
+        sb.append(" | metadataKeys=${metadata.keys.size}")
+        return sb.toString()
+    }
+
+    private fun buildListAuditEntry(
+        timestamp: Instant,
+        metadata: Map<String, Any>
+    ): String {
+        val sb = StringBuilder()
+        sb.append("operation=LIST")
+        sb.append(" | timestamp=$timestamp")
+        sb.append(" | metadataKeys=${metadata.keys.size}")
+        return sb.toString()
     }
 
     private fun buildAuditEntry(
