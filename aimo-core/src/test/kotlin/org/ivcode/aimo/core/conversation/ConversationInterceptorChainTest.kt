@@ -22,6 +22,28 @@ import kotlin.test.assertFalse
 class ConversationInterceptorChainTest {
 
     @Test
+    fun `existing interceptors can use default create and list behavior`() {
+        val legacyInterceptor = object : ConversationInterceptor {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? = chain.proceed(chatId, metadata)
+
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean = chain.proceed(chatId, metadata)
+        }
+        val factory = MemoryConversationFactory(listOf(legacyInterceptor))
+
+        val created = factory.createConversation(emptyMap())
+
+        assertEquals(listOf(created), factory.getConversations(emptyMap()))
+    }
+
+    @Test
     fun `single interceptor executes and calls proceed`() {
         val callLog = mutableListOf<String>()
         val chatId = UUID.randomUUID()

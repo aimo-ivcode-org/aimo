@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper
 import tools.jackson.module.kotlin.jsonMapper
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * File-backed persistent implementation of ConversationFactory.
@@ -22,62 +23,70 @@ import java.util.UUID
  * @param objectMapper Jackson ObjectMapper for JSON serialization (defaults to standard Kotlin-aware config)
  * @param interceptors list of interceptors to apply to all factory operations
  */
-class FileConversationFactory(
+class FileConversationFactory private constructor(
     private val storageDir: File,
-    private val objectMapper: ObjectMapper = jsonMapper(),
-    private val interceptors: List<ConversationInterceptor> = emptyList()
+    private val objectMapper: ObjectMapper,
+    private val interceptors: List<ConversationInterceptor>,
+    private val conversationLocks: ConcurrentHashMap<UUID, Any>
 ) : ConversationFactory {
+    constructor(
+        storageDir: File,
+        objectMapper: ObjectMapper = jsonMapper(),
+        interceptors: List<ConversationInterceptor> = emptyList()
+    ) : this(storageDir, objectMapper, interceptors, ConcurrentHashMap())
+
     init {
         storageDir.mkdirs()
     }
 
     override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
-        return FileConversationFactory(storageDir, objectMapper, interceptors + interceptor)
+        return FileConversationFactory(storageDir, objectMapper, interceptors + interceptor, conversationLocks)
     }
 
     override fun createConversation(metadata: Map<String, Any>): Conversation {
         val chatId = UUID.randomUUID()
         val mutableMetadata = metadata.toMutableMap()
+        val lock = conversationLock(chatId)
         
         val conversation = if (interceptors.isEmpty()) {
-            FileConversation(chatId, storageDir, objectMapper)
+            FileConversation.withLock(chatId, storageDir, objectMapper, lock)
         } else {
             val chain = buildCreateChain(interceptors, 0) { _ ->
-                FileConversation(chatId, storageDir, objectMapper)
+                FileConversation.withLock(chatId, storageDir, objectMapper, lock)
             }
             chain.proceed(mutableMetadata) as Conversation
         }
         
-        // Persist metadata if provided
-        if (mutableMetadata.isNotEmpty()) {
-            conversation.writeChatProperties(mutableMetadata)
-        }
+        // Persist empty metadata too, so a missing metadata file indicates a failed load.
+        conversation.writeChatProperties(mutableMetadata)
         
         return conversation
     }
 
     override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
         val conversationDir = File(storageDir, chatId.toString())
-        if (!conversationDir.exists()) return null
-        
-        val mutableMetadata = metadata.toMutableMap()
-        val conversation = FileConversation(chatId, storageDir, objectMapper)
-        
-        // Run interceptor chain first to allow enrichment of metadata
-        val result = if (interceptors.isEmpty()) {
-            conversation
-        } else {
-            val chain = buildGetChain(interceptors, 0) { _ ->
+        val lock = conversationLock(chatId)
+
+        return synchronized(lock) {
+            if (!conversationDir.exists()) return@synchronized null
+
+            val mutableMetadata = metadata.toMutableMap()
+            val conversation = FileConversation.withLock(chatId, storageDir, objectMapper, lock)
+
+            // Run interceptor chain first to allow enrichment of metadata
+            val result = if (interceptors.isEmpty()) {
                 conversation
+            } else {
+                val chain = buildGetChain(interceptors, 0) { _ ->
+                    conversation
+                }
+                chain.proceed(chatId, mutableMetadata)
             }
-            chain.proceed(chatId, mutableMetadata)
+
+            // Validate against metadata while writes and deletes for this chat are excluded.
+            val storedMetadata = loadStoredMetadata(conversationDir)
+            if (matchesScope(storedMetadata, mutableMetadata)) result else null
         }
-        
-        // After interceptors complete, validate scope match with enriched metadata
-        val storedMetadata = loadStoredMetadata(conversationDir)
-        if (!matchesScope(storedMetadata, mutableMetadata)) return null
-        
-        return result
     }
 
     override fun getConversations(metadata: Map<String, Any>): List<Conversation> {
@@ -90,9 +99,12 @@ class FileConversationFactory(
                 val chatIdStr = dir.name
                 try {
                     val chatId = UUID.fromString(chatIdStr)
-                    val storedMetadata = loadStoredMetadata(dir)
-                    if (matchesScope(storedMetadata, metadata)) {
-                        conversations.add(FileConversation(chatId, storageDir, objectMapper))
+                    val lock = conversationLock(chatId)
+                    synchronized(lock) {
+                        val storedMetadata = loadStoredMetadata(dir)
+                        if (matchesScope(storedMetadata, metadata)) {
+                            conversations.add(FileConversation.withLock(chatId, storageDir, objectMapper, lock))
+                        }
                     }
                 } catch (e: IllegalArgumentException) {
                     // Skip directories that are not valid UUIDs
@@ -113,33 +125,34 @@ class FileConversationFactory(
 
     override fun deleteConversation(chatId: UUID, metadata: Map<String, Any>): Boolean {
         val conversationDir = File(storageDir, chatId.toString())
-        if (!conversationDir.exists()) return false
-        
-        // Load stored metadata and validate scope match BEFORE running delete
-        val storedMetadata = loadStoredMetadata(conversationDir)
-        if (!matchesScope(storedMetadata, metadata)) return false
-        
-        val mutableMetadata = metadata.toMutableMap()
-        
-        return if (interceptors.isEmpty()) {
-            conversationDir.deleteRecursively()
-        } else {
-            val chain = buildDeleteChain(interceptors, 0) { _ ->
+        val lock = conversationLock(chatId)
+
+        return synchronized(lock) {
+            if (!conversationDir.exists()) return@synchronized false
+
+            // Validate scope and delete under the same per-chat lock as conversation writes.
+            val storedMetadata = loadStoredMetadata(conversationDir)
+            if (!matchesScope(storedMetadata, metadata)) return@synchronized false
+
+            val mutableMetadata = metadata.toMutableMap()
+            if (interceptors.isEmpty()) {
                 conversationDir.deleteRecursively()
+            } else {
+                val chain = buildDeleteChain(interceptors, 0) { _ ->
+                    conversationDir.deleteRecursively()
+                }
+                chain.proceed(chatId, mutableMetadata)
             }
-            chain.proceed(chatId, mutableMetadata)
         }
     }
 
+    private fun conversationLock(chatId: UUID): Any =
+        conversationLocks.computeIfAbsent(chatId) { Any() }
+
     private fun loadStoredMetadata(conversationDir: File): Map<String, Any> {
         val metadataFile = File(conversationDir, "metadata.json")
-        if (!metadataFile.exists()) return emptyMap()
-        return try {
-            @Suppress("UNCHECKED_CAST")
-            objectMapper.readValue(metadataFile, Map::class.java) as Map<String, Any>
-        } catch (e: Exception) {
-            emptyMap()
-        }
+        @Suppress("UNCHECKED_CAST")
+        return objectMapper.readValue(metadataFile, Map::class.java) as Map<String, Any>
     }
 
     private fun matchesScope(storedMetadata: Map<String, Any>, requestedMetadata: Map<String, Any>): Boolean {

@@ -23,11 +23,27 @@ import java.util.UUID
  * @param storageDir the root directory where conversation data is stored (one subdirectory per chatId)
  * @param objectMapper the Jackson ObjectMapper to use for JSON serialization (defaults to standard configuration)
  */
-class FileConversation(
+class FileConversation private constructor(
     override val chatId: UUID,
     private val storageDir: File,
-    private val objectMapper: ObjectMapper = jsonMapper()
+    private val objectMapper: ObjectMapper,
+    private val lock: Any
 ) : Conversation {
+
+    constructor(
+        chatId: UUID,
+        storageDir: File,
+        objectMapper: ObjectMapper = jsonMapper()
+    ) : this(chatId, storageDir, objectMapper, Any())
+
+    companion object {
+        internal fun withLock(
+            chatId: UUID,
+            storageDir: File,
+            objectMapper: ObjectMapper,
+            lock: Any
+        ): FileConversation = FileConversation(chatId, storageDir, objectMapper, lock)
+    }
     
     private data class RequestGroup(
         val requestId: UUID,
@@ -39,16 +55,9 @@ class FileConversation(
     private val messagesFile = File(conversationDir, "messages.json")
     private val metadataFile = File(conversationDir, "metadata.json")
     
-    // Lock for thread-safe file operations
-    private val lock = Object()
-
     private fun loadRequestGroupsUnsafe(): List<RequestGroup> {
         if (!messagesFile.exists()) return emptyList()
-        return try {
-            objectMapper.readValue(messagesFile, Array<RequestGroup>::class.java).toList()
-        } catch (e: Exception) {
-            emptyList()
-        }
+        return objectMapper.readValue(messagesFile, Array<RequestGroup>::class.java).toList()
     }
 
     private fun saveRequestGroupsUnsafe(groups: List<RequestGroup>) {

@@ -31,11 +31,14 @@ interface ConversationInterceptor {
     /**
      * Intercept a [ConversationFactory.createConversation] call.
      *
+     * The default implementation proceeds without modifying the operation.
+     *
      * @param chain The interceptor chain to proceed with
      * @param metadata Mutable metadata map for the new conversation; interceptors may add or modify entries
      * @return The newly created Conversation instance
      */
-    fun interceptCreate(chain: CreateChain, metadata: MutableMap<String, Any>): Conversation
+    fun interceptCreate(chain: CreateChain, metadata: MutableMap<String, Any>): Conversation =
+        chain.proceed(metadata)
 
     /**
      * Intercept a [ConversationFactory.getConversation] call.
@@ -50,11 +53,14 @@ interface ConversationInterceptor {
     /**
      * Intercept a [ConversationFactory.getConversations] call.
      *
+     * The default implementation proceeds without modifying the operation.
+     *
      * @param chain The interceptor chain to proceed with
      * @param metadata Mutable metadata map for scope filtering; interceptors may modify entries
      * @return list of Conversation instances matching scope, or empty list if none found
      */
-    fun interceptList(chain: ListChain, metadata: MutableMap<String, Any>): List<Conversation>
+    fun interceptList(chain: ListChain, metadata: MutableMap<String, Any>): List<Conversation> =
+        chain.proceed(metadata)
 
     /**
      * Intercept a [ConversationFactory.deleteConversation] call.
