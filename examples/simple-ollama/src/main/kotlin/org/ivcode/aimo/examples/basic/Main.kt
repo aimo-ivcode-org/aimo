@@ -1,7 +1,7 @@
 package org.ivcode.aimo.examples.basic
 
-import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.dao.AimoChatClientDaoFile
+import org.ivcode.aimo.core.conversation.ConversationFactory
+import org.ivcode.aimo.core.conversation.FileConversationFactory
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.beans.factory.annotation.Value
@@ -21,11 +21,11 @@ fun main(args: Array<String>) {
 class SimpleOllamaConfig {
 
     @Bean
-    fun createAimoDao(
+    fun appConversationFactory(
         @Value("\${aimo.data-dir:./data}") dataDirPath: String,
         objectMapper: ObjectMapper
-    ): AimoChatClientDao {
+    ): ConversationFactory {
         val dataDir = File(dataDirPath)
-        return AimoChatClientDaoFile(dataDir, objectMapper)
+        return FileConversationFactory(dataDir, objectMapper)
     }
 }

@@ -1,7 +1,5 @@
 package org.ivcode.aimo.server.service
 
-import org.ivcode.aimo.core.dao.ChatConversationEntity
-import org.ivcode.aimo.core.dao.ChatRequestEntity
 import org.ivcode.aimo.core.model.AimoChatMessage
 import org.ivcode.aimo.core.model.AimoChatMessageType
 import org.ivcode.aimo.core.model.AimoChatRequest
@@ -60,29 +58,6 @@ internal fun AimoHistoryRequest.toChatHistoryRequest() = ChatHistoryRequest(
 internal fun AimoConversationInfo.toChatConversationInfo() = ChatConversationInfo(
     chatId = chatId,
     metadata = metadata,
-)
-
-internal fun ChatConversationEntity.toChatConversationInfo() = ChatConversationInfo(
-    chatId = chatId,
-    metadata = metadata,
-)
-
-internal fun ChatRequestEntity.toChatHistoryRequest() = ChatHistoryRequest(
-    chatId = chatId,
-    requestId = requestId,
-    messages = messages.map { it.toAimoChatMessage().toChatMessage() },
-    createdAt = createdAt
-)
-
-internal fun org.ivcode.aimo.core.dao.ChatMessageEntity.toAimoChatMessage() = AimoChatMessage(
-    messageId = messageId,
-    type = AimoChatMessageType.valueOf(type),
-    content = content,
-    thinking = thinking,
-    toolName = toolName,
-    toolCallId = toolCallId,
-    toolCalls = toolCalls,
-    done = true
 )
 
 internal fun AimoUsage.toChatUsage() = ChatUsage(

@@ -1,6 +1,6 @@
 package org.ivcode.aimo.server.service
 
-import org.ivcode.aimo.core.dao.AimoChatClientDao
+import org.ivcode.aimo.core.conversation.ConversationFactory
 import org.ivcode.aimo.server.exceptions.NotFoundException
 import org.ivcode.aimo.server.model.ChatConversationInfo
 import org.springframework.stereotype.Service
@@ -8,33 +8,35 @@ import java.util.UUID
 
 @Service
 class ConversationService (
-    private val conversationStore: AimoChatClientDao
+    private val conversationFactory: ConversationFactory
 ) {
     fun createConversation(metadata: Map<String, Any> = emptyMap()): ChatConversationInfo {
-        val entity = conversationStore.createChatConversation(metadata)
-        return entity.toChatConversationInfo()
+        val conversation = conversationFactory.createConversation(metadata)
+        return ChatConversationInfo(chatId = conversation.chatId, metadata = conversation.getChatMetadata())
     }
 
     fun getConversations(scopeMetadata: Map<String, Any> = emptyMap()): List<ChatConversationInfo> {
-        return conversationStore.getChatConversations(scopeMetadata).map { it.toChatConversationInfo() }
+        return conversationFactory.getConversations(scopeMetadata).map { conversation ->
+            ChatConversationInfo(chatId = conversation.chatId, metadata = conversation.getChatMetadata())
+        }
     }
 
     fun getConversation(chatId: UUID, scopeMetadata: Map<String, Any> = emptyMap()): ChatConversationInfo {
-        val entity = conversationStore.getChatConversation(chatId, scopeMetadata)
+        val conversation = conversationFactory.getConversation(chatId, scopeMetadata)
             ?: throw NotFoundException("Conversation with id $chatId not found")
-        return entity.toChatConversationInfo()
+        return ChatConversationInfo(chatId = conversation.chatId, metadata = conversation.getChatMetadata())
     }
 
     fun deleteConversation(chatId: UUID, scopeMetadata: Map<String, Any> = emptyMap()) {
-        if (!conversationStore.deleteChatConversation(chatId, scopeMetadata)) {
+        if (!conversationFactory.deleteConversation(chatId, scopeMetadata)) {
             throw NotFoundException("Conversation with id $chatId not found")
         }
     }
 
     fun getMetadata(chatId: UUID, scopeMetadata: Map<String, Any> = emptyMap()): Map<String, Any> {
-        val entity = conversationStore.getChatConversation(chatId, scopeMetadata)
+        val conversation = conversationFactory.getConversation(chatId, scopeMetadata)
             ?: throw NotFoundException("Conversation with id $chatId not found")
-        return entity.metadata
+        return conversation.getChatMetadata()
     }
 
     fun upsertMetadata(
@@ -42,9 +44,9 @@ class ConversationService (
         metadata: Map<String, Any>,
         scopeMetadata: Map<String, Any> = emptyMap(),
     ) {
-        if (!conversationStore.upsertConversationMetadata(chatId, metadata, scopeMetadata)) {
-            throw NotFoundException("Conversation with id $chatId not found")
-        }
+        val conversation = conversationFactory.getConversation(chatId, scopeMetadata)
+            ?: throw NotFoundException("Conversation with id $chatId not found")
+        conversation.writeChatProperties(metadata)
     }
 
     fun deleteMetadata(
@@ -52,8 +54,8 @@ class ConversationService (
         keys: List<String>,
         scopeMetadata: Map<String, Any> = emptyMap(),
     ) {
-        if (!conversationStore.deleteConversationMetadata(chatId, keys, scopeMetadata)) {
-            throw NotFoundException("Conversation with id $chatId not found")
-        }
+        val conversation = conversationFactory.getConversation(chatId, scopeMetadata)
+            ?: throw NotFoundException("Conversation with id $chatId not found")
+        conversation.deleteChatProperties(keys)
     }
 }

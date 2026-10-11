@@ -13,6 +13,7 @@ import org.ivcode.aimo.core.model.AimoChatModelConfig
 import org.ivcode.aimo.core.model.AimoChatOptions
 import org.ivcode.aimo.core.model.AimoChatRequest
 import org.ivcode.aimo.core.model.AimoChatResponse
+import org.ivcode.aimo.core.model.AimoHistoryRequest
 import org.ivcode.aimo.core.model.AimoPrompt
 import java.time.Instant
 import java.util.UUID
@@ -51,11 +52,14 @@ class ChatClientProviderImplIntegrationTest {
         val conversation = object : Conversation {
             override val chatId: UUID = convId
             override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = null
-            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) = Unit
+            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>) = Unit
             override fun getChatMetadata(): Map<String, Any> = emptyMap()
             override fun getChatProperty(property: String): Any? = null
             override fun writeChatProperty(property: String, value: Any) = Unit
             override fun deleteChatProperty(property: String): Boolean = false
+            override fun writeChatProperties(properties: Map<String, Any>) = Unit
+            override fun deleteChatProperties(keys: List<String>) = Unit
+            override fun getHistory(maxCacheCharacters: Long?): List<AimoHistoryRequest> = emptyList()
         }
 
         // Minimal engine that returns a deterministic response
@@ -561,11 +565,14 @@ class ChatClientProviderImplIntegrationTest {
         return object : Conversation {
             override val chatId: UUID = convId
             override fun getMessages(maxCacheCharacters: Long?): List<AimoChatMessage>? = null
-            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>, maxCacheCharacters: Long?) = Unit
+            override fun addMessages(requestId: UUID, messages: List<AimoChatMessage>) = Unit
             override fun getChatMetadata(): Map<String, Any> = emptyMap()
             override fun getChatProperty(property: String): Any? = null
             override fun writeChatProperty(property: String, value: Any) = Unit
             override fun deleteChatProperty(property: String): Boolean = false
+            override fun writeChatProperties(properties: Map<String, Any>) = Unit
+            override fun deleteChatProperties(keys: List<String>) = Unit
+            override fun getHistory(maxCacheCharacters: Long?): List<AimoHistoryRequest> = emptyList()
         }
     }
 

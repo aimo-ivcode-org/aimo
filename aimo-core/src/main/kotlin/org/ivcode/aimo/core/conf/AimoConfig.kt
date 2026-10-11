@@ -19,8 +19,7 @@ import org.ivcode.aimo.core.chatscope.ChatScope
 import org.ivcode.aimo.core.chatscope.ChatScopeProvider
 import org.ivcode.aimo.core.chatscope.ChatScopeProviderImpl
 import org.ivcode.aimo.core.conversation.ConversationFactory
-import org.ivcode.aimo.core.conversation.ConversationFactoryImpl
-import org.ivcode.aimo.core.dao.AimoChatClientDao
+import org.ivcode.aimo.core.conversation.MemoryConversationFactory
 import org.ivcode.aimo.core.model.AimoChatModelProviderFactory
 import org.ivcode.aimo.core.model.AimoChatModelFactory
 import org.ivcode.aimo.core.model.AimoChatModelFactoryImpl
@@ -186,22 +185,6 @@ class AimoConfig {
             providerManager = providerManager,
         )
        }
-
-    /**
-     * Creates the conversation factory used to resolve conversation instances from persistent storage.
-     *
-     * The factory resolves the DAO explicitly so sample applications can contribute their own storage beans without
-     * creating an ambiguous type-only injection point.
-     *
-     * @param applicationContext The Spring context used to locate the conversation DAO.
-     * @return A conversation factory bound to the configured store.
-     */
-    @Bean
-    fun createConversationFactory(
-        applicationContext: ApplicationContext,
-    ): ConversationFactory {
-        return ConversationFactoryImpl(resolveConversationStore(applicationContext))
-    }
 
 
     /**
@@ -462,25 +445,6 @@ private fun collectSystemMessagesForScope(
     }
 
     return uniqueMessages + inlineMessages
-}
-
-/**
- * Resolves the conversation DAO from the application context.
- *
- * The lookup prefers a bean named `aimoChatClientDao` when present so example applications can opt into a canonical
- * storage bean name while still allowing other single-candidate DAO beans to work unchanged.
- *
- * @param applicationContext The Spring application context containing DAO beans.
- * @return The resolved `AimoChatClientDao` implementation.
- */
-private fun resolveConversationStore(applicationContext: ApplicationContext): AimoChatClientDao {
-    val beanNames = applicationContext.getBeanNamesForType(AimoChatClientDao::class.java)
-    require(beanNames.isNotEmpty()) {
-        "No AimoChatClientDao bean is available for ConversationFactory"
-    }
-
-    val preferredBeanName = beanNames.firstOrNull { it == "aimoChatClientDao" } ?: beanNames.first()
-    return applicationContext.getBean(preferredBeanName, AimoChatClientDao::class.java)
 }
 
 /**

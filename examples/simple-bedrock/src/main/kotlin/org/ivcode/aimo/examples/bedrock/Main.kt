@@ -1,7 +1,7 @@
 package org.ivcode.aimo.examples.bedrock
 
-import org.ivcode.aimo.core.dao.AimoChatClientDao
-import org.ivcode.aimo.core.dao.AimoChatClientDaoMemory
+import org.ivcode.aimo.core.conversation.ConversationFactory
+import org.ivcode.aimo.core.conversation.MemoryConversationFactory
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
@@ -18,8 +18,8 @@ fun main(args: Array<String>) {
 class SimpleBedrockConfig {
 
     @Bean
-    fun createAimoDao(): AimoChatClientDao {
-        return AimoChatClientDaoMemory()
+    fun appConversationFactory(): ConversationFactory {
+        return MemoryConversationFactory()
     }
 }
 
