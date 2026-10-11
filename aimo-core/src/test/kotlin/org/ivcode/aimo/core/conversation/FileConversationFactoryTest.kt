@@ -50,6 +50,33 @@ class FileConversationFactoryTest {
     }
 
     @Test
+    fun `adding interceptor applies it to existing conversations`() {
+        val factory = FileConversationFactory(tempDir)
+        val conversation = factory.createConversation()
+        val interceptedChatIds = mutableListOf<UUID>()
+
+        factory.addInterceptor(object : ConversationInterceptor {
+            override fun interceptGet(
+                chain: ConversationInterceptor.GetChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Conversation? {
+                interceptedChatIds.add(chatId)
+                return chain.proceed(chatId, metadata)
+            }
+
+            override fun interceptDelete(
+                chain: ConversationInterceptor.DeleteChain,
+                chatId: UUID,
+                metadata: MutableMap<String, Any>
+            ): Boolean = chain.proceed(chatId, metadata)
+        })
+
+        assertNotNull(factory.getConversation(conversation.chatId))
+        assertEquals(listOf(conversation.chatId), interceptedChatIds)
+    }
+
+    @Test
     fun `conversation persists across factory instances and enforces scope`() {
         val firstFactory = FileConversationFactory(tempDir)
         val created = firstFactory.createConversation(mapOf("tenant" to "a"))

@@ -136,9 +136,8 @@ class MyInterceptor : ConversationInterceptor {
     }
 }
 
-val conversation = factory
-    .withInterceptor(MyInterceptor())
-    .getConversation(chatId, metadata)
+factory.addInterceptor(MyInterceptor())
+val conversation = factory.getConversation(chatId, metadata)
 ```
 
 **Typical use cases:**
@@ -207,8 +206,8 @@ factory.deleteConversation(chatId, metadata)
 **Interceptor support:**
 ```kotlin
 val factory = MemoryConversationFactory()
-    .withInterceptor(AuditingInterceptor())
-    .withInterceptor(EncryptionInterceptor())
+factory.addInterceptor(AuditingInterceptor())
+factory.addInterceptor(EncryptionInterceptor())
 ```
 
 ## Context Management

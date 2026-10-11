@@ -66,12 +66,8 @@ class FileConversation private constructor(
 
     private fun loadMetadataUnsafe(): Map<String, Any> {
         if (!metadataFile.exists()) return emptyMap()
-        return try {
-            @Suppress("UNCHECKED_CAST")
-            objectMapper.readValue(metadataFile, Map::class.java) as Map<String, Any>
-        } catch (e: Exception) {
-            emptyMap()
-        }
+        @Suppress("UNCHECKED_CAST")
+        return objectMapper.readValue(metadataFile, Map::class.java) as Map<String, Any>
     }
 
     private fun saveMetadataUnsafe(metadata: Map<String, Any>) {

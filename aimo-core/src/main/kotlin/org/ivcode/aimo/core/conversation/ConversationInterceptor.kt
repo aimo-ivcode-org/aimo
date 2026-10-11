@@ -20,12 +20,11 @@ import java.util.UUID
  * - `interceptDelete`: Intercepts [ConversationFactory.deleteConversation] calls
  *
  * ```kotlin
- * factory
- *     .withInterceptor(MyCustomInterceptor())
- *     .createConversation(mapOf("title" to "New Chat"))
+ * factory.addInterceptor(MyCustomInterceptor())
+ * val conversation = factory.createConversation(mapOf("title" to "New Chat"))
  * ```
  *
- * Interceptors are applied in the order they were added via [ConversationFactory.withInterceptor].
+ * Interceptors are applied in the order they were added via [ConversationFactory.addInterceptor].
  */
 interface ConversationInterceptor {
     /**

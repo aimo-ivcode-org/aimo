@@ -15,9 +15,14 @@ import java.util.concurrent.ConcurrentHashMap
  * Thread-safe: concurrent access is protected by an internal ConcurrentHashMap.
  */
 class MemoryConversationFactory(
-    private val interceptors: List<ConversationInterceptor> = emptyList(),
+    interceptors: List<ConversationInterceptor> = emptyList(),
     sharedConversations: Map<UUID, Conversation>? = null
 ) : ConversationFactory {
+    @Volatile
+    private var registeredInterceptors: List<ConversationInterceptor> = interceptors.toList()
+
+    private val interceptorLock = Any()
+
     // Internal thread-safe storage - always a ConcurrentHashMap, never exposed
     private val conversations: ConcurrentHashMap<UUID, Conversation> = 
         if (sharedConversations != null) {
@@ -26,19 +31,21 @@ class MemoryConversationFactory(
             ConcurrentHashMap()
         }
 
-    override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
-        // Share the same backing store so existing conversations remain accessible
-        return MemoryConversationFactory(interceptors + interceptor, conversations)
+    override fun addInterceptor(interceptor: ConversationInterceptor) {
+        synchronized(interceptorLock) {
+            registeredInterceptors = registeredInterceptors + interceptor
+        }
     }
 
     override fun createConversation(metadata: Map<String, Any>): Conversation {
+        val interceptorSnapshot = registeredInterceptors
         val chatId = UUID.randomUUID()
         val mutableMetadata = metadata.toMutableMap()
         
-        val conversation = if (interceptors.isEmpty()) {
+        val conversation = if (interceptorSnapshot.isEmpty()) {
             MemoryConversation(chatId)
         } else {
-            val chain = buildCreateChain(interceptors, 0) { _ ->
+            val chain = buildCreateChain(interceptorSnapshot, 0) { _ ->
                 MemoryConversation(chatId)
             }
             chain.proceed(mutableMetadata) as Conversation
@@ -54,15 +61,16 @@ class MemoryConversationFactory(
     }
 
     override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
+        val interceptorSnapshot = registeredInterceptors
         val mutableMetadata = metadata.toMutableMap()
         
         val conversation = conversations[chatId] ?: return null
         
         // Run interceptor chain first to allow enrichment of metadata
-        val result = if (interceptors.isEmpty()) {
+        val result = if (interceptorSnapshot.isEmpty()) {
             conversation
         } else {
-            val chain = buildGetChain(interceptors, 0) { _ ->
+            val chain = buildGetChain(interceptorSnapshot, 0) { _ ->
                 conversation
             }
             chain.proceed(chatId, mutableMetadata)
@@ -76,16 +84,17 @@ class MemoryConversationFactory(
     }
 
     override fun getConversations(metadata: Map<String, Any>): List<Conversation> {
+        val interceptorSnapshot = registeredInterceptors
         val mutableMetadata = metadata.toMutableMap()
         
         val filtered = conversations.values.filter { conversation ->
             matchesScope(conversation.getChatMetadata(), mutableMetadata)
         }
         
-        return if (interceptors.isEmpty()) {
+        return if (interceptorSnapshot.isEmpty()) {
             filtered
         } else {
-            val chain = buildListChain(interceptors, 0) {
+            val chain = buildListChain(interceptorSnapshot, 0) {
                 filtered
             }
             chain.proceed(mutableMetadata)
@@ -93,6 +102,7 @@ class MemoryConversationFactory(
     }
 
     override fun deleteConversation(chatId: UUID, metadata: Map<String, Any>): Boolean {
+        val interceptorSnapshot = registeredInterceptors
         val mutableMetadata = metadata.toMutableMap()
         
         val conversation = conversations[chatId] ?: return false
@@ -101,10 +111,10 @@ class MemoryConversationFactory(
         val storedMetadata = conversation.getChatMetadata()
         if (!matchesScope(storedMetadata, mutableMetadata)) return false
         
-        return if (interceptors.isEmpty()) {
+        return if (interceptorSnapshot.isEmpty()) {
             conversations.remove(chatId) != null
         } else {
-            val chain = buildDeleteChain(interceptors, 0) { _ ->
+            val chain = buildDeleteChain(interceptorSnapshot, 0) { _ ->
                 conversations.remove(chatId) != null
             }
             chain.proceed(chatId, mutableMetadata)

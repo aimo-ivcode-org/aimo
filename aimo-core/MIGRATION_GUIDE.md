@@ -44,7 +44,7 @@ val messages = conversation.getMessages()
 - Replace `AimoChatClientDaoMemory()` with `MemoryConversationFactory()`
 - Replace `AimoChatClientDaoFile(dataDir)` with `FileConversationFactory(dataDir)`
 - Remove `ConversationFactoryImpl` wrapper - factories are used directly
-- API remains identical - no caller changes needed
+- This is a source-breaking migration for code using the deleted DAO and wrapper APIs or affected method signatures; update callers and custom implementations as described below. Core conversation persistence and runtime behavior are preserved.
 
 ### Path 2: From Accessing DAO Entities to Using Conversation Methods
 
@@ -126,22 +126,15 @@ fun testMessagePersistence() {
 **After:** Tests using ConversationContractTest
 
 ```kotlin
+import java.util.UUID
+
 class MyConversationTest : ConversationContractTest() {
     
-    override fun createConversation(): Conversation {
-        return MemoryConversation(
-            chatId = UUID.randomUUID(),
-            scopeMetadata = null
-        )
+    override fun createConversation(chatId: UUID): Conversation {
+        return MemoryConversation(chatId)
     }
     
-    // Inherits all contract tests:
-    // - testAddMessages()
-    // - testGetMessages()
-    // - testChatMetadata()
-    // - testScopeMetadataEnforcement()
-    // - testCharacterBudget()
-    // - etc.
+    // Inherits shared contract tests for messages, history, metadata, and character budgets.
 }
 ```
 

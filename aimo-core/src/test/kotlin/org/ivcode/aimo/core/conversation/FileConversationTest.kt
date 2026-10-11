@@ -42,4 +42,17 @@ class FileConversationTest : ConversationContractTest() {
         }
         assertEquals("{ malformed", messagesFile.readText())
     }
+
+    @org.junit.jupiter.api.Test
+    fun writeChatPropertyDoesNotOverwriteMalformedMetadata() {
+        val chatId = UUID.randomUUID()
+        val conversation = FileConversation(chatId, tempDir)
+        val metadataFile = File(tempDir, "$chatId/metadata.json")
+        metadataFile.writeText("{ malformed")
+
+        assertFailsWith<JacksonException> {
+            conversation.writeChatProperty("title", "Updated")
+        }
+        assertEquals("{ malformed", metadataFile.readText())
+    }
 }

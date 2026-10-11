@@ -32,8 +32,8 @@ class MemoryConversationFactoryTest {
     fun `interceptors execute in registration order for lifecycle operations`() {
         val events = mutableListOf<String>()
         val factory = MemoryConversationFactory()
-            .withInterceptor(RecordingInterceptor("first", events))
-            .withInterceptor(RecordingInterceptor("second", events))
+        factory.addInterceptor(RecordingInterceptor("first", events))
+        factory.addInterceptor(RecordingInterceptor("second", events))
 
         val conversation = factory.createConversation()
         assertEquals(
@@ -61,6 +61,18 @@ class MemoryConversationFactoryTest {
             listOf("first:delete:before", "second:delete:before", "second:delete:after", "first:delete:after"),
             events
         )
+    }
+
+    @Test
+    fun `adding interceptor after creating conversation keeps it in the same factory`() {
+        val factory = MemoryConversationFactory()
+        val conversation = factory.createConversation()
+        val events = mutableListOf<String>()
+
+        factory.addInterceptor(RecordingInterceptor("added", events))
+
+        assertNotNull(factory.getConversation(conversation.chatId))
+        assertEquals(listOf("added:get:before", "added:get:after"), events)
     }
 
     private class RecordingInterceptor(

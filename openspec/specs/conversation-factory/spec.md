@@ -49,7 +49,7 @@ ConversationFactory SHALL retrieve multiple conversations matching optional scop
 ConversationFactory SHALL support adding ConversationInterceptors that apply cross-cutting concerns (auditing, encryption, access control) transparently.
 
 ### Scenario: Interceptor can log conversation access
-- **WHEN** ConversationFactory.withInterceptor(loggingInterceptor) is used
+- **WHEN** ConversationFactory.addInterceptor(loggingInterceptor) is used
 - **THEN** loggingInterceptor.interceptGet(chain, chatId, metadata) is called on every getConversation()
 
 ### Scenario: Interceptors can modify metadata
@@ -57,7 +57,7 @@ ConversationFactory SHALL support adding ConversationInterceptors that apply cro
 - **THEN** the modified metadata is passed to underlying Conversation
 
 ### Scenario: Interceptor chain is composable
-- **WHEN** multiple interceptors are added via withInterceptor()
+- **WHEN** multiple interceptors are added via addInterceptor()
 - **THEN** they execute in order forming a chain
 
 ### Scenario: Interceptors can deny access

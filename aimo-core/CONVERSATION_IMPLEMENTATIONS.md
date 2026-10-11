@@ -109,8 +109,7 @@ class PostgresConversation(
     
     override fun addMessages(
         requestId: UUID, 
-        messages: List<AimoChatMessage>, 
-        maxCacheCharacters: Long?
+        messages: List<AimoChatMessage>
     ) {
         // Insert messages into database
         // Group by requestId
@@ -158,9 +157,8 @@ class PostgresConversationFactory(
     
     private val interceptors = mutableListOf<ConversationInterceptor>()
     
-    override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
+    override fun addInterceptor(interceptor: ConversationInterceptor) {
         interceptors.add(interceptor)
-        return this
     }
     
     override fun createConversation(metadata: Map<String, Any>): Conversation {
@@ -238,8 +236,9 @@ class PostgresConversationConfig {
     @Bean
     @Primary
     fun conversationFactory(dataSource: DataSource): ConversationFactory {
-        return PostgresConversationFactory(dataSource)
-            .withInterceptor(AuditingInterceptor())
+        return PostgresConversationFactory(dataSource).also {
+            it.addInterceptor(AuditingInterceptor())
+        }
     }
 }
 ```

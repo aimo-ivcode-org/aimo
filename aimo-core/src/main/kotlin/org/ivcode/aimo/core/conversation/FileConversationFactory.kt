@@ -26,9 +26,14 @@ import java.util.concurrent.ConcurrentHashMap
 class FileConversationFactory private constructor(
     private val storageDir: File,
     private val objectMapper: ObjectMapper,
-    private val interceptors: List<ConversationInterceptor>,
+    interceptors: List<ConversationInterceptor>,
     private val conversationLocks: ConcurrentHashMap<UUID, Any>
 ) : ConversationFactory {
+    @Volatile
+    private var registeredInterceptors: List<ConversationInterceptor> = interceptors.toList()
+
+    private val interceptorLock = Any()
+
     constructor(
         storageDir: File,
         objectMapper: ObjectMapper = jsonMapper(),
@@ -39,19 +44,22 @@ class FileConversationFactory private constructor(
         storageDir.mkdirs()
     }
 
-    override fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory {
-        return FileConversationFactory(storageDir, objectMapper, interceptors + interceptor, conversationLocks)
+    override fun addInterceptor(interceptor: ConversationInterceptor) {
+        synchronized(interceptorLock) {
+            registeredInterceptors = registeredInterceptors + interceptor
+        }
     }
 
     override fun createConversation(metadata: Map<String, Any>): Conversation {
+        val interceptorSnapshot = registeredInterceptors
         val chatId = UUID.randomUUID()
         val mutableMetadata = metadata.toMutableMap()
         val lock = conversationLock(chatId)
         
-        val conversation = if (interceptors.isEmpty()) {
+        val conversation = if (interceptorSnapshot.isEmpty()) {
             FileConversation.withLock(chatId, storageDir, objectMapper, lock)
         } else {
-            val chain = buildCreateChain(interceptors, 0) { _ ->
+            val chain = buildCreateChain(interceptorSnapshot, 0) { _ ->
                 FileConversation.withLock(chatId, storageDir, objectMapper, lock)
             }
             chain.proceed(mutableMetadata) as Conversation
@@ -64,6 +72,7 @@ class FileConversationFactory private constructor(
     }
 
     override fun getConversation(chatId: UUID, metadata: Map<String, Any>): Conversation? {
+        val interceptorSnapshot = registeredInterceptors
         val conversationDir = File(storageDir, chatId.toString())
         val lock = conversationLock(chatId)
 
@@ -74,10 +83,10 @@ class FileConversationFactory private constructor(
             val conversation = FileConversation.withLock(chatId, storageDir, objectMapper, lock)
 
             // Run interceptor chain first to allow enrichment of metadata
-            val result = if (interceptors.isEmpty()) {
+            val result = if (interceptorSnapshot.isEmpty()) {
                 conversation
             } else {
-                val chain = buildGetChain(interceptors, 0) { _ ->
+                val chain = buildGetChain(interceptorSnapshot, 0) { _ ->
                     conversation
                 }
                 chain.proceed(chatId, mutableMetadata)
@@ -90,6 +99,7 @@ class FileConversationFactory private constructor(
     }
 
     override fun getConversations(metadata: Map<String, Any>): List<Conversation> {
+        val interceptorSnapshot = registeredInterceptors
         val conversations = mutableListOf<Conversation>()
         
         if (!storageDir.exists()) return emptyList()
@@ -112,11 +122,11 @@ class FileConversationFactory private constructor(
             }
         }
         
-        return if (interceptors.isEmpty()) {
+        return if (interceptorSnapshot.isEmpty()) {
             conversations
         } else {
             val mutableMetadata = metadata.toMutableMap()
-            val chain = buildListChain(interceptors, 0) {
+            val chain = buildListChain(interceptorSnapshot, 0) {
                 conversations
             }
             chain.proceed(mutableMetadata)
@@ -124,6 +134,7 @@ class FileConversationFactory private constructor(
     }
 
     override fun deleteConversation(chatId: UUID, metadata: Map<String, Any>): Boolean {
+        val interceptorSnapshot = registeredInterceptors
         val conversationDir = File(storageDir, chatId.toString())
         val lock = conversationLock(chatId)
 
@@ -135,10 +146,10 @@ class FileConversationFactory private constructor(
             if (!matchesScope(storedMetadata, metadata)) return@synchronized false
 
             val mutableMetadata = metadata.toMutableMap()
-            if (interceptors.isEmpty()) {
+            if (interceptorSnapshot.isEmpty()) {
                 conversationDir.deleteRecursively()
             } else {
-                val chain = buildDeleteChain(interceptors, 0) { _ ->
+                val chain = buildDeleteChain(interceptorSnapshot, 0) { _ ->
                     conversationDir.deleteRecursively()
                 }
                 chain.proceed(chatId, mutableMetadata)

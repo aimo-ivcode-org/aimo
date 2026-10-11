@@ -23,12 +23,14 @@ import java.util.UUID
  */
 interface ConversationFactory {
     /**
-     * Add an interceptor to be applied to all future conversations created by this factory.
+     * Register an interceptor to apply to subsequent operations on this factory.
+     *
+     * Interceptors run in the order they are registered. Thread-safe; operations already in progress
+     * use the interceptor chain captured when that operation began.
      *
      * @param interceptor the interceptor to add
-     * @return this factory instance for chaining
      */
-    fun withInterceptor(interceptor: ConversationInterceptor): ConversationFactory
+    fun addInterceptor(interceptor: ConversationInterceptor)
 
     /**
      * Create a new conversation.

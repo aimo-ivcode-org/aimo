@@ -54,12 +54,11 @@ Example Use Case
 -----------------
 ```kotlin
 val factory = ConversationFactoryImpl(daoMemory)
-    .withInterceptor(AuditingConversationInterceptor())
-    .withInterceptor(CachingConversationInterceptor())
+factory.addInterceptor(AuditingConversationInterceptor())
+factory.addInterceptor(CachingConversationInterceptor())
 
 val conversation = factory.getConversation(chatId, mapOf("tenant" to "acme"))
 val messages = conversation.getMessages(maxCacheCharacters = 10000)
 conversation.addMessages(requestId, newMessages)
 ```
-
 
